@@ -5,8 +5,12 @@
  * - Кастомная тёмная тема
  * - Markdown-подсветка синтаксиса
  * - Горячие клавиши (Ctrl+S для сохранения)
+ *
+ * ВАЖНО: Используем useRef для callback'ов, чтобы избежать
+ * stale closure при работе с CodeMirror (он создаётся один раз,
+ * а React-состояние обновляется на каждом рендере).
  */
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef } from 'react'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view'
 import { markdown } from '@codemirror/lang-markdown'
@@ -23,11 +27,19 @@ export function MarkdownEditor() {
   // Получаем активную вкладку
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
 
-  // Функция сохранения через горячую клавишу
-  const handleSave = useCallback(() => {
-    saveActiveFile()
-    return true // Предотвращаем стандартное поведение браузера
-  }, [saveActiveFile])
+  // ============================================================
+  // Рефы для актуальных callback'ов — решает проблему stale closure.
+  // CodeMirror создаётся один раз в useEffect и захватывает замыкание.
+  // Без рефов он бы вызывал устаревшие функции с начальным состоянием.
+  // ============================================================
+  const saveRef = useRef(saveActiveFile)
+  saveRef.current = saveActiveFile
+
+  const activeTabIdRef = useRef(activeTab?.id)
+  activeTabIdRef.current = activeTab?.id
+
+  const dispatchRef = useRef(dispatch)
+  dispatchRef.current = dispatch
 
   // ============================================================
   // Инициализация / пересоздание редактора при смене вкладки
@@ -40,6 +52,9 @@ export function MarkdownEditor() {
       viewRef.current.destroy()
     }
 
+    // ID вкладки, для которой создаётся редактор
+    const tabId = activeTab.id
+
     // Создаём новое состояние CodeMirror
     const startState = EditorState.create({
       doc: activeTab.content,
@@ -49,29 +64,37 @@ export function MarkdownEditor() {
         highlightActiveLine(),
         history(),
 
-        // Горячие клавиши
+        // Горячие клавиши — используем ref для актуальной функции сохранения
         keymap.of([
           ...defaultKeymap,
           ...historyKeymap,
-          { key: 'Mod-s', run: handleSave },
+          {
+            key: 'Mod-s',
+            run: () => {
+              saveRef.current()  // Всегда вызывает актуальную функцию
+              return true
+            },
+          },
         ]),
 
-        // Markdown-парсер (для подсветки и автодополнения)
+        // Markdown-парсер
         markdown(),
 
-        // Seamless-режим (скрытие/показ Markdown-символов)
+        // Seamless-режим
         seamlessMarkdownPlugin,
 
         // Кастомная тема
         editorTheme,
 
-        // Обработчик изменений — обновляем состояние React
+        // Обработчик изменений — обновляем состояние React.
+        // Используем tabId из замыкания (он не меняется внутри эффекта),
+        // и dispatchRef для актуального dispatch.
         EditorView.updateListener.of((update) => {
-          if (update.docChanged && activeTab) {
-            dispatch({
+          if (update.docChanged) {
+            dispatchRef.current({
               type: 'UPDATE_CONTENT',
               payload: {
-                tabId: activeTab.id,
+                tabId: tabId,
                 content: update.state.doc.toString(),
               },
             })
@@ -87,8 +110,6 @@ export function MarkdownEditor() {
     })
 
     viewRef.current = view
-
-    // Автофокус
     view.focus()
 
     // Очистка при размонтировании
@@ -104,7 +125,6 @@ export function MarkdownEditor() {
   if (!activeTab) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-[#1a1b1e] text-[#3a3d44]">
-        {/* Логотип */}
         <svg
           width="64"
           height="64"
