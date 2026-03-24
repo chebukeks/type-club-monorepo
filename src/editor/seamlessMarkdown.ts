@@ -6,6 +6,9 @@
  * 2. Создаёт декорации (Decoration.replace) для скрытия спецсимволов
  * 3. Создаёт декорации (Decoration.mark) для визуального оформления текста
  * 4. Если курсор находится на строке — декорации скрытия снимаются (символы видны)
+ *
+ * ВАЖНО: Используем Decoration.set(ranges, true) вместо RangeSetBuilder,
+ * чтобы избежать проблем с порядком добавления декораций.
  */
 import {
   ViewPlugin,
@@ -14,7 +17,7 @@ import {
   DecorationSet,
   EditorView,
 } from '@codemirror/view'
-import { RangeSetBuilder } from '@codemirror/state'
+import type { Range } from '@codemirror/state'
 
 // ============================================================
 // Вспомогательные функции для создания декораций
@@ -24,7 +27,7 @@ import { RangeSetBuilder } from '@codemirror/state'
 const hideDecoration = Decoration.replace({})
 
 /** Создать CSS-класс декорацию для оформления текста */
-function markDecoration(cssClass: string) {
+function markDeco(cssClass: string) {
   return Decoration.mark({ class: cssClass })
 }
 
@@ -32,13 +35,13 @@ function markDecoration(cssClass: string) {
 // Регулярные выражения для парсинга Markdown-конструкций
 // ============================================================
 
-/** Заголовки: # H1, ## H2, ### H3, #### H4 и т.д. */
+/** Заголовки: # H1, ## H2, ### H3 и т.д. */
 const HEADING_RE = /^(#{1,6})\s/
 
 /** Жирный текст: **bold** */
 const BOLD_RE = /\*\*(.+?)\*\*/g
 
-/** Курсив: *italic* (но не **) */
+/** Курсив: *italic* (одиночная звёздочка, не часть **) */
 const ITALIC_RE = /(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g
 
 /** Инлайн-код: `code` */
@@ -83,12 +86,15 @@ export const seamlessMarkdownPlugin = ViewPlugin.fromClass(
      * Построение набора декораций для всего документа.
      * Ключевая логика: если курсор стоит на строке — спецсимволы видны,
      * иначе — скрыты, а текст стилизован.
+     *
+     * Используем массив Range<Decoration> и Decoration.set(..., true)
+     * для автоматической сортировки — это решает проблему с порядком.
      */
     buildDecorations(view: EditorView): DecorationSet {
-      const builder = new RangeSetBuilder<Decoration>()
+      const ranges: Range<Decoration>[] = []
       const doc = view.state.doc
 
-      // Получаем номера строк, на которых стоит курсор (может быть несколько при multi-cursor)
+      // Получаем номера строк, на которых стоит курсор
       const cursorLines = new Set<number>()
       for (const range of view.state.selection.ranges) {
         const startLine = doc.lineAt(range.from).number
@@ -104,13 +110,13 @@ export const seamlessMarkdownPlugin = ViewPlugin.fromClass(
         const lineText = line.text
         const isActiveLine = cursorLines.has(i)
 
-        // --- Пустая строка — пропускаем ---
+        // Пустая строка — пропускаем
         if (lineText.trim() === '') continue
 
         // --- Горизонтальная линия ---
         if (HR_RE.test(lineText)) {
           if (!isActiveLine) {
-            builder.add(line.from, line.to, markDecoration('cm-md-hr'))
+            ranges.push(markDeco('cm-md-hr').range(line.from, line.to))
           }
           continue
         }
@@ -119,41 +125,45 @@ export const seamlessMarkdownPlugin = ViewPlugin.fromClass(
         const headingMatch = lineText.match(HEADING_RE)
         if (headingMatch) {
           const level = headingMatch[1].length
-          const markerLen = level + 1 // # + пробел
+          const markerLen = level + 1 // символы # + пробел
 
-          // Стилизация всей строки — размер шрifта заголовка
+          // CSS-класс в зависимости от уровня заголовка
           const headerClass =
             level === 1 ? 'cm-md-header1' :
             level === 2 ? 'cm-md-header2' :
                           'cm-md-header3'
-          builder.add(line.from, line.to, markDecoration(headerClass))
 
-          // Скрываем символы # и пробел (только когда курсор не на строке)
+          // Стилизация всей строки как заголовок
+          ranges.push(markDeco(headerClass).range(line.from, line.to))
+
+          // Скрываем # и пробел (только когда курсор не на строке)
           if (!isActiveLine) {
-            builder.add(line.from, line.from + markerLen, hideDecoration)
+            ranges.push(hideDecoration.range(line.from, line.from + markerLen))
           }
+
+          // Обрабатываем инлайн-разметку внутри заголовка (напр. **bold** в заголовке)
+          this.addInlineDecorations(ranges, line.from, lineText, isActiveLine)
           continue
         }
 
         // --- Цитата (blockquote) ---
         const blockquoteMatch = lineText.match(BLOCKQUOTE_RE)
         if (blockquoteMatch) {
-          builder.add(line.from, line.to, markDecoration('cm-md-blockquote'))
+          ranges.push(markDeco('cm-md-blockquote').range(line.from, line.to))
           if (!isActiveLine) {
-            builder.add(line.from, line.from + 2, hideDecoration) // "> "
+            ranges.push(hideDecoration.range(line.from, line.from + 2)) // "> "
           }
-          // Продолжаем обработку инлайн-стилей внутри цитаты
         }
 
         // --- Маркированный список ---
         const ulMatch = lineText.match(UNORDERED_LIST_RE)
         if (ulMatch) {
           const indent = ulMatch[1].length
-          // Стилизуем маркер
-          builder.add(
-            line.from + indent,
-            line.from + indent + 1,
-            markDecoration('cm-md-listMarker')
+          ranges.push(
+            markDeco('cm-md-listMarker').range(
+              line.from + indent,
+              line.from + indent + 1
+            )
           )
         }
 
@@ -162,26 +172,28 @@ export const seamlessMarkdownPlugin = ViewPlugin.fromClass(
         if (olMatch) {
           const indent = olMatch[1].length
           const numLen = olMatch[2].length
-          builder.add(
-            line.from + indent,
-            line.from + indent + numLen,
-            markDecoration('cm-md-listMarker')
+          ranges.push(
+            markDeco('cm-md-listMarker').range(
+              line.from + indent,
+              line.from + indent + numLen
+            )
           )
         }
 
-        // --- Инлайн-разметка внутри строки ---
-        this.addInlineDecorations(builder, line.from, lineText, isActiveLine)
+        // --- Инлайн-разметка ---
+        this.addInlineDecorations(ranges, line.from, lineText, isActiveLine)
       }
 
-      return builder.finish()
+      // Автоматическая сортировка декораций — ключевое отличие от RangeSetBuilder!
+      return Decoration.set(ranges, true)
     }
 
     /**
      * Добавление декораций для инлайн-разметки: **bold**, *italic*, `code`.
-     * Обрабатываем жирный до курсива, чтобы ** не конфликтовал с *.
+     * Все декорации складываются в массив ranges, сортировка происходит позже.
      */
     addInlineDecorations(
-      builder: RangeSetBuilder<Decoration>,
+      ranges: Range<Decoration>[],
       lineFrom: number,
       text: string,
       isActiveLine: boolean
@@ -196,13 +208,13 @@ export const seamlessMarkdownPlugin = ViewPlugin.fromClass(
         const start = lineFrom + match.index
         const end = start + match[0].length
 
-        // Стилизация текста (без скобок)
-        builder.add(start + 2, end - 2, markDecoration('cm-md-bold'))
+        // Стилизация текста (без **) — всегда видна
+        ranges.push(markDeco('cm-md-bold').range(start + 2, end - 2))
 
-        // Скрываем ** с обеих сторон
+        // Скрываем ** с обеих сторон (только когда курсор не на строке)
         if (!isActiveLine) {
-          builder.add(start, start + 2, hideDecoration)
-          builder.add(end - 2, end, hideDecoration)
+          ranges.push(hideDecoration.range(start, start + 2))
+          ranges.push(hideDecoration.range(end - 2, end))
         }
 
         processed.push([match.index, match.index + match[0].length])
@@ -223,11 +235,11 @@ export const seamlessMarkdownPlugin = ViewPlugin.fromClass(
         const start = lineFrom + matchStart
         const end = lineFrom + matchEnd
 
-        builder.add(start + 1, end - 1, markDecoration('cm-md-italic'))
+        ranges.push(markDeco('cm-md-italic').range(start + 1, end - 1))
 
         if (!isActiveLine) {
-          builder.add(start, start + 1, hideDecoration)
-          builder.add(end - 1, end, hideDecoration)
+          ranges.push(hideDecoration.range(start, start + 1))
+          ranges.push(hideDecoration.range(end - 1, end))
         }
 
         processed.push([matchStart, matchEnd])
@@ -247,11 +259,12 @@ export const seamlessMarkdownPlugin = ViewPlugin.fromClass(
         const start = lineFrom + matchStart
         const end = lineFrom + matchEnd
 
-        builder.add(start, end, markDecoration('cm-md-inlineCode'))
+        // Стилизация всего блока (включая бэктики — они тоже стилизованы)
+        ranges.push(markDeco('cm-md-inlineCode').range(start, end))
 
         if (!isActiveLine) {
-          builder.add(start, start + 1, hideDecoration)
-          builder.add(end - 1, end, hideDecoration)
+          ranges.push(hideDecoration.range(start, start + 1))
+          ranges.push(hideDecoration.range(end - 1, end))
         }
       }
     }
