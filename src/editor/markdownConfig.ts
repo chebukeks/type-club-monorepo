@@ -15,20 +15,44 @@ import {
 import MarkdownIt from 'markdown-it'
 // @ts-expect-error: no types available for markdown-it-mark
 import markPlugin from 'markdown-it-mark'
-// @ts-expect-error: no types available for markdown-it-task-lists
-import taskListsPlugin from 'markdown-it-task-lists'
 import { schema } from './schema'
+
+// Самописный плагин для task-lists (избегаем багов markdown-it-task-lists)
+function taskListPlugin(md: MarkdownIt) {
+  md.core.ruler.after('inline', 'task_lists', (state: any) => {
+    const tokens = state.tokens
+    for (let i = 2; i < tokens.length; i++) {
+      if (tokens[i].type === 'inline') {
+        const content = tokens[i].content
+        if (content.startsWith('[ ] ') || content.toLowerCase().startsWith('[x] ')) {
+          // Ищем предыдущий list_item_open
+          for (let j = i - 1; j >= 0; j--) {
+            if (tokens[j].type === 'list_item_open') {
+              tokens[j].attrSet('checked', content.toLowerCase().startsWith('[x] ') ? 'true' : 'false')
+              // Удаляем синтаксис чекбокса из текста
+              tokens[i].content = content.slice(4)
+              if (tokens[i].children && tokens[i].children[0].type === 'text') {
+                tokens[i].children[0].content = tokens[i].children[0].content.slice(4)
+              }
+              break
+            }
+          }
+        }
+      }
+    }
+  })
+}
 
 // ============================================================
 // Парсер: Markdown → ProseMirror doc
 // ============================================================
 
-// Создаём markdown-it экземпляр с поддержкой таблиц, strikethrough, mark и task-lists
+// Создаём markdown-it экземпляр с поддержкой таблиц, strikethrough, mark и нашего taskListPlugin
 const md = new MarkdownIt('commonmark', { html: false })
   .enable('table')
   .enable('strikethrough')
   .use(markPlugin)
-  .use(taskListsPlugin, { enabled: true, label: true })
+  .use(taskListPlugin)
 
 /**
  * Парсер.
@@ -48,7 +72,13 @@ export const markdownParser = new MarkdownParser(schema, md, {
   // Списки
   bullet_list: { block: 'bullet_list' },
   ordered_list: { block: 'ordered_list', getAttrs: tok => ({ order: Number(tok.attrGet('start')) || 1 }) },
-  list_item: { block: 'list_item' },
+  list_item: { 
+    block: 'list_item',
+    getAttrs: (tok) => {
+      const checked = tok.attrGet('checked')
+      return { checked: checked === 'true' ? true : checked === 'false' ? false : null }
+    }
+  },
 
   // Таблицы
   table: { block: 'table' },
@@ -115,7 +145,7 @@ export const markdownSerializer = new MarkdownSerializer(
     },
 
     bullet_list(state, node) {
-      state.renderList(node, '  ', () => '* ')
+      state.renderList(node, '  ', () => '- ')
     },
 
     ordered_list(state, node) {

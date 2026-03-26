@@ -84,6 +84,14 @@ export function getEditorStyles(): string {
   margin: 8px 0;
 }
 
+.ProseMirror ul {
+  list-style-type: disc;
+}
+
+.ProseMirror ol {
+  list-style-type: decimal;
+}
+
 .ProseMirror li {
   margin-bottom: 4px;
   line-height: 1.6;

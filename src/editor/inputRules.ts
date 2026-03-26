@@ -75,6 +75,25 @@ function orderedListRule(nodeType: NodeType) {
   )
 }
 
+function taskListRule() {
+  return new InputRule(
+    /^\[([ xX])\]\s$/,
+    (state, match, start, end) => {
+      const $start = state.doc.resolve(start)
+      if ($start.parent.type !== state.schema.nodes.paragraph || $start.depth < 2) return null
+      
+      const listItemPos = $start.before(-1)
+      const node = state.doc.nodeAt(listItemPos)
+      if (node?.type !== state.schema.nodes.list_item) return null
+
+      const tr = state.tr
+      tr.delete(start, end)
+      tr.setNodeMarkup(listItemPos, null, { checked: match[1] !== ' ' })
+      return tr
+    }
+  )
+}
+
 // ============================================================
 // Инлайн-правила для markdown-синтаксиса
 // ============================================================
@@ -120,6 +139,9 @@ export function getInputRulesPlugin(): Plugin {
       blockQuoteRule(schema.nodes.blockquote),
       bulletListRule(schema.nodes.bullet_list),
       orderedListRule(schema.nodes.ordered_list),
+
+      // Чекбоксы в списках (вводим [ ] или [x] внутри списка)
+      taskListRule(),
 
       // Инлайн: **text** → bold
       markInputRule(
