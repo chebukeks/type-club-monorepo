@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+.env
+
+# other
+.agent
+
+# test-examples
+test-examples/

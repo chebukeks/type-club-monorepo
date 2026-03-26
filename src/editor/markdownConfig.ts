@@ -60,6 +60,10 @@ export const markdownParser = new MarkdownParser(schema, md, {
   fence: { block: 'paragraph' },
   image: { ignore: true },
   s: { ignore: true },
+  link: { mark: 'em' },       // Ссылки — пока рендерим как курсив (пока нет mark link)
+  softbreak: { node: 'hard_break' },
+  html_inline: { ignore: true },
+  html_block: { ignore: true },
 })
 
 // ============================================================

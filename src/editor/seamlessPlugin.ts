@@ -25,13 +25,12 @@ export const seamlessPlugin = new Plugin({
 
   state: {
     init(_, state) {
-      return buildDecorations(state.doc, state.selection.from)
+      return buildDecorations(state)
     },
 
     apply(tr, oldDeco, _oldState, newState) {
-      // Пересчитываем только при изменении документа или курсора
-      if (!tr.docChanged && !tr.selectionSet) return oldDeco
-      return buildDecorations(newState.doc, newState.selection.from)
+      if (!tr.docChanged && !tr.selectionSet && _oldState.storedMarks === newState.storedMarks) return oldDeco
+      return buildDecorations(newState)
     },
   },
 
@@ -46,7 +45,9 @@ export const seamlessPlugin = new Plugin({
 // Построение декораций
 // ============================================================
 
-function buildDecorations(doc: PMNode, cursorPos: number): DecorationSet {
+function buildDecorations(state: import('prosemirror-state').EditorState): DecorationSet {
+  const doc = state.doc
+  const cursorPos = state.selection.from
   const decorations: Decoration[] = []
 
   // --- Заголовки: показываем `# ` когда курсор внутри ---
@@ -83,8 +84,8 @@ function buildDecorations(doc: PMNode, cursorPos: number): DecorationSet {
   const parent = $from.parent
   const parentStart = $from.start()
 
-  // Проверяем марки в текущей позиции
-  const activeMarks = $from.marks()
+  // Проверяем марки в текущей позиции (приоритет у storedMarks)
+  const activeMarks = state.storedMarks || $from.marks()
 
   for (const mark of activeMarks) {
     const syntax = getMarkSyntax(mark.type.name)
@@ -92,27 +93,46 @@ function buildDecorations(doc: PMNode, cursorPos: number): DecorationSet {
 
     // Находим полный диапазон этой марки в parent
     const range = findMarkRange(parent, $from.parentOffset, mark.type, parentStart)
-    if (!range) continue
+    
+    if (range) {
+      // Марка применена к существующему тексту
+      decorations.push(
+        Decoration.widget(range.from, () => {
+          const span = document.createElement('span')
+          span.className = 'pm-mark-syntax'
+          span.textContent = syntax
+          return span
+        }, { side: -1, key: `mark-open-${range.from}-${mark.type.name}` })
+      )
 
-    // Открывающий синтаксис
-    decorations.push(
-      Decoration.widget(range.from, () => {
-        const span = document.createElement('span')
-        span.className = 'pm-mark-syntax'
-        span.textContent = syntax
-        return span
-      }, { side: -1, key: `mark-open-${range.from}-${mark.type.name}` })
-    )
+      decorations.push(
+        Decoration.widget(range.to, () => {
+          const span = document.createElement('span')
+          span.className = 'pm-mark-syntax'
+          span.textContent = syntax
+          return span
+        }, { side: 1, key: `mark-close-${range.to}-${mark.type.name}` })
+      )
+    } else if (state.selection.empty) {
+      // Марка активна (storedMarks), но текста ещё нет
+      decorations.push(
+        Decoration.widget(cursorPos, () => {
+          const span = document.createElement('span')
+          span.className = 'pm-mark-syntax'
+          span.textContent = syntax
+          return span
+        }, { side: -1, key: `mark-empty-open-${cursorPos}-${mark.type.name}` })
+      )
 
-    // Закрывающий синтаксис
-    decorations.push(
-      Decoration.widget(range.to, () => {
-        const span = document.createElement('span')
-        span.className = 'pm-mark-syntax'
-        span.textContent = syntax
-        return span
-      }, { side: 1, key: `mark-close-${range.to}-${mark.type.name}` })
-    )
+      decorations.push(
+        Decoration.widget(cursorPos, () => {
+          const span = document.createElement('span')
+          span.className = 'pm-mark-syntax'
+          span.textContent = syntax
+          return span
+        }, { side: 1, key: `mark-empty-close-${cursorPos}-${mark.type.name}` })
+      )
+    }
   }
 
   return DecorationSet.create(doc, decorations)

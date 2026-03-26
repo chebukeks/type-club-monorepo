@@ -1,14 +1,7 @@
 /**
  * editorTheme.ts — CSS-стили для ProseMirror-редактора
- *
- * Глобальные стили в рамках .pm-editor-wrapper.
- * Включает стили для заголовков, таблиц, seamless-синтаксиса и т.д.
  */
 
-/**
- * Возвращает строку CSS для ProseMirror.
- * Вставляется в <style> при монтировании редактора.
- */
 export function getEditorStyles(): string {
   return `
 /* ==========================================
@@ -37,35 +30,24 @@ export function getEditorStyles(): string {
 }
 
 /* ==========================================
-   Заголовки
+   Заголовки (обычные <h1>–<h6> теги от ProseMirror)
    ========================================== */
 
-.pm-heading {
-  margin: 1em 0 0.4em 0;
-  line-height: 1.3;
-}
+.ProseMirror h1 { font-size: 2em; font-weight: 700; color: #e8eaed; line-height: 1.3; margin: 1em 0 0.4em 0; }
+.ProseMirror h2 { font-size: 1.5em; font-weight: 650; color: #e8eaed; line-height: 1.35; margin: 0.8em 0 0.3em 0; }
+.ProseMirror h3 { font-size: 1.25em; font-weight: 600; color: #d2d4d7; line-height: 1.4; margin: 0.7em 0 0.3em 0; }
+.ProseMirror h4 { font-size: 1.1em; font-weight: 600; color: #c0c3c8; line-height: 1.45; margin: 0.6em 0 0.3em 0; }
+.ProseMirror h5 { font-size: 1.05em; font-weight: 600; color: #b0b3b8; line-height: 1.5; margin: 0.5em 0 0.2em 0; }
+.ProseMirror h6 { font-size: 1em; font-weight: 600; color: #9ca0a8; line-height: 1.5; margin: 0.5em 0 0.2em 0; }
 
-.pm-heading-1 { font-size: 2em; font-weight: 700; color: #e8eaed; }
-.pm-heading-2 { font-size: 1.5em; font-weight: 650; color: #e8eaed; }
-.pm-heading-3 { font-size: 1.25em; font-weight: 600; color: #d2d4d7; }
-.pm-heading-4 { font-size: 1.1em; font-weight: 600; color: #c0c3c8; }
-.pm-heading-5 { font-size: 1.05em; font-weight: 600; color: #b0b3b8; }
-.pm-heading-6 { font-size: 1em; font-weight: 600; color: #9ca0a8; }
-
-/* Seamless: prefix (# , ## , etc.) */
+/* Seamless prefix (# , ## , etc.) — показывается через виджет-декорацию */
 .pm-heading-prefix {
   color: #4a4d54;
   font-weight: 400;
+  font-size: 0.65em;
   user-select: none;
-  transition: opacity 0.15s ease, width 0.15s ease;
-}
-
-.pm-heading-prefix.pm-hidden {
-  opacity: 0;
-  width: 0;
-  overflow: hidden;
-  display: inline-block;
-  font-size: 0;
+  pointer-events: none;
+  margin-right: 2px;
 }
 
 /* ==========================================
@@ -91,7 +73,7 @@ export function getEditorStyles(): string {
   color: #8ca8ff;
 }
 
-/* Seamless: синтаксис марок (**,  *, \`) */
+/* Seamless mark syntax (**,  *, \`) */
 .pm-mark-syntax {
   color: #4a4d54;
   font-weight: 400;
@@ -161,7 +143,6 @@ export function getEditorStyles(): string {
   background: rgba(30, 32, 37, 0.5);
 }
 
-/* Selection and resize handles from prosemirror-tables */
 .ProseMirror .selectedCell::after {
   z-index: 2;
   position: absolute;
@@ -181,14 +162,13 @@ export function getEditorStyles(): string {
   cursor: col-resize;
 }
 
-/* Table cell content: remove default margins */
 .ProseMirror th p,
 .ProseMirror td p {
   margin: 0;
 }
 
 /* ==========================================
-   Курсор / Gap cursor
+   Gap Cursor
    ========================================== */
 
 .ProseMirror .ProseMirror-gapcursor {
