@@ -1,42 +1,56 @@
 /**
- * MarkdownEditor.tsx — React-обёртка для CodeMirror 6.
- * Инициализирует экземпляр CodeMirror с поддержкой:
- * - Seamless Markdown (скрытие/показ спецсимволов)
- * - Кастомная тёмная тема
- * - Markdown-подсветка синтаксиса
- * - Горячие клавиши (Ctrl+S для сохранения)
+ * MarkdownEditor.tsx — React-обёртка для ProseMirror.
  *
- * ВАЖНО: Используем useRef для callback'ов, чтобы избежать
- * stale closure при работе с CodeMirror (он создаётся один раз,
- * а React-состояние обновляется на каждом рендере).
+ * Инициализирует ProseMirror EditorView с:
+ * - Markdown-парсингом/сериализацией
+ * - Seamless-режимом (Typora-стиль)
+ * - Таблицами (prosemirror-tables)
+ * - Горячими клавишами (Ctrl+B, Ctrl+I, Ctrl+S и т.д.)
+ *
+ * АРХИТЕКТУРА:
+ * - При монтировании: parse(markdown) → PM doc
+ * - При изменении: serialize(doc) → dispatch(UPDATE_CONTENT)
+ * - EditorContext хранит content как string (markdown)
  */
 import { useEffect, useRef } from 'react'
-import { EditorState } from '@codemirror/state'
-import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view'
-import { markdown } from '@codemirror/lang-markdown'
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
-import { editorTheme } from '../editor/editorTheme'
-import { seamlessMarkdownPlugin } from '../editor/seamlessMarkdown'
+import { EditorState, Plugin } from 'prosemirror-state'
+import { EditorView } from 'prosemirror-view'
+import { history } from 'prosemirror-history'
+import { dropCursor } from 'prosemirror-dropcursor'
+import { gapCursor } from 'prosemirror-gapcursor'
+import { columnResizing, tableEditing, goToNextCell } from 'prosemirror-tables'
+import { keymap } from 'prosemirror-keymap'
+
+
+import { parseMarkdown, serializeMarkdown } from '../editor/markdownConfig'
+import { getKeymapPlugins } from '../editor/keymap'
+import { getInputRulesPlugin } from '../editor/inputRules'
+import { seamlessPlugin } from '../editor/seamlessPlugin'
+import { getEditorStyles } from '../editor/editorTheme'
 import { useEditor } from '../context/EditorContext'
+
+// Inject CSS один раз
+let styleInjected = false
+function injectStyles() {
+  if (styleInjected) return
+  const style = document.createElement('style')
+  style.id = 'pm-editor-theme'
+  style.textContent = getEditorStyles()
+  document.head.appendChild(style)
+  styleInjected = true
+}
 
 export function MarkdownEditor() {
   const { state, dispatch, saveActiveFile } = useEditor()
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
 
-  // Получаем активную вкладку
+  // Активная вкладка
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
 
-  // ============================================================
-  // Рефы для актуальных callback'ов — решает проблему stale closure.
-  // CodeMirror создаётся один раз в useEffect и захватывает замыкание.
-  // Без рефов он бы вызывал устаревшие функции с начальным состоянием.
-  // ============================================================
+  // Рефы для актуальных callback'ов (решает stale closure)
   const saveRef = useRef(saveActiveFile)
   saveRef.current = saveActiveFile
-
-  const activeTabIdRef = useRef(activeTab?.id)
-  activeTabIdRef.current = activeTab?.id
 
   const dispatchRef = useRef(dispatch)
   dispatchRef.current = dispatch
@@ -47,80 +61,94 @@ export function MarkdownEditor() {
   useEffect(() => {
     if (!editorRef.current || !activeTab) return
 
+    // Inject CSS
+    injectStyles()
+
     // Уничтожаем предыдущий экземпляр
     if (viewRef.current) {
       viewRef.current.destroy()
     }
 
-    // ID вкладки, для которой создаётся редактор
     const tabId = activeTab.id
+    const initialContent = activeTab.content || ''
 
-    // Создаём новое состояние CodeMirror
-    const startState = EditorState.create({
-      doc: activeTab.content,
-      extensions: [
-        // Базовые расширения
-        lineNumbers(),
-        highlightActiveLine(),
-        history(),
+    // Парсим markdown → ProseMirror doc
+    const doc = parseMarkdown(initialContent)
 
-        // Горячие клавиши — используем ref для актуальной функции сохранения
-        keymap.of([
-          ...defaultKeymap,
-          ...historyKeymap,
-          {
-            key: 'Mod-s',
-            run: () => {
-              saveRef.current()  // Всегда вызывает актуальную функцию
-              return true
-            },
+    // Плагин для Ctrl+S (через ref)
+    const savePlugin = keymap({
+      'Mod-s': () => {
+        saveRef.current()
+        return true
+      },
+    })
+
+    // Плагин Tab для таблиц
+    const tabPlugin = keymap({
+      'Tab': goToNextCell(1),
+      'Shift-Tab': goToNextCell(-1),
+    })
+
+    // Плагин для отслеживания изменений → обновление контекста
+    const syncPlugin = new Plugin({
+      view() {
+        return {
+          update(view, prevState) {
+            if (!view.state.doc.eq(prevState.doc)) {
+              const md = serializeMarkdown(view.state.doc)
+              dispatchRef.current({
+                type: 'UPDATE_CONTENT',
+                payload: { tabId, content: md },
+              })
+            }
           },
-        ]),
+        }
+      },
+    })
 
-        // Markdown-парсер
-        markdown(),
+    // Создаём ProseMirror state
+    const editorState = EditorState.create({
+      doc,
+      plugins: [
+        // Наши кастомные плагины
+        savePlugin,
+        ...getKeymapPlugins(),
+        getInputRulesPlugin(),
+
+        // Таблицы
+        columnResizing({}),
+        tableEditing(),
+        tabPlugin,
 
         // Seamless-режим
-        seamlessMarkdownPlugin,
+        seamlessPlugin,
 
-        // Кастомная тема
-        editorTheme,
+        // Стандартные плагины
+        history(),
+        dropCursor(),
+        gapCursor(),
 
-        // Обработчик изменений — обновляем состояние React.
-        // Используем tabId из замыкания (он не меняется внутри эффекта),
-        // и dispatchRef для актуального dispatch.
-        EditorView.updateListener.of((update) => {
-          if (update.docChanged) {
-            dispatchRef.current({
-              type: 'UPDATE_CONTENT',
-              payload: {
-                tabId: tabId,
-                content: update.state.doc.toString(),
-              },
-            })
-          }
-        }),
+        // Синхронизация с React
+        syncPlugin,
       ],
     })
 
-    // Создаём экземпляр EditorView
-    const view = new EditorView({
-      state: startState,
-      parent: editorRef.current,
+    // Создаём EditorView
+    const view = new EditorView(editorRef.current, {
+      state: editorState,
     })
 
     viewRef.current = view
     view.focus()
 
-    // Очистка при размонтировании
     return () => {
       view.destroy()
       viewRef.current = null
     }
-  }, [activeTab?.id]) // Пересоздаём только при смене вкладки
+  }, [activeTab?.id])
 
   // ============================================================
-  // Заглушка, когда нет открытых вкладок
+  // Заглушка при отсутствии открытых вкладок
   // ============================================================
   if (!activeTab) {
     return (
@@ -146,6 +174,14 @@ export function MarkdownEditor() {
         </p>
         <div className="mt-6 flex flex-col gap-2 text-[12px] text-[#3a3d44]">
           <span className="flex items-center gap-2">
+            <kbd className="px-1.5 py-0.5 bg-[#232428] rounded text-[11px] text-[#6a6e78]">Ctrl+B</kbd>
+            Жирный
+          </span>
+          <span className="flex items-center gap-2">
+            <kbd className="px-1.5 py-0.5 bg-[#232428] rounded text-[11px] text-[#6a6e78]">Ctrl+I</kbd>
+            Курсив
+          </span>
+          <span className="flex items-center gap-2">
             <kbd className="px-1.5 py-0.5 bg-[#232428] rounded text-[11px] text-[#6a6e78]">Ctrl+S</kbd>
             Сохранить
           </span>
@@ -155,7 +191,7 @@ export function MarkdownEditor() {
   }
 
   return (
-    <div className="flex-1 overflow-hidden bg-[#1a1b1e]">
+    <div className="flex-1 overflow-auto bg-[#1a1b1e]">
       <div ref={editorRef} className="h-full w-full" />
     </div>
   )
