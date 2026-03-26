@@ -26,6 +26,7 @@ import { parseMarkdown, serializeMarkdown } from '../editor/markdownConfig'
 import { getKeymapPlugins } from '../editor/keymap'
 import { getInputRulesPlugin } from '../editor/inputRules'
 import { seamlessPlugin } from '../editor/seamlessPlugin'
+import { syntaxHighlightPlugin } from '../editor/syntaxHighlightPlugin'
 import { getEditorStyles } from '../editor/editorTheme'
 import { useEditor } from '../context/EditorContext'
 
@@ -120,8 +121,9 @@ export function MarkdownEditor() {
         tableEditing(),
         tabPlugin,
 
-        // Seamless-режим
+        // Seamless-режим и подсветка кода
         seamlessPlugin,
+        syntaxHighlightPlugin,
 
         // Стандартные плагины
         history(),

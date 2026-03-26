@@ -48,7 +48,7 @@ function taskListPlugin(md: MarkdownIt) {
 // ============================================================
 
 // Создаём markdown-it экземпляр с поддержкой таблиц, strikethrough, mark и нашего taskListPlugin
-const md = new MarkdownIt('commonmark', { html: false })
+const md = new MarkdownIt('default', { html: false })
   .enable('table')
   .enable('strikethrough')
   .use(markPlugin)
@@ -85,8 +85,6 @@ export const markdownParser = new MarkdownParser(schema, md, {
   thead: { ignore: true }, // Контент обрабатывается через tr
   tbody: { ignore: true },
   tr: { block: 'table_row' },
-  th: { block: 'table_header' },
-  td: { block: 'table_cell' },
 
   // Inline marks
   em: { mark: 'em' },
@@ -101,9 +99,35 @@ export const markdownParser = new MarkdownParser(schema, md, {
   image: { ignore: true },
   link: { mark: 'em' },       // Ссылки — пока рендерим как курсив (пока нет mark link)
   softbreak: { node: 'hard_break' },
+  hardbreak: { node: 'hard_break' },
   html_inline: { ignore: true },
   html_block: { ignore: true },
 })
+
+// Кастомные обработчики для ячеек таблицы
+// В markdown-it внутри td/th лежат inline-токены, но prosemirror-tables требует блок (paragraph)
+// Поэтому мы вручную открываем paragraph при открытии ячейки и закрываем при закрытии.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const handlers = (markdownParser as any).tokenHandlers || (markdownParser as any).handlers
+
+if (handlers) {
+  handlers.th_open = (state: any) => {
+    state.openNode(schema.nodes.table_header)
+    state.openNode(schema.nodes.paragraph)
+  }
+  handlers.th_close = (state: any) => {
+    state.closeNode() // close paragraph
+    state.closeNode() // close table_header
+  }
+  handlers.td_open = (state: any) => {
+    state.openNode(schema.nodes.table_cell)
+    state.openNode(schema.nodes.paragraph)
+  }
+  handlers.td_close = (state: any) => {
+    state.closeNode() // close paragraph
+    state.closeNode() // close table_cell
+  }
+}
 
 // ============================================================
 // Сериализатор: ProseMirror doc → Markdown
@@ -184,49 +208,57 @@ export const markdownSerializer = new MarkdownSerializer(
         return
       }
 
-      // Вычисляем ширины столбцов
-      const colCount = getColCount(rows[0])
-      const colWidths: number[] = new Array(colCount).fill(3)
-
       // Проходим по всем ячейкам для определения ширин
+      const colWidths: number[] = []
       for (const row of rows) {
         let col = 0
         row.forEach(cell => {
           const text = cellText(state, cell)
-          colWidths[col] = Math.max(colWidths[col], text.length)
+          const currentMax = colWidths[col] || 3
+          colWidths[col] = Math.max(currentMax, text.length)
           col++
         })
       }
 
-      // Определяем, какая строка — заголовок
-      const firstRow = rows[0]
-      const isHeaderRow = firstRow.firstChild?.type.name === 'table_header'
+      // Максимальное количество колонок по всем строкам
+      const maxCols = colWidths.length
 
-      // Рендерим строки
-      for (let r = 0; r < rows.length; r++) {
-        const row = rows[r]
+      // Функция вывода строки
+      const renderRow = (row: PMNode, isHeader = false) => {
         let col = 0
-        state.write('|')
+        let rowStr = '|'
         row.forEach(cell => {
           const text = cellText(state, cell)
-          state.write(` ${text.padEnd(colWidths[col])} |`)
+          const width = colWidths[col] || 3
+          rowStr += ` ${text.padEnd(width, ' ')} |`
           col++
         })
-        state.write('\n')
-
-        // После заголовка — разделитель
-        if (r === 0 && isHeaderRow) {
-          state.write('|')
-          for (let c = 0; c < colCount; c++) {
-            state.write('-'.repeat(colWidths[c] + 2) + '|')
-          }
-          state.write('\n')
+        // Добиваем пустые ячейки, если строка короче самой длинной
+        while (col < maxCols) {
+          const width = colWidths[col] || 3
+          rowStr += ` ${' '.padEnd(width, ' ')} |`
+          col++
         }
+        state.write(rowStr + '\n')
+
+        if (isHeader) {
+          let sepStr = '|'
+          for (let i = 0; i < maxCols; i++) {
+            const width = colWidths[i] || 3
+            sepStr += `-${'-'.repeat(width)}-|`
+          }
+          state.write(sepStr + '\n')
+        }
+      }
+
+      // Рендерим заголовки и тело
+      renderRow(rows[0], true)
+      for (let i = 1; i < rows.length; i++) {
+        renderRow(rows[i], false)
       }
 
       state.closeBlock(node)
     },
-
     table_row() { /* обрабатывается в table */ },
     table_cell() { /* обрабатывается в table */ },
     table_header() { /* обрабатывается в table */ },
@@ -268,13 +300,6 @@ export const markdownSerializer = new MarkdownSerializer(
 // ============================================================
 // Хелперы
 // ============================================================
-
-/** Получить количество колонок в строке */
-function getColCount(row: PMNode): number {
-  let count = 0
-  row.forEach(() => count++)
-  return count
-}
 
 /** Получить текстовое содержимое ячейки (с марками) */
 function cellText(_state: unknown, cell: PMNode): string {

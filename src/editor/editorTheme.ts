@@ -169,6 +169,64 @@ export function getEditorStyles(): string {
 }
 
 /* ==========================================
+   Syntax Highlighting (Atom One Dark)
+   ========================================== */
+
+.ProseMirror .hljs-keyword,
+.ProseMirror .hljs-selector-tag,
+.ProseMirror .hljs-operator {
+  color: #c678dd;
+}
+
+.ProseMirror .hljs-string,
+.ProseMirror .hljs-meta .hljs-string,
+.ProseMirror .hljs-doctag,
+.ProseMirror .hljs-regexp {
+  color: #98c379;
+}
+
+.ProseMirror .hljs-title,
+.ProseMirror .hljs-section,
+.ProseMirror .hljs-name,
+.ProseMirror .hljs-selector-id,
+.ProseMirror .hljs-selector-class {
+  color: #e06c75;
+}
+
+.ProseMirror .hljs-number,
+.ProseMirror .hljs-built_in,
+.ProseMirror .hljs-literal,
+.ProseMirror .hljs-type,
+.ProseMirror .hljs-params,
+.ProseMirror .hljs-variable,
+.ProseMirror .hljs-template-variable,
+.ProseMirror .hljs-link {
+  color: #d19a66;
+}
+
+.ProseMirror .hljs-comment,
+.ProseMirror .hljs-quote,
+.ProseMirror .hljs-meta {
+  color: #5c6370;
+  font-style: italic;
+}
+
+.ProseMirror .hljs-attr,
+.ProseMirror .hljs-attribute {
+  color: #d19a66;
+}
+
+.ProseMirror .hljs-symbol,
+.ProseMirror .hljs-bullet,
+.ProseMirror .hljs-addition {
+  color: #61aeee;
+}
+
+.ProseMirror .hljs-deletion {
+  color: #e06c75;
+}
+
+/* ==========================================
    Inline стили
    ========================================== */
 
