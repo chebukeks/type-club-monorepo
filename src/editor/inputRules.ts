@@ -13,6 +13,7 @@
 import {
   inputRules,
   textblockTypeInputRule,
+  wrappingInputRule,
   InputRule,
 } from 'prosemirror-inputrules'
 import { schema } from './schema'
@@ -46,6 +47,31 @@ function hrRule(hrType: NodeType) {
       tr.setSelection(TextSelection.near(tr.doc.resolve(blockStart + 2)))
       return tr
     }
+  )
+}
+
+function codeBlockRule(nodeType: NodeType) {
+  return textblockTypeInputRule(
+    /^```([a-zA-Z0-9]*)\s$/,
+    nodeType,
+    match => ({ params: match[1] })
+  )
+}
+
+function blockQuoteRule(nodeType: NodeType) {
+  return wrappingInputRule(/^\s*>\s$/, nodeType)
+}
+
+function bulletListRule(nodeType: NodeType) {
+  return wrappingInputRule(/^\s*([-+*])\s$/, nodeType)
+}
+
+function orderedListRule(nodeType: NodeType) {
+  return wrappingInputRule(
+    /^(\d+)\.\s$/,
+    nodeType,
+    match => ({ order: +match[1] }),
+    (match, node) => node.childCount + node.attrs.order === +match[1]
   )
 }
 
@@ -90,6 +116,10 @@ export function getInputRulesPlugin(): Plugin {
       // Блочные
       headingRule(schema.nodes.heading, 6),
       hrRule(schema.nodes.horizontal_rule),
+      codeBlockRule(schema.nodes.code_block),
+      blockQuoteRule(schema.nodes.blockquote),
+      bulletListRule(schema.nodes.bullet_list),
+      orderedListRule(schema.nodes.ordered_list),
 
       // Инлайн: **text** → bold
       markInputRule(
@@ -107,6 +137,18 @@ export function getInputRulesPlugin(): Plugin {
       markInputRule(
         /`([^`]+)`$/,
         schema.marks.code
+      ),
+
+      // Инлайн: ~~text~~ → strikethrough
+      markInputRule(
+        /~~([^~]+)~~$/,
+        schema.marks.s
+      ),
+
+      // Инлайн: ==text== → highlight
+      markInputRule(
+        /==([^=]+)==$/,
+        schema.marks.highlight
       ),
     ],
   })

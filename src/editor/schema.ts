@@ -8,6 +8,7 @@
  *      strong, em, code
  */
 import { Schema } from 'prosemirror-model'
+import { bulletList, orderedList, listItem } from 'prosemirror-schema-list'
 import { tableNodes } from 'prosemirror-tables'
 
 // ============================================================
@@ -44,7 +45,12 @@ export const schema = new Schema({
       parseDOM: [{ tag: 'p' }],
       toDOM() { return ['p', 0] },
     },
-
+    blockquote: {
+      content: 'block+',
+      group: 'block',
+      parseDOM: [{ tag: 'blockquote' }],
+      toDOM() { return ['blockquote', 0] },
+    },
     heading: {
       attrs: { level: { default: 1, validate: 'number' } },
       content: 'inline*',
@@ -61,6 +67,27 @@ export const schema = new Schema({
       toDOM(node) { return [`h${node.attrs.level}`, 0] },
     },
 
+    code_block: {
+      content: 'text*',
+      marks: '',
+      group: 'block',
+      code: true,
+      defining: true,
+      attrs: { params: { default: '' } },
+      parseDOM: [
+        {
+          tag: 'pre',
+          preserveWhitespace: 'full',
+          getAttrs: (node: HTMLElement) => ({
+            params: node.getAttribute('data-params') || '',
+          }),
+        },
+      ],
+      toDOM(node) {
+        return ['pre', node.attrs.params ? { 'data-params': node.attrs.params } : {}, ['code', 0]]
+      },
+    },
+
     horizontal_rule: {
       group: 'block',
       parseDOM: [{ tag: 'hr' }],
@@ -69,6 +96,51 @@ export const schema = new Schema({
 
     // Подключаем таблицы
     ...tableNodeSpecs,
+
+    bullet_list: {
+      ...bulletList,
+      content: 'list_item+',
+      group: 'block',
+    },
+
+    ordered_list: {
+      ...orderedList,
+      content: 'list_item+',
+      group: 'block',
+    },
+
+    list_item: {
+      ...listItem,
+      content: 'paragraph block*',
+      attrs: {
+        checked: { default: null }, // Для task-lists
+      },
+      parseDOM: [
+        {
+          tag: 'li',
+          getAttrs: (dom: HTMLElement) => {
+            if (dom.classList.contains('task-list-item')) {
+              const checked = dom.querySelector('input[type="checkbox"]')?.hasAttribute('checked') || false
+              return { checked }
+            }
+            return { checked: null }
+          },
+        },
+      ],
+      toDOM(node) {
+        if (node.attrs.checked !== null) {
+          return [
+            'li',
+            {
+              class: 'task-list-item',
+              'data-checked': node.attrs.checked ? 'true' : 'false',
+            },
+            0,
+          ]
+        }
+        return ['li', {}, 0]
+      },
+    },
 
     text: {
       group: 'inline',
@@ -85,27 +157,24 @@ export const schema = new Schema({
 
   marks: {
     strong: {
-      parseDOM: [
-        { tag: 'strong' },
-        { tag: 'b', getAttrs: (node: HTMLElement) => node.style.fontWeight !== 'normal' && null },
-        { style: 'font-weight=bold' },
-        { style: 'font-weight', getAttrs: (value: string) => /^(bold(er)?|[5-9]\d{2,})$/.test(value) && null },
-      ],
+      parseDOM: [{ tag: 'b' }, { tag: 'strong' }, { style: 'font-weight', getAttrs: value => /^(bold(er)?|[5-9]\d{2,})$/.test(value as string) && null }],
       toDOM() { return ['strong', 0] },
     },
-
     em: {
-      parseDOM: [
-        { tag: 'i' },
-        { tag: 'em' },
-        { style: 'font-style=italic' },
-      ],
+      parseDOM: [{ tag: 'i' }, { tag: 'em' }, { style: 'font-style=italic' }],
       toDOM() { return ['em', 0] },
     },
-
     code: {
       parseDOM: [{ tag: 'code' }],
       toDOM() { return ['code', 0] },
+    },
+    s: {
+      parseDOM: [{ tag: 's' }, { tag: 'del' }, { tag: 'strike' }, { style: 'text-decoration=line-through' }],
+      toDOM() { return ['s', 0] },
+    },
+    highlight: {
+      parseDOM: [{ tag: 'mark' }],
+      toDOM() { return ['mark', 0] },
     },
   },
 })

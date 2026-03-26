@@ -147,6 +147,8 @@ function getMarkSyntax(markName: string): string | null {
     case 'strong': return '**'
     case 'em': return '*'
     case 'code': return '`'
+    case 's': return '~~'
+    case 'highlight': return '=='
     default: return null
   }
 }

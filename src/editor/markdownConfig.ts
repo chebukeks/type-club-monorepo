@@ -13,24 +13,30 @@ import {
   MarkdownSerializer,
 } from 'prosemirror-markdown'
 import MarkdownIt from 'markdown-it'
+// @ts-expect-error: no types available for markdown-it-mark
+import markPlugin from 'markdown-it-mark'
+// @ts-expect-error: no types available for markdown-it-task-lists
+import taskListsPlugin from 'markdown-it-task-lists'
 import { schema } from './schema'
 
 // ============================================================
 // Парсер: Markdown → ProseMirror doc
 // ============================================================
 
-// Создаём markdown-it экземпляр с поддержкой таблиц (GFM tables)
+// Создаём markdown-it экземпляр с поддержкой таблиц, strikethrough, mark и task-lists
 const md = new MarkdownIt('commonmark', { html: false })
   .enable('table')
   .enable('strikethrough')
+  .use(markPlugin)
+  .use(taskListsPlugin, { enabled: true, label: true })
 
 /**
- * Парсер с поддержкой таблиц.
+ * Парсер.
  * Маппинг markdown-it токенов → ProseMirror nodes/marks.
  */
 export const markdownParser = new MarkdownParser(schema, md, {
   // Блочные ноды
-  blockquote: { block: 'paragraph' }, // Временно как параграф (не в MVP)
+  blockquote: { block: 'blockquote' },
   paragraph: { block: 'paragraph' },
   heading: {
     block: 'heading',
@@ -38,6 +44,11 @@ export const markdownParser = new MarkdownParser(schema, md, {
   },
   hr: { node: 'horizontal_rule' },
   hard_break: { node: 'hard_break' },
+
+  // Списки
+  bullet_list: { block: 'bullet_list' },
+  ordered_list: { block: 'ordered_list', getAttrs: tok => ({ order: Number(tok.attrGet('start')) || 1 }) },
+  list_item: { block: 'list_item' },
 
   // Таблицы
   table: { block: 'table' },
@@ -51,15 +62,13 @@ export const markdownParser = new MarkdownParser(schema, md, {
   em: { mark: 'em' },
   strong: { mark: 'strong' },
   code_inline: { mark: 'code', noCloseToken: true },
+  s: { mark: 's' },
+  mark: { mark: 'highlight' },
 
   // Игнорируемые токены (не в MVP)
-  bullet_list: { block: 'paragraph' },
-  ordered_list: { block: 'paragraph' },
-  list_item: { block: 'paragraph' },
-  code_block: { block: 'paragraph' },
-  fence: { block: 'paragraph' },
+  code_block: { block: 'code_block', noCloseToken: true },
+  fence: { block: 'code_block', getAttrs: tok => ({ params: tok.info || '' }), noCloseToken: true },
   image: { ignore: true },
-  s: { ignore: true },
   link: { mark: 'em' },       // Ссылки — пока рендерим как курсив (пока нет mark link)
   softbreak: { node: 'hard_break' },
   html_inline: { ignore: true },
@@ -82,15 +91,48 @@ export const markdownSerializer = new MarkdownSerializer(
       state.closeBlock(node)
     },
 
+    blockquote(state, node) {
+      state.wrapBlock('> ', null, node, () => state.renderContent(node))
+    },
+
     heading(state, node) {
       state.write('#'.repeat(node.attrs.level) + ' ')
       state.renderInline(node)
       state.closeBlock(node)
     },
 
+    code_block(state, node) {
+      state.write('```' + (node.attrs.params || '') + '\n')
+      state.text(node.textContent, false)
+      state.ensureNewLine()
+      state.write('```')
+      state.closeBlock(node)
+    },
+
     horizontal_rule(state, node) {
       state.write('---')
       state.closeBlock(node)
+    },
+
+    bullet_list(state, node) {
+      state.renderList(node, '  ', () => '* ')
+    },
+
+    ordered_list(state, node) {
+      const start = node.attrs.order || 1
+      const maxW = String(start + node.childCount - 1).length
+      const space = state.repeat(' ', maxW + 2)
+      state.renderList(node, space, i => {
+        const nStr = String(start + i)
+        return state.repeat(' ', maxW - nStr.length) + nStr + '. '
+      })
+    },
+
+    list_item(state, node) {
+      if (node.attrs.checked !== null) {
+        state.write(node.attrs.checked ? '[x] ' : '[ ] ')
+      }
+      state.renderContent(node)
     },
 
     hard_break(state) {
@@ -177,6 +219,18 @@ export const markdownSerializer = new MarkdownSerializer(
       open(_state, _mark, _parent, _index) { return '`' },
       close(_state, _mark, _parent, _index) { return '`' },
       escape: false,
+    },
+    s: {
+      open: '~~',
+      close: '~~',
+      mixable: true,
+      expelEnclosingWhitespace: true,
+    },
+    highlight: {
+      open: '==',
+      close: '==',
+      mixable: true,
+      expelEnclosingWhitespace: true,
     },
   }
 )

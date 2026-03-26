@@ -51,6 +51,116 @@ export function getEditorStyles(): string {
 }
 
 /* ==========================================
+   Цитаты (Blockquote)
+   ========================================== */
+
+.ProseMirror blockquote {
+  border-left: 4px solid #6c8cff;
+  padding-left: 16px;
+  margin: 16px 0;
+  color: #a0a4ab;
+  background: rgba(108, 140, 255, 0.05);
+  padding-top: 8px;
+  padding-bottom: 8px;
+  border-radius: 0 4px 4px 0;
+}
+
+.ProseMirror blockquote p {
+  margin-bottom: 0.5em;
+  color: inherit;
+}
+
+.ProseMirror blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+/* ==========================================
+   Списки и чекбоксы (Task lists)
+   ========================================== */
+
+.ProseMirror ul,
+.ProseMirror ol {
+  padding-left: 24px;
+  margin: 8px 0;
+}
+
+.ProseMirror li {
+  margin-bottom: 4px;
+  line-height: 1.6;
+}
+
+.ProseMirror li.task-list-item {
+  list-style: none;
+  position: relative;
+  margin-left: -24px; /* Убираем отступ маркера для чекбокса */
+  padding-left: 28px;
+}
+
+.ProseMirror li.task-list-item::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  width: 16px;
+  height: 16px;
+  border: 1px solid #6c8cff;
+  border-radius: 4px;
+  background: transparent;
+  display: inline-block;
+  pointer-events: none; /* Пока не делаем интерактивным клик */
+}
+
+.ProseMirror li.task-list-item[data-checked="true"]::before {
+  background: #6c8cff;
+  border-color: #6c8cff;
+}
+
+/* Галочка (check) */
+.ProseMirror li.task-list-item[data-checked="true"]::after {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: 6px;
+  width: 4px;
+  height: 8px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+.ProseMirror li.task-list-item[data-checked="true"] > p {
+  color: #7b7d85;
+  text-decoration: line-through;
+}
+
+/* ==========================================
+   Блоки кода
+   ========================================== */
+
+.ProseMirror pre {
+  background: #1e2025;
+  border-radius: 8px;
+  padding: 16px;
+  overflow-x: auto;
+  margin: 16px 0;
+  border: 1px solid #2d2e32;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.9em;
+  line-height: 1.6;
+  color: #e8eaed;
+}
+
+.ProseMirror pre code {
+  color: inherit;
+  padding: 0;
+  background: none;
+  border-radius: 0;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* ==========================================
    Inline стили
    ========================================== */
 
@@ -71,6 +181,18 @@ export function getEditorStyles(): string {
   padding: 1px 6px;
   font-size: 0.88em;
   color: #8ca8ff;
+}
+
+.ProseMirror s {
+  text-decoration: line-through;
+  color: #7b7d85;
+}
+
+.ProseMirror mark {
+  background: rgba(255, 215, 0, 0.2);
+  color: #ffd700;
+  border-radius: 3px;
+  padding: 0 2px;
 }
 
 /* Seamless mark syntax (**,  *, \`) */
