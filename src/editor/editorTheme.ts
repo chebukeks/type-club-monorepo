@@ -146,17 +146,72 @@ export function getEditorStyles(): string {
    Блоки кода
    ========================================== */
 
-.ProseMirror pre {
-  background: #1e2025;
+.code-block-wrapper {
+  background: #1e1e1e; /* Темный фон Telegram */
   border-radius: 8px;
-  padding: 16px;
-  overflow-x: auto;
   margin: 16px 0;
+  overflow: hidden;
   border: 1px solid #2d2e32;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 0.9em;
-  line-height: 1.6;
-  color: #e8eaed;
+  position: relative;
+}
+
+.code-block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.05); /* Немного светлее фона */
+  user-select: none;
+}
+
+.code-block-lang {
+  color: #8bb4e7; /* Светло-голубой цвет языка */
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: lowercase;
+}
+
+.code-block-copy {
+  background: none;
+  border: none;
+  color: #6a6e78;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.code-block-copy:hover {
+  color: #a0a4ae;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.code-block-copy .copied-text {
+  font-size: 11px;
+  color: #98c379;
+}
+
+.code-block-wrapper pre {
+  margin: 0;
+  padding: 12px;
+  overflow-x: auto;
+}
+
+.code-block-content {
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #e4e6eb;
+}
+
+.ProseMirror pre {
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  border: none;
 }
 
 .ProseMirror pre code {

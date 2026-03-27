@@ -27,6 +27,7 @@ import { getKeymapPlugins } from '../editor/keymap'
 import { getInputRulesPlugin } from '../editor/inputRules'
 import { seamlessPlugin } from '../editor/seamlessPlugin'
 import { syntaxHighlightPlugin } from '../editor/syntaxHighlightPlugin'
+import { CodeBlockView } from '../editor/codeBlockView'
 import { getEditorStyles } from '../editor/editorTheme'
 import { useEditor } from '../context/EditorContext'
 
@@ -138,6 +139,9 @@ export function MarkdownEditor() {
     // Создаём EditorView
     const view = new EditorView(editorRef.current, {
       state: editorState,
+      nodeViews: {
+        code_block: (node, view, getPos) => new CodeBlockView(node, view, getPos)
+      }
     })
 
     viewRef.current = view

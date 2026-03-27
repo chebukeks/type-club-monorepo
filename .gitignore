@@ -27,5 +27,6 @@ dist-ssr
 # other
 .agent
 
-# test-examples
+# tests
 test-examples/
+test_bug.ts
