@@ -300,6 +300,7 @@ export function getEditorStyles(): string {
 .math-inline-editor {
   color: #c678dd;
   display: none;
+  min-width: 10px;
 }
 
 .math-inline-render {
@@ -308,7 +309,7 @@ export function getEditorStyles(): string {
 
 /* При фокусе: показываем текст, показываем $ с двух сторон через CSS, и тултип снизу */
 .math-inline-wrapper.is-active .math-inline-editor {
-  display: inline;
+  display: inline-block;
 }
 
 .math-inline-wrapper.is-active .math-inline-prefix {

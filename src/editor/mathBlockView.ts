@@ -67,13 +67,20 @@ export class MathBlockView implements NodeView {
   }
 
   renderMath() {
+    const text = this.node.textContent
+    if (!text) {
+      this.renderDOM.innerHTML = '<div style="color: grey; opacity: 0.5;">Empty Math Block</div>'
+      return
+    }
+
     try {
-      katex.render(this.node.textContent || '', this.renderDOM, {
+      this.renderDOM.innerHTML = ''
+      katex.render(text, this.renderDOM, {
         throwOnError: false,
         displayMode: true
       })
     } catch (e) {
-      this.renderDOM.textContent = this.node.textContent
+      this.renderDOM.textContent = text
     }
   }
 

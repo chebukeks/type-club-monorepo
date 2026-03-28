@@ -12,7 +12,8 @@
  * - При изменении: serialize(doc) → dispatch(UPDATE_CONTENT)
  * - EditorContext хранит content как string (markdown)
  */
-import { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
+import 'katex/dist/katex.min.css'
 import { EditorState, Plugin } from 'prosemirror-state'
 import { EditorView } from 'prosemirror-view'
 import { history } from 'prosemirror-history'

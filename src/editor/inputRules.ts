@@ -161,15 +161,22 @@ function imageRule(): InputRule {
 // Формулы
 // ============================================================
 
-function mathInlineRule(): InputRule {
+function singleMathInlineRule(): InputRule {
   return new InputRule(
-    /(?:^|\s)\$([^$]+)\$$/,
+    /(?:[^\\]|^|\s)\$$/,
     (state, match, start, end) => {
-      const [all, text] = match
-      const trStart = start + (all.match(/^\s/) ? 1 : 0)
+      const trStart = start + match[0].indexOf('$')
       const tr = state.tr
-      const node = schema.nodes.math_inline.create(null, schema.text(text))
-      return tr.replaceWith(trStart, end, node)
+      
+      // Создаем math_inline как атомарную ноду (без текста внутри, формула хранится в атрибуте)
+      const node = schema.nodes.math_inline.create({ formula: '' })
+      tr.replaceWith(trStart, end, node)
+      
+      // Выделяем саму ноду (NodeSelection) 
+      // При фокусе на NodeSelection плагин mathActivePlugin активирует ее, и MathInlineView покажет input
+      const { NodeSelection } = require('prosemirror-state')
+      tr.setSelection(NodeSelection.create(tr.doc, trStart))
+      return tr
     }
   )
 }
@@ -228,7 +235,7 @@ export function getInputRulesPlugin(): Plugin {
       ),
 
       // Формулы
-      mathInlineRule(),
+      singleMathInlineRule(),
 
       // Ссылки и картинки
       imageRule(),

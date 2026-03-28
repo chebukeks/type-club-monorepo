@@ -16,10 +16,10 @@ const exitBlockByEsc: Command = (state, dispatch) => {
   const { $head } = state.selection
   
   let blockDepth = -1
+
   for (let d = $head.depth; d > 0; d--) {
     const name = $head.node(d).type.name
-    // Из цитат выход уже работает через двойной Enter (стандартный baseKeymap / splitBlock), но для надежности можно добавить
-    if (name === 'table' || name === 'code_block') {
+    if (name === 'table' || name === 'code_block' || name === 'math_block') {
       blockDepth = d
       break
     }
@@ -27,6 +27,7 @@ const exitBlockByEsc: Command = (state, dispatch) => {
   if (blockDepth === -1) return false
   
   if (dispatch) {
+    // Для блочных элементов вставляем новый пустой параграф ниже
     const endPos = $head.after(blockDepth)
     const tr = state.tr
     tr.insert(endPos, schema.nodes.paragraph.createAndFill()!)
@@ -118,6 +119,24 @@ const tableBackspaceCommand: Command = (state, dispatch) => {
   return false
 }
 
+// Команда: автосоздание математического блока по $$ + Enter
+const createMathBlockOnEnter: Command = (state, dispatch) => {
+  const { $head } = state.selection
+  if ($head.parent.type.name !== 'paragraph') return false
+  
+  if ($head.parent.textContent.trim() === '$$') {
+    if (dispatch) {
+      const start = $head.before()
+      const end = $head.after()
+      const tr = state.tr.replaceWith(start, end, schema.nodes.math_block.create())
+      tr.setSelection(TextSelection.near(tr.doc.resolve(start + 1)))
+      dispatch(tr)
+    }
+    return true
+  }
+  return false
+}
+
 /** Кастомные горячие клавиши */
 const customKeymap = keymap({
   // Форматирование
@@ -131,11 +150,12 @@ const customKeymap = keymap({
   // Умный Enter: цепочка команд (первая вернувшая true перехватывает событие)
   'Enter': chainCommands(
     tableEnterNav,
+    createMathBlockOnEnter,
     createTableOnEnter,
     splitListItem(schema.nodes.list_item)
   ),
 
-  // Удаление строк таблицы, если выделена вся строка (через Backspace)
+  // Удаление строк таблицы (через Backspace)
   'Backspace': tableBackspaceCommand,
 
   // Выход из блоков:
