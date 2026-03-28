@@ -100,7 +100,7 @@ export const markdownParser = new MarkdownParser(schema, md, {
   // Игнорируемые токены (не в MVP)
   code_block: { block: 'code_block', noCloseToken: true },
   fence: { block: 'code_block', getAttrs: tok => ({ params: tok.info || '' }), noCloseToken: true },
-  math_inline: { block: 'math_inline' },
+  math_inline: { node: 'math_inline' },
   math_block: { block: 'math_block', noCloseToken: true },
   math_display: { block: 'math_block', noCloseToken: true },
   image: { 

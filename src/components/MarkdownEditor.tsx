@@ -12,7 +12,7 @@
  * - При изменении: serialize(doc) → dispatch(UPDATE_CONTENT)
  * - EditorContext хранит content как string (markdown)
  */
-import React, { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import 'katex/dist/katex.min.css'
 import { EditorState, Plugin } from 'prosemirror-state'
 import { EditorView } from 'prosemirror-view'
@@ -31,7 +31,6 @@ import { syntaxHighlightPlugin } from '../editor/syntaxHighlightPlugin'
 import { CodeBlockView } from '../editor/codeBlockView'
 import { linkTooltipPlugin } from '../editor/linkTooltipPlugin'
 import { mathActivePlugin } from '../editor/mathActivePlugin'
-import { MathInlineView } from '../editor/mathInlineView'
 import { MathBlockView } from '../editor/mathBlockView'
 import { getEditorStyles } from '../editor/editorTheme'
 import { useEditor } from '../context/EditorContext'
@@ -148,7 +147,6 @@ export function MarkdownEditor() {
       state: editorState,
       nodeViews: {
         code_block: (node, view, getPos) => new CodeBlockView(node, view, getPos),
-        math_inline: (node, view, getPos) => new MathInlineView(node, view, getPos),
         math_block: (node, view, getPos) => new MathBlockView(node, view, getPos)
       }
     })

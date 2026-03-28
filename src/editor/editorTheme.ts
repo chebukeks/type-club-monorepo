@@ -285,43 +285,51 @@ export function getEditorStyles(): string {
    Math (KaTeX)
    ========================================== */
 
-/* Inline Math */
+/* Inline Math Wrapper */
 .math-inline {
   position: relative;
   display: inline-block;
   cursor: text;
 }
 
-.math-inline-prefix {
-  color: #6a6e78;
-  display: none;
+/* Inactive State (not focused): hide the raw text hole */
+.math-inline.is-inactive {
+  font-size: 0;
+  color: transparent;
+  padding: 0;
+  margin: 0;
+  vertical-align: top;
 }
 
-.math-inline-editor {
+/* Active State (focused): show the text and $ boundaries */
+.math-inline.is-active {
   color: #c678dd;
-  display: none;
-  min-width: 10px;
+  font-family: inherit;
+  font-size: 1rem;
 }
+.math-inline.is-active::before { content: "$"; color: #6a6e78; }
+.math-inline.is-active::after { content: "$"; color: #6a6e78; }
 
-.math-inline-render {
-  display: inline-block;
-}
-
-/* При фокусе: показываем текст, показываем $ с двух сторон через CSS, и тултип снизу */
-.math-inline.is-active .math-inline-editor {
-  display: inline-block;
-}
-
-.math-inline.is-active .math-inline-prefix {
+/* Inline Render Widget (shown when inactive) */
+.math-inline-render-anchor {
+  position: relative;
   display: inline;
 }
-
-.math-inline.is-active::after {
-  content: "$";
-  color: #6a6e78;
+.math-inline-render {
+  font-size: 1rem;
+  color: #abb2bf;
+  pointer-events: none; /* Let clicks pass through to the zero-size text node */
+  user-select: none;
 }
 
-.math-inline.is-active .math-inline-render {
+/* Tooltip Widget (shown when active) */
+.math-inline-tooltip-anchor {
+  position: relative;
+  display: inline;
+  width: 0;
+  height: 0;
+}
+.math-inline-tooltip {
   position: absolute;
   top: 100%;
   left: 50%;
@@ -335,6 +343,7 @@ export function getEditorStyles(): string {
   pointer-events: none;
   font-size: 1.1em;
   white-space: nowrap;
+  color: #abb2bf;
 }
 
 /* Block Math */

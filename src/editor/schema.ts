@@ -167,11 +167,8 @@ export const schema = new Schema({
       inline: true,
       content: 'text*',
       group: 'inline',
-      parseDOM: [{ 
-        tag: 'span.math-inline',
-        contentElement: 'span.math-inline-editor'
-      }],
-      toDOM: () => ['span', { class: 'math-inline' }, ['span', { class: 'math-inline-editor' }, 0]]
+      parseDOM: [{ tag: 'span.math-inline' }],
+      toDOM: () => ['span', { class: 'math-inline' }, 0]
     },
     math_block: {
       content: 'text*',
