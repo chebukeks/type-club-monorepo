@@ -137,6 +137,138 @@ const createMathBlockOnEnter: Command = (state, dispatch) => {
   return false
 }
 
+// ===== ИНЛАЙН МАТЕМАТИКА (TYPORA STYLE) =====
+
+const mathBackspaceCommand: Command = (state, dispatch) => {
+  const { $head } = state.selection
+  if ($head.parent.type.name !== 'math_inline') return false
+  
+  const text = $head.parent.textContent
+  const textTrimmed = text.trim()
+  const posInside = $head.parentOffset
+  
+  if (textTrimmed.length === 0) {
+    if (dispatch) {
+      // Пустая формула -> полностью удаляем
+      let tr = state.tr
+      tr.delete($head.before(), $head.after())
+      dispatch(tr)
+    }
+    return true
+  }
+  
+  if (posInside === 0 || (posInside === 1 && text.startsWith(' '))) {
+    if (dispatch) {
+      // Удаляем "левый" $ -> превращаем остаток в текст с правым $
+      const rawFormula = textTrimmed
+      let tr = state.tr
+      tr.replaceWith($head.before(), $head.after(), schema.text(rawFormula + '$'))
+      tr.setSelection(TextSelection.near(tr.doc.resolve($head.before())))
+      dispatch(tr)
+    }
+    return true
+  }
+  return false
+}
+
+const mathDeleteCommand: Command = (state, dispatch) => {
+  const { $head } = state.selection
+  if ($head.parent.type.name !== 'math_inline') return false
+  
+  const text = $head.parent.textContent
+  const textTrimmed = text.trim()
+  const posInside = $head.parentOffset
+  const textLen = text.length
+  
+  if (textTrimmed.length === 0) {
+    if (dispatch) {
+      // Пустая формула -> оставляем только первый $
+      let tr = state.tr
+      tr.replaceWith($head.before(), $head.after(), schema.text('$'))
+      tr.setSelection(TextSelection.near(tr.doc.resolve($head.before() + 1)))
+      dispatch(tr)
+    }
+    return true
+  }
+  
+  if (posInside === textLen || (posInside === textLen - 1 && text.endsWith(' '))) {
+    if (dispatch) {
+      // Удаляем "правый" $ -> превращаем остаток в текст с левым $
+      const rawFormula = textTrimmed
+      let tr = state.tr
+      tr.replaceWith($head.before(), $head.after(), schema.text('$' + rawFormula))
+      tr.setSelection(TextSelection.near(tr.doc.resolve($head.before() + rawFormula.length + 1)))
+      dispatch(tr)
+    }
+    return true
+  }
+  return false
+}
+
+const mathSpaceCommand: Command = (state, dispatch) => {
+  const { $head } = state.selection
+  if ($head.parent.type.name !== 'math_inline') return false
+  
+  if ($head.parent.textContent.trim().length === 0) {
+    if (dispatch) {
+      let tr = state.tr
+      tr.replaceWith($head.before(), $head.after(), schema.text('$ '))
+      tr.setSelection(TextSelection.near(tr.doc.resolve($head.before() + 2)))
+      dispatch(tr)
+    }
+    return true
+  }
+  return false
+}
+
+const mathEscCommand: Command = (state, dispatch) => {
+  const { $head } = state.selection
+  if ($head.parent.type.name === 'math_inline') {
+    if ($head.parent.textContent.trim().length === 0) {
+      if (dispatch) {
+        let tr = state.tr
+        tr.replaceWith($head.before(), $head.after(), schema.text('$'))
+        tr.setSelection(TextSelection.near(tr.doc.resolve($head.before() + 1)))
+        dispatch(tr)
+      }
+      return true
+    } else {
+      if (dispatch) {
+        let tr = state.tr
+        tr.setSelection(TextSelection.near(tr.doc.resolve($head.after())))
+        dispatch(tr)
+      }
+      return true
+    }
+  }
+  return exitBlockByEsc(state, dispatch)
+}
+
+const mathDollarCommand: Command = (state, dispatch) => {
+  const { $head } = state.selection
+  if ($head.parent.type.name === 'math_inline') {
+    if ($head.parent.textContent.trim().length === 0) {
+      if (dispatch) {
+        let tr = state.tr
+        tr.replaceWith($head.before(), $head.after(), schema.text('$$'))
+        tr.setSelection(TextSelection.near(tr.doc.resolve($head.before() + 2)))
+        dispatch(tr)
+      }
+      return true
+    } else {
+      if (dispatch) {
+        let tr = state.tr
+        tr.setSelection(TextSelection.near(tr.doc.resolve($head.after())))
+        dispatch(tr)
+      }
+      return true
+    }
+  }
+  return false
+}
+
+// =========================================================
+
 /** Кастомные горячие клавиши */
 const customKeymap = keymap({
   // Форматирование
@@ -155,14 +287,16 @@ const customKeymap = keymap({
     splitListItem(schema.nodes.list_item)
   ),
 
-  // Удаление строк таблицы (через Backspace)
-  'Backspace': tableBackspaceCommand,
-
-  // Выход из блоков:
-  'Escape': exitBlockByEsc,
+  // Математика и табличный бэкспэйс
+  'Backspace': chainCommands(mathBackspaceCommand, tableBackspaceCommand),
+  'Delete': mathDeleteCommand,
+  'Space': mathSpaceCommand,
+  '$': mathDollarCommand,
+  'Escape': mathEscCommand,
 
   // Списки
   'Tab': sinkListItem(schema.nodes.list_item),
+
   'Shift-Tab': liftListItem(schema.nodes.list_item),
 
   // Undo/Redo

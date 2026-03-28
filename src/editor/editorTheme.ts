@@ -286,7 +286,7 @@ export function getEditorStyles(): string {
    ========================================== */
 
 /* Inline Math */
-.math-inline-wrapper {
+.math-inline {
   position: relative;
   display: inline-block;
   cursor: text;
@@ -308,20 +308,20 @@ export function getEditorStyles(): string {
 }
 
 /* При фокусе: показываем текст, показываем $ с двух сторон через CSS, и тултип снизу */
-.math-inline-wrapper.is-active .math-inline-editor {
+.math-inline.is-active .math-inline-editor {
   display: inline-block;
 }
 
-.math-inline-wrapper.is-active .math-inline-prefix {
+.math-inline.is-active .math-inline-prefix {
   display: inline;
 }
 
-.math-inline-wrapper.is-active::after {
+.math-inline.is-active::after {
   content: "$";
   color: #6a6e78;
 }
 
-.math-inline-wrapper.is-active .math-inline-render {
+.math-inline.is-active .math-inline-render {
   position: absolute;
   top: 100%;
   left: 50%;

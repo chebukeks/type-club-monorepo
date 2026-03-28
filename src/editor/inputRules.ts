@@ -168,14 +168,12 @@ function singleMathInlineRule(): InputRule {
       const trStart = start + match[0].indexOf('$')
       const tr = state.tr
       
-      // Создаем math_inline как атомарную ноду (без текста внутри, формула хранится в атрибуте)
-      const node = schema.nodes.math_inline.create({ formula: '' })
+      // Создаем math_inline с пробелом (пробел нужен, чтобы браузер мог поставить каретку)
+      const node = schema.nodes.math_inline.create(null, schema.text(' '))
       tr.replaceWith(trStart, end, node)
       
-      // Выделяем саму ноду (NodeSelection) 
-      // При фокусе на NodeSelection плагин mathActivePlugin активирует ее, и MathInlineView покажет input
-      const { NodeSelection } = require('prosemirror-state')
-      tr.setSelection(NodeSelection.create(tr.doc, trStart))
+      // Ставим TextSelection ровно перед пробелом
+      tr.setSelection(TextSelection.create(tr.doc, trStart + 1))
       return tr
     }
   )
