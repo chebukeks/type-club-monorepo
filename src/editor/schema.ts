@@ -118,12 +118,10 @@ export const schema = new Schema({
       parseDOM: [
         {
           tag: 'li',
-          getAttrs: (dom: HTMLElement) => {
-            if (dom.classList.contains('task-list-item')) {
-              const checked = dom.querySelector('input[type="checkbox"]')?.hasAttribute('checked') || false
-              return { checked }
-            }
-            return { checked: null }
+          getAttrs(dom) {
+            const hasCheckbox = (dom as HTMLElement).hasAttribute('data-checked')
+            if (!hasCheckbox) return { checked: null }
+            return { checked: (dom as HTMLElement).getAttribute('data-checked') === 'true' }
           },
         },
       ],
@@ -141,6 +139,45 @@ export const schema = new Schema({
         return ['li', {}, 0]
       },
     },
+    image: {
+      inline: true,
+      attrs: {
+        src: {},
+        alt: { default: null },
+        title: { default: null }
+      },
+      group: 'inline',
+      draggable: true,
+      parseDOM: [{
+        tag: 'img[src]',
+        getAttrs(dom) {
+          return {
+            src: (dom as HTMLElement).getAttribute('src'),
+            title: (dom as HTMLElement).getAttribute('title'),
+            alt: (dom as HTMLElement).getAttribute('alt')
+          }
+        }
+      }],
+      toDOM(node) {
+        return ['img', { ...node.attrs }]
+      }
+    },
+
+    math_inline: {
+      inline: true,
+      content: 'text*',
+      group: 'inline',
+      parseDOM: [{ tag: 'span.math-inline' }],
+      toDOM() { return ['span', { class: 'math-inline' }, 0] }
+    },
+    math_block: {
+      content: 'text*',
+      group: 'block',
+      code: true,
+      defining: true,
+      parseDOM: [{ tag: 'div.math-block' }],
+      toDOM() { return ['div', { class: 'math-block' }, 0] }
+    },
 
     text: {
       group: 'inline',
@@ -156,6 +193,25 @@ export const schema = new Schema({
   },
 
   marks: {
+    link: {
+      attrs: {
+        href: {},
+        title: { default: null }
+      },
+      inclusive: false,
+      parseDOM: [{
+        tag: 'a[href]',
+        getAttrs(dom) {
+          return {
+            href: (dom as HTMLElement).getAttribute('href'),
+            title: (dom as HTMLElement).getAttribute('title')
+          }
+        }
+      }],
+      toDOM(node) { 
+        return ['a', { ...node.attrs }, 0] 
+      }
+    },
     strong: {
       parseDOM: [{ tag: 'b' }, { tag: 'strong' }, { style: 'font-weight', getAttrs: value => /^(bold(er)?|[5-9]\d{2,})$/.test(value as string) && null }],
       toDOM() { return ['strong', 0] },

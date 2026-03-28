@@ -282,6 +282,182 @@ export function getEditorStyles(): string {
 }
 
 /* ==========================================
+   Math (KaTeX)
+   ========================================== */
+
+/* Inline Math */
+.math-inline-wrapper {
+  position: relative;
+  display: inline-block;
+  cursor: text;
+}
+
+.math-inline-prefix {
+  color: #6a6e78;
+  display: none;
+}
+
+.math-inline-editor {
+  color: #c678dd;
+  display: none;
+}
+
+.math-inline-render {
+  display: inline-block;
+}
+
+/* При фокусе: показываем текст, показываем $ с двух сторон через CSS, и тултип снизу */
+.math-inline-wrapper.is-active .math-inline-editor {
+  display: inline;
+}
+
+.math-inline-wrapper.is-active .math-inline-prefix {
+  display: inline;
+}
+
+.math-inline-wrapper.is-active::after {
+  content: "$";
+  color: #6a6e78;
+}
+
+.math-inline-wrapper.is-active .math-inline-render {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #232428;
+  border: 1px solid #36373d;
+  padding: 4px 8px;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 100;
+  pointer-events: none;
+  font-size: 1.1em;
+  white-space: nowrap;
+}
+
+/* Block Math */
+.math-block-wrapper {
+  margin: 16px 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+}
+
+.math-block-editor-wrapper {
+  background: #1e1e1e;
+  border: 1px solid #2d2e32;
+  border-radius: 8px 8px 0 0;
+  padding: 12px;
+  display: none;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  color: #c678dd;
+  white-space: pre-wrap;
+}
+
+.math-block-preview-wrapper {
+  background: transparent;
+  padding: 12px;
+  text-align: center;
+  position: relative;
+}
+
+.math-block-preview-header {
+  display: none;
+  justify-content: space-between;
+  align-items: center;
+  background: #232428;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #8bb4e7;
+  border: 1px solid #2d2e32;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  margin: -12px -12px 12px -12px;
+}
+
+.math-btn-ok {
+  background: none;
+  border: none;
+  color: #98c379;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.math-btn-ok:hover {
+  background: rgba(152, 195, 121, 0.1);
+}
+
+.math-block-wrapper.is-active .math-block-editor-wrapper {
+  display: block;
+}
+
+.math-block-wrapper.is-active .math-block-preview-header {
+  display: flex;
+}
+
+.math-block-wrapper.is-active .math-block-preview-wrapper {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed #36373d;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+}
+
+/* ==========================================
+   Tooltips (Ссылки и Изображения)
+   ========================================== */
+
+.pm-tooltip {
+  position: absolute;
+  z-index: 1000;
+  background: #232428;
+  border: 1px solid #36373d;
+  border-radius: 6px;
+  padding: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.pm-tooltip-input {
+  background: #1e1f22;
+  border: 1px solid #4a4b53;
+  color: #e4e6eb;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  outline: none;
+  min-width: 250px;
+  display: block;
+}
+
+.pm-tooltip-input:focus {
+  border-color: #5865f2;
+}
+
+/* ==========================================
+   Изображения и Ссылки
+   ========================================== */
+.ProseMirror img {
+  max-width: 100%;
+  border-radius: 6px;
+  margin: 12px 0;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.ProseMirror img.ProseMirror-selectednode {
+  border-color: #5865f2;
+}
+
+.ProseMirror a {
+  color: #5865f2;
+  text-decoration: none;
+  cursor: text;
+}
+
+.ProseMirror a:hover {
+  text-decoration: underline;
+}
+
+/* ==========================================
    Inline стили
    ========================================== */
 

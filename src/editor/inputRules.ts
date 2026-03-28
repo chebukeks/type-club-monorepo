@@ -126,6 +126,59 @@ function markInputRule(
 }
 
 // ============================================================
+// Картинки и Ссылки
+// ============================================================
+
+function linkRule(): InputRule {
+  return new InputRule(
+    /(?:^|\s)\[([^\[]+)\]\(([^)]+)\)$/,
+    (state, match, start, end) => {
+      const [all, text, href] = match
+      const tr = state.tr
+      const trStart = start + (all.match(/^\s/) ? 1 : 0)
+      
+      const mark = schema.marks.link.create({ href })
+      tr.replaceWith(trStart, end, schema.text(text, [mark]))
+      tr.removeStoredMark(schema.marks.link)
+      return tr
+    }
+  )
+}
+
+function imageRule(): InputRule {
+  return new InputRule(
+    /(?:^|\s)!\[([^\[]*)\]\(([^)]+)\)$/,
+    (state, match, start, end) => {
+      const [all, alt, src] = match
+      const trStart = start + (all.match(/^\s/) ? 1 : 0)
+      const node = schema.nodes.image.create({ src, alt })
+      return state.tr.replaceWith(trStart, end, node)
+    }
+  )
+}
+
+// ============================================================
+// Формулы
+// ============================================================
+
+function mathInlineRule(): InputRule {
+  return new InputRule(
+    /(?:^|\s)\$([^$]+)\$$/,
+    (state, match, start, end) => {
+      const [all, text] = match
+      const trStart = start + (all.match(/^\s/) ? 1 : 0)
+      const tr = state.tr
+      const node = schema.nodes.math_inline.create(null, schema.text(text))
+      return tr.replaceWith(trStart, end, node)
+    }
+  )
+}
+
+function mathBlockRule(): InputRule {
+  return textblockTypeInputRule(/^\$\$\s$/, schema.nodes.math_block)
+}
+
+// ============================================================
 // Экспорт
 // ============================================================
 
@@ -133,6 +186,7 @@ export function getInputRulesPlugin(): Plugin {
   return inputRules({
     rules: [
       // Блочные
+      mathBlockRule(),
       headingRule(schema.nodes.heading, 6),
       hrRule(schema.nodes.horizontal_rule),
       codeBlockRule(schema.nodes.code_block),
@@ -172,6 +226,13 @@ export function getInputRulesPlugin(): Plugin {
         /==([^=]+)==$/,
         schema.marks.highlight
       ),
+
+      // Формулы
+      mathInlineRule(),
+
+      // Ссылки и картинки
+      imageRule(),
+      linkRule(),
     ],
   })
 }

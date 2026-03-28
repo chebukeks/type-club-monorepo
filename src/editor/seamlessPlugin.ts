@@ -88,7 +88,7 @@ function buildDecorations(state: import('prosemirror-state').EditorState): Decor
   const activeMarks = state.storedMarks || $from.marks()
 
   for (const mark of activeMarks) {
-    const syntax = getMarkSyntax(mark.type.name)
+    const syntax = getMarkSyntax(mark)
     if (!syntax) continue
 
     // Находим полный диапазон этой марки в parent
@@ -100,7 +100,7 @@ function buildDecorations(state: import('prosemirror-state').EditorState): Decor
         Decoration.widget(range.from, () => {
           const span = document.createElement('span')
           span.className = 'pm-mark-syntax'
-          span.textContent = syntax
+          span.textContent = syntax.open
           return span
         }, { side: -1, key: `mark-open-${range.from}-${mark.type.name}` })
       )
@@ -109,7 +109,7 @@ function buildDecorations(state: import('prosemirror-state').EditorState): Decor
         Decoration.widget(range.to, () => {
           const span = document.createElement('span')
           span.className = 'pm-mark-syntax'
-          span.textContent = syntax
+          span.textContent = syntax.close
           return span
         }, { side: 1, key: `mark-close-${range.to}-${mark.type.name}` })
       )
@@ -119,7 +119,7 @@ function buildDecorations(state: import('prosemirror-state').EditorState): Decor
         Decoration.widget(cursorPos, () => {
           const span = document.createElement('span')
           span.className = 'pm-mark-syntax'
-          span.textContent = syntax
+          span.textContent = syntax.open
           return span
         }, { side: -1, key: `mark-empty-open-${cursorPos}-${mark.type.name}` })
       )
@@ -128,7 +128,7 @@ function buildDecorations(state: import('prosemirror-state').EditorState): Decor
         Decoration.widget(cursorPos, () => {
           const span = document.createElement('span')
           span.className = 'pm-mark-syntax'
-          span.textContent = syntax
+          span.textContent = syntax.close
           return span
         }, { side: 1, key: `mark-empty-close-${cursorPos}-${mark.type.name}` })
       )
@@ -142,13 +142,18 @@ function buildDecorations(state: import('prosemirror-state').EditorState): Decor
 // Хелперы
 // ============================================================
 
-function getMarkSyntax(markName: string): string | null {
-  switch (markName) {
-    case 'strong': return '**'
-    case 'em': return '*'
-    case 'code': return '`'
-    case 's': return '~~'
-    case 'highlight': return '=='
+function getMarkSyntax(mark: import('prosemirror-model').Mark): { open: string, close: string } | null {
+  switch (mark.type.name) {
+    case 'strong': return { open: '**', close: '**' }
+    case 'em': return { open: '*', close: '*' }
+    case 'code': return { open: '`', close: '`' }
+    case 's': return { open: '~~', close: '~~' }
+    case 'highlight': return { open: '==', close: '==' }
+    case 'link': {
+      const href = mark.attrs.href || ''
+      const title = mark.attrs.title ? ` "${mark.attrs.title}"` : ''
+      return { open: '[', close: `](${href}${title})` }
+    }
     default: return null
   }
 }

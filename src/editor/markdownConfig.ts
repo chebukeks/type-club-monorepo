@@ -15,6 +15,9 @@ import {
 import MarkdownIt from 'markdown-it'
 // @ts-expect-error: no types available for markdown-it-mark
 import markPlugin from 'markdown-it-mark'
+// @ts-ignore
+import texmath from 'markdown-it-texmath'
+import katex from 'katex'
 import { schema } from './schema'
 
 // Самописный плагин для task-lists (избегаем багов markdown-it-task-lists)
@@ -53,6 +56,7 @@ const md = new MarkdownIt('default', { html: false })
   .enable('strikethrough')
   .use(markPlugin)
   .use(taskListPlugin)
+  .use(texmath, { engine: katex, delimiters: 'dollars' })
 
 /**
  * Парсер.
@@ -96,8 +100,24 @@ export const markdownParser = new MarkdownParser(schema, md, {
   // Игнорируемые токены (не в MVP)
   code_block: { block: 'code_block', noCloseToken: true },
   fence: { block: 'code_block', getAttrs: tok => ({ params: tok.info || '' }), noCloseToken: true },
-  image: { ignore: true },
-  link: { mark: 'em' },       // Ссылки — пока рендерим как курсив (пока нет mark link)
+  math_inline: { block: 'math_inline', noCloseToken: true },
+  math_block: { block: 'math_block', noCloseToken: true },
+  math_display: { block: 'math_block', noCloseToken: true },
+  image: { 
+    node: 'image', 
+    getAttrs: tok => ({ 
+      src: tok.attrGet('src'), 
+      alt: tok.children?.[0]?.content || tok.attrGet('alt') || null, 
+      title: tok.attrGet('title') || null 
+    }) 
+  },
+  link: { 
+    mark: 'link', 
+    getAttrs: tok => ({ 
+      href: tok.attrGet('href'), 
+      title: tok.attrGet('title') || null 
+    }) 
+  },
   softbreak: { node: 'hard_break' },
   hardbreak: { node: 'hard_break' },
   html_inline: { ignore: true },
@@ -259,12 +279,33 @@ export const markdownSerializer = new MarkdownSerializer(
 
       state.closeBlock(node)
     },
-    table_row() { /* обрабатывается в table */ },
     table_cell() { /* обрабатывается в table */ },
     table_header() { /* обрабатывается в table */ },
+    math_inline(state, node) {
+      state.write('$' + node.textContent + '$')
+    },
+    math_block(state, node) {
+      state.write('$$\n' + node.textContent + '\n$$')
+      state.closeBlock(node)
+    },
+    image(state, node) {
+      const alt = node.attrs.alt || ''
+      const src = node.attrs.src || ''
+      const title = node.attrs.title ? ` "${node.attrs.title.replace(/"/g, '\\"')}"` : ''
+      state.write(`![${alt}](${src}${title})`)
+    },
   },
   {
     // --- Marks ---
+    link: {
+      open: '[',
+      close(_state, mark) {
+        const href = mark.attrs.href || ''
+        const title = mark.attrs.title ? ` "${mark.attrs.title.replace(/"/g, '\\"')}"` : ''
+        return `](${href}${title})`
+      },
+      escape: false
+    },
     strong: {
       open: '**',
       close: '**',

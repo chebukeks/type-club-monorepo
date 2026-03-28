@@ -28,6 +28,10 @@ import { getInputRulesPlugin } from '../editor/inputRules'
 import { seamlessPlugin } from '../editor/seamlessPlugin'
 import { syntaxHighlightPlugin } from '../editor/syntaxHighlightPlugin'
 import { CodeBlockView } from '../editor/codeBlockView'
+import { linkTooltipPlugin } from '../editor/linkTooltipPlugin'
+import { mathActivePlugin } from '../editor/mathActivePlugin'
+import { MathInlineView } from '../editor/mathInlineView'
+import { MathBlockView } from '../editor/mathBlockView'
 import { getEditorStyles } from '../editor/editorTheme'
 import { useEditor } from '../context/EditorContext'
 
@@ -125,6 +129,8 @@ export function MarkdownEditor() {
         // Seamless-режим и подсветка кода
         seamlessPlugin,
         syntaxHighlightPlugin,
+        linkTooltipPlugin(),
+        mathActivePlugin,
 
         // Стандартные плагины
         history(),
@@ -140,7 +146,9 @@ export function MarkdownEditor() {
     const view = new EditorView(editorRef.current, {
       state: editorState,
       nodeViews: {
-        code_block: (node, view, getPos) => new CodeBlockView(node, view, getPos)
+        code_block: (node, view, getPos) => new CodeBlockView(node, view, getPos),
+        math_inline: (node, view, getPos) => new MathInlineView(node, view, getPos),
+        math_block: (node, view, getPos) => new MathBlockView(node, view, getPos)
       }
     })
 
