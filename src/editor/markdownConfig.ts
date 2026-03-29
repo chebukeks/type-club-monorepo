@@ -46,6 +46,32 @@ function taskListPlugin(md: MarkdownIt) {
   })
 }
 
+// Фикс для texmath: превращаем одинарный токен math_inline в тройку (open, text, close)
+// чтобы ProseMirror мог распарсить content: 'text*'
+function texmathFixPlugin(md: MarkdownIt) {
+  md.core.ruler.after('inline', 'texmath_fix', (state: any) => {
+    const tokens = state.tokens
+    for (let i = 0; i < tokens.length; i++) {
+      if (tokens[i].type === 'inline' && tokens[i].children) {
+        const children = tokens[i].children
+        for (let j = children.length - 1; j >= 0; j--) {
+          if (children[j].type === 'math_inline') {
+            const content = children[j].content
+            
+            // Используем обычные объекты, совместимые с prosemirror-markdown,
+            const base = { level: 0, map: null, children: null, markup: '', info: '', meta: null, block: false, hidden: false }
+            const open = { ...base, type: 'math_inline_open', tag: 'math', nesting: 1, attrs: null, content: '' } as any
+            const text = { ...base, type: 'text', content: content, nesting: 0, attrs: null } as any
+            const close = { ...base, type: 'math_inline_close', tag: 'math', nesting: -1, attrs: null, content: '' } as any
+            
+            children.splice(j, 1, open, text, close)
+          }
+        }
+      }
+    }
+  })
+}
+
 // ============================================================
 // Парсер: Markdown → ProseMirror doc
 // ============================================================
@@ -57,6 +83,7 @@ const md = new MarkdownIt('default', { html: false })
   .use(markPlugin)
   .use(taskListPlugin)
   .use(texmath, { engine: katex, delimiters: 'dollars' })
+  .use(texmathFixPlugin)
 
 /**
  * Парсер.
@@ -100,7 +127,11 @@ export const markdownParser = new MarkdownParser(schema, md, {
   // Игнорируемые токены (не в MVP)
   code_block: { block: 'code_block', noCloseToken: true },
   fence: { block: 'code_block', getAttrs: tok => ({ params: tok.info || '' }), noCloseToken: true },
-  math_inline: { node: 'math_inline' },
+  
+  // КРИТИЧЕСКИЙ ФИКС: Используем `block` вместо `node`, чтобы MarkdownParser
+  // зарегистрировал обработчики _open и _close для инлайн-ноды, позволив ей содержать текст!
+  math_inline: { block: 'math_inline' },
+  
   math_block: { block: 'math_block', noCloseToken: true },
   math_display: { block: 'math_block', noCloseToken: true },
   image: { 
@@ -383,15 +414,143 @@ function cellText(_state: unknown, cell: PMNode): string {
 
 /** Markdown string → ProseMirror document */
 export function parseMarkdown(markdown: string): PMNode {
-  const doc = markdownParser.parse(markdown)
-  if (!doc) {
-    // Если парсинг вернул null — пустой документ
-    return schema.node('doc', null, [schema.node('paragraph')])
+  try {
+    const doc = markdownParser.parse(markdown)
+    if (!doc) {
+      // Если парсинг вернул null — пустой документ
+      return schema.node('doc', null, [schema.node('paragraph')])
+    }
+    return doc
+  } catch (error: any) {
+    console.error('Markdown parse error:', error)
+    // Возвращаем документ с текстом ошибки, чтобы приложение не падало в "черный экран"
+    return schema.node('doc', null, [
+      schema.node('paragraph', null, [
+         schema.text('CRITICAL PARSE ERROR: ' + (error.message || String(error)))
+      ]),
+      schema.node('code_block', { params: '' }, [
+         schema.text(String(error.stack || ''))
+      ])
+    ])
   }
-  return doc
 }
 
 /** ProseMirror document → Markdown string */
 export function serializeMarkdown(doc: PMNode): string {
-  return markdownSerializer.serialize(doc)
+  try {
+    return markdownSerializer.serialize(doc)
+  } catch (err) {
+    console.error('Ошибка сериализации Markdown:', err)
+    return ''
+  }
+}
+
+/** Markdown string → HTML string (for Export) */
+export function generateExportHtml(markdown: string): string {
+  // Конвертируем Markdown в HTML тело
+  const bodyHtml = md.render(markdown)
+  
+  // Добавляем стили KaTeX (загрузка из CDN) и базовую светлую тему
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Export</title>
+  
+  <!-- Подключение CSS для корректной отрисовки математики -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  
+  <style>
+    /* Дефолтная светлая тема (чистая/печатная) */
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background-color: #fff;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.5em;
+      margin-bottom: 0.5em;
+      font-weight: 600;
+      line-height: 1.25;
+    }
+    
+    h1 { font-size: 2em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
+    h2 { font-size: 1.5em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
+    
+    p { margin-top: 0; margin-bottom: 16px; }
+    
+    a { color: #0366d6; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    
+    code {
+      font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 85%;
+      background-color: rgba(27,31,35,0.05);
+      border-radius: 3px;
+      padding: 0.2em 0.4em;
+    }
+    
+    pre {
+      background-color: #f6f8fa;
+      border-radius: 6px;
+      padding: 16px;
+      overflow: auto;
+    }
+    
+    pre code {
+      background-color: transparent;
+      padding: 0;
+    }
+    
+    blockquote {
+      padding: 0 1em;
+      color: #6a737d;
+      border-left: 0.25em solid #dfe2e5;
+      margin: 0 0 16px 0;
+    }
+    
+    table {
+      border-spacing: 0;
+      border-collapse: collapse;
+      margin-bottom: 16px;
+      width: 100%;
+    }
+    
+    table th, table td {
+      padding: 6px 13px;
+      border: 1px solid #dfe2e5;
+    }
+    
+    table tr:nth-child(2n) {
+      background-color: #f6f8fa;
+    }
+    
+    hr {
+      height: 0.25em;
+      padding: 0;
+      margin: 24px 0;
+      background-color: #e1e4e8;
+      border: 0;
+    }
+    
+    /* Стили для математических блоков, чтобы они центрировались и влезали */
+    .katex-display {
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 1rem 0;
+    }
+  </style>
+</head>
+<body>
+  ${bodyHtml}
+</body>
+</html>
+  `.trim()
 }

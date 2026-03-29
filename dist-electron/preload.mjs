@@ -27,6 +27,14 @@ electron.contextBridge.exposeInMainWorld("api", {
   openFile: () => {
     return electron.ipcRenderer.invoke("dialog:openFile");
   },
+  /** Экспорт в HTML (откроет диалог сохранения) */
+  exportHtml: (content, defaultName) => {
+    return electron.ipcRenderer.invoke("export:html", content, defaultName);
+  },
+  /** Экспорт в PDF (откроет диалог сохранения) */
+  exportPdf: (htmlContent, defaultName) => {
+    return electron.ipcRenderer.invoke("export:pdf", htmlContent, defaultName);
+  },
   // ==========================================
   // Управление окном (frameless window)
   // ==========================================

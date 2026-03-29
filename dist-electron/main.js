@@ -1,4 +1,4 @@
-import { ipcMain, dialog, app, BrowserWindow } from "electron";
+import { ipcMain, dialog, BrowserWindow, app } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import fs from "node:fs";
@@ -95,6 +95,51 @@ ipcMain.handle("dialog:openFile", async () => {
   const filePath = result.filePaths[0];
   const content = fs.readFileSync(filePath, "utf-8");
   return { filePath, content };
+});
+ipcMain.handle("export:html", async (_event, htmlContent, defaultName) => {
+  const result = await dialog.showSaveDialog(win, {
+    title: "Экспорт в HTML",
+    defaultPath: defaultName,
+    filters: [{ name: "HTML Document", extensions: ["html"] }]
+  });
+  if (result.canceled || !result.filePath) return false;
+  try {
+    fs.writeFileSync(result.filePath, htmlContent, "utf-8");
+    return true;
+  } catch (err) {
+    console.error("Ошибка экспорта HTML:", err);
+    return false;
+  }
+});
+ipcMain.handle("export:pdf", async (_event, htmlContent, defaultName) => {
+  const result = await dialog.showSaveDialog(win, {
+    title: "Экспорт в PDF",
+    defaultPath: defaultName,
+    filters: [{ name: "PDF Document", extensions: ["pdf"] }]
+  });
+  if (result.canceled || !result.filePath) return false;
+  try {
+    const printWin = new BrowserWindow({
+      show: false,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true
+      }
+    });
+    const dataUri = "data:text/html;charset=utf-8," + encodeURIComponent(htmlContent);
+    await printWin.loadURL(dataUri);
+    const pdfBuffer = await printWin.webContents.printToPDF({
+      printBackground: true,
+      pageSize: "A4",
+      margins: { marginType: "default" }
+    });
+    fs.writeFileSync(result.filePath, pdfBuffer);
+    printWin.close();
+    return true;
+  } catch (err) {
+    console.error("Ошибка экспорта PDF:", err);
+    return false;
+  }
 });
 ipcMain.on("window:minimize", () => win == null ? void 0 : win.minimize());
 ipcMain.on("window:maximize", () => {

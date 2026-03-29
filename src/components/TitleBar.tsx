@@ -6,6 +6,7 @@
  * - Кнопки управления окном (свернуть, развернуть, закрыть)
  */
 import { useEditor } from '../context/EditorContext'
+import { MenuBar } from './MenuBar'
 
 export function TitleBar() {
   const { saveActiveFile } = useEditor()
@@ -14,11 +15,11 @@ export function TitleBar() {
     <div className="flex items-center h-9 bg-[#1e1f22] border-b border-[#2d2e32] select-none">
       {/* Область перетаскивания окна */}
       <div
-        className="flex-1 flex items-center h-full px-4"
+        className="flex-1 flex items-center h-full px-3"
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
         {/* Логотип */}
-        <div className="flex items-center gap-2 text-[#a0a4ab] text-xs font-medium tracking-wide">
+        <div className="flex items-center gap-2 text-[#a0a4ab] text-xs font-medium tracking-wide mr-2">
           <svg
             width="14"
             height="14"
@@ -34,12 +35,15 @@ export function TitleBar() {
             <path d="M9 20h6" />
             <path d="M12 4v16" />
           </svg>
-          <span>Type Club</span>
+          {/* Убираем текст 'Type Club', так как у нас теперь меню как в VS Code */}
         </div>
+        
+        {/* Интерактивное Меню (File, Edit...) */}
+        <MenuBar />
 
         {/* Горячие клавиши (показываем как подсказку) */}
         <div
-          className="ml-4 flex items-center gap-3"
+          className="ml-auto flex items-center gap-3 pr-4"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
           <button

@@ -292,13 +292,9 @@ export function getEditorStyles(): string {
   cursor: text;
 }
 
-/* Inactive State (not focused): hide the raw text hole */
+/* Inactive State (not focused): hide the raw text hole completely */
 .math-inline.is-inactive {
-  font-size: 0;
-  color: transparent;
-  padding: 0;
-  margin: 0;
-  vertical-align: top;
+  display: none;
 }
 
 /* Active State (focused): show the text and $ boundaries */

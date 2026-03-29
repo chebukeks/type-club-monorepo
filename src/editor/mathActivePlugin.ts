@@ -22,6 +22,21 @@ export const mathActivePlugin = new Plugin({
   props: {
     decorations(state) {
       return mathActiveKey.getState(state)
+    },
+    handleClick(view, _pos, event) {
+      const target = event.target as HTMLElement
+      const renderEl = target.closest('.math-inline-render') as HTMLElement
+      if (renderEl) {
+        const nodePos = parseInt(renderEl.dataset.pos || '-1', 10)
+        if (nodePos > -1) {
+          const { TextSelection } = require('prosemirror-state')
+          const tr = view.state.tr
+          // Ставим курсор внутрь формулы
+          view.dispatch(tr.setSelection(TextSelection.create(view.state.doc, nodePos + 1)))
+          return true
+        }
+      }
+      return false
     }
   }
 })
@@ -81,11 +96,10 @@ function buildDecorations(state: any): DecorationSet {
         
         // Inline render Widget
         const renderInline = () => {
-          const anchor = document.createElement('span')
-          anchor.className = 'math-inline-render-anchor'
-
           const span = document.createElement('span')
           span.className = 'math-inline-render'
+          span.dataset.pos = String(pos) // Сохраняем реальную позицию для клика
+          
           const text = node.textContent?.trim() || ''
           
           if (!text) {
@@ -97,12 +111,10 @@ function buildDecorations(state: any): DecorationSet {
                 span.textContent = text
              }
           }
-          
-          anchor.appendChild(span)
-          return anchor
+          return span
         }
         
-        decos.push(Decoration.widget(pos, renderInline, { side: -1, ignoreSelection: true }))
+        decos.push(Decoration.widget(pos + node.nodeSize, renderInline, { side: 1, ignoreSelection: true }))
       }
     }
     

@@ -39,6 +39,16 @@ contextBridge.exposeInMainWorld('api', {
     return ipcRenderer.invoke('dialog:openFile')
   },
 
+  /** Экспорт в HTML (откроет диалог сохранения) */
+  exportHtml: (content: string, defaultName: string) => {
+    return ipcRenderer.invoke('export:html', content, defaultName)
+  },
+
+  /** Экспорт в PDF (откроет диалог сохранения) */
+  exportPdf: (htmlContent: string, defaultName: string) => {
+    return ipcRenderer.invoke('export:pdf', htmlContent, defaultName)
+  },
+
   // ==========================================
   // Управление окном (frameless window)
   // ==========================================

@@ -57,6 +57,9 @@ export interface IElectronAPI {
   minimizeWindow: () => void;
   maximizeWindow: () => void;
   closeWindow: () => void;
+  /** Экспорт */
+  exportHtml: (content: string, defaultName: string) => Promise<boolean>;
+  exportPdf: (content: string, defaultName: string) => Promise<boolean>;
 }
 
 /** Расширение глобального Window для доступа к API */

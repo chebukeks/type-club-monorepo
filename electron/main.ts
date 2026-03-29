@@ -147,6 +147,67 @@ ipcMain.handle('dialog:openFile', async (): Promise<{ filePath: string; content:
   return { filePath, content }
 })
 
+// --- Экспорт в HTML ---
+ipcMain.handle('export:html', async (_event, htmlContent: string, defaultName: string): Promise<boolean> => {
+  const result = await dialog.showSaveDialog(win!, {
+    title: 'Экспорт в HTML',
+    defaultPath: defaultName,
+    filters: [{ name: 'HTML Document', extensions: ['html'] }]
+  })
+  
+  if (result.canceled || !result.filePath) return false
+  
+  try {
+    fs.writeFileSync(result.filePath, htmlContent, 'utf-8')
+    return true
+  } catch (err) {
+    console.error('Ошибка экспорта HTML:', err)
+    return false
+  }
+})
+
+// --- Экспорт в PDF ---
+ipcMain.handle('export:pdf', async (_event, htmlContent: string, defaultName: string): Promise<boolean> => {
+  const result = await dialog.showSaveDialog(win!, {
+    title: 'Экспорт в PDF',
+    defaultPath: defaultName,
+    filters: [{ name: 'PDF Document', extensions: ['pdf'] }]
+  })
+  
+  if (result.canceled || !result.filePath) return false
+  
+  try {
+    // Создаем скрытое окно для рендеринга PDF
+    const printWin = new BrowserWindow({
+      show: false,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true
+      }
+    })
+    
+    // Загружаем HTML-контент через Data URI, чтобы он отрендерился внутри Chromium
+    const dataUri = 'data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent)
+    await printWin.loadURL(dataUri)
+    
+    // Генерируем PDF
+    const pdfBuffer = await printWin.webContents.printToPDF({
+      printBackground: true,
+      pageSize: 'A4',
+      margins: { marginType: 'default' }
+    })
+    
+    // Сохраняем и чистим окно
+    fs.writeFileSync(result.filePath, pdfBuffer)
+    printWin.close()
+    
+    return true
+  } catch (err) {
+    console.error('Ошибка экспорта PDF:', err)
+    return false
+  }
+})
+
 // ============================================================
 // IPC-хэндлеры для управления окном
 // ============================================================
