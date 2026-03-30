@@ -19,6 +19,8 @@ import markPlugin from 'markdown-it-mark'
 import texmath from 'markdown-it-texmath'
 import katex from 'katex'
 import { schema } from './schema'
+// @ts-ignore
+import taskListsPlugin from 'markdown-it-task-lists'
 
 // Самописный плагин для task-lists (избегаем багов markdown-it-task-lists)
 function taskListPlugin(md: MarkdownIt) {
@@ -447,10 +449,24 @@ export function serializeMarkdown(doc: PMNode): string {
 
 /** Markdown string → HTML string (for Export) */
 export function generateExportHtml(markdown: string): string {
-  // Конвертируем Markdown в HTML тело
-  const bodyHtml = md.render(markdown)
+  // --- Инициализируем чистый парсер специально для экспорта ---
+  // Нам не нужны костыли для ProseMirror (texmathFixPlugin, кастомные чекбоксы),
+  // нам нужен родной, стандартный рендер HTML.
   
-  // Добавляем стили KaTeX (загрузка из CDN) и базовую светлую тему
+  const exportMd = new MarkdownIt('default', {
+    html: true,
+    breaks: true,
+    linkify: true,
+  })
+    .use(texmath, { engine: katex, delimiters: 'dollars' })
+    .use(taskListsPlugin, { enabled: true, label: true })
+    .use(markPlugin)
+
+  // Конвертируем Markdown в HTML тело
+  const bodyHtml = exportMd.render(markdown)
+  
+  // Добавляем стили KaTeX через CDN, НО и локальный фолбэк для отключения 
+  // дублирующихся .katex-mathml элементов, если CDN не подгрузится (например при экспорте PDF через Electron).
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -459,7 +475,7 @@ export function generateExportHtml(markdown: string): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Export</title>
   
-  <!-- Подключение CSS для корректной отрисовки математики -->
+  <!-- Подключение CSS для математики -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
   
   <style>
@@ -540,11 +556,30 @@ export function generateExportHtml(markdown: string): string {
       border: 0;
     }
     
-    /* Стили для математических блоков, чтобы они центрировались и влезали */
+    /* Стили для математических блоков, чтобы они не дублировались даже если CDN падает (ошибка -100) */
+    .katex-mathml {
+      position: absolute;
+      clip: rect(1px, 1px, 1px, 1px);
+      padding: 0;
+      border: 0;
+      height: 1px;
+      width: 1px;
+      overflow: hidden;
+    }
+    
     .katex-display {
       overflow-x: auto;
       overflow-y: hidden;
       padding: 1rem 0;
+    }
+
+    /* Стили для нормального отображения чекбоксов (Task Lists) */
+    .task-list-item {
+      list-style-type: none;
+    }
+    .task-list-item input[type="checkbox"] {
+      margin-right: 8px;
+      vertical-align: middle;
     }
   </style>
 </head>

@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
+import os from 'node:os'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -185,20 +186,29 @@ ipcMain.handle('export:pdf', async (_event, htmlContent: string, defaultName: st
         contextIsolation: true
       }
     })
+    // Создаем временный файл, чтобы Chromium мог корректно загрузить внешние ресурсы (CSS/Fonts)
+    // Data URI блокирует загрузку шрифтов из-за строгой политики безопасности (CORS/Opaque Origin)
+    const tempHtmlPath = path.join(os.tmpdir(), `type_club_export_${Date.now()}.html`)
+    fs.writeFileSync(tempHtmlPath, htmlContent, 'utf-8')
     
-    // Загружаем HTML-контент через Data URI, чтобы он отрендерился внутри Chromium
-    const dataUri = 'data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent)
-    await printWin.loadURL(dataUri)
+    // Загружаем сохраненный HTML файл с диска
+    await printWin.loadURL(`file://${tempHtmlPath}`)
     
-    // Генерируем PDF
+    // ДОЖИДАЕМСЯ загрузки всех веб-шрифтов KaTeX (чтобы формулы не были "скукоженными")
+    await printWin.webContents.executeJavaScript('document.fonts.ready')
+    // Небольшая доп. пауза на всякий случай для применения CSS
+    await new Promise(resolve => setTimeout(resolve, 500))
+    
+    // Генерация PDF (Chromium может подождать небольшой таймаут для загрузки шрифтов)
     const pdfBuffer = await printWin.webContents.printToPDF({
       printBackground: true,
       pageSize: 'A4',
       margins: { marginType: 'default' }
     })
     
-    // Сохраняем и чистим окно
+    // Сохраняем финальный PDF в выбранное пользователем место и чистим временный файл
     fs.writeFileSync(result.filePath, pdfBuffer)
+    fs.unlinkSync(tempHtmlPath)
     printWin.close()
     
     return true

@@ -1,169 +1,133 @@
-import { ipcMain, dialog, BrowserWindow, app } from "electron";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
-import fs from "node:fs";
-const __dirname$1 = path.dirname(fileURLToPath(import.meta.url));
-process.env.APP_ROOT = path.join(__dirname$1, "..");
-const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
-const MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
-const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
-process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
-let win;
-function createWindow() {
-  win = new BrowserWindow({
+import { ipcMain as s, dialog as d, BrowserWindow as u, app as f } from "electron";
+import { fileURLToPath as _ } from "node:url";
+import a from "node:path";
+import l from "node:fs";
+import g from "node:os";
+const p = a.dirname(_(import.meta.url));
+process.env.APP_ROOT = a.join(p, "..");
+const m = process.env.VITE_DEV_SERVER_URL, x = a.join(process.env.APP_ROOT, "dist-electron"), h = a.join(process.env.APP_ROOT, "dist");
+process.env.VITE_PUBLIC = m ? a.join(process.env.APP_ROOT, "public") : h;
+let t;
+function w() {
+  t = new u({
     width: 1200,
     height: 800,
     minWidth: 800,
     minHeight: 500,
-    frame: false,
+    frame: !1,
     // Убираем системную рамку
     titleBarStyle: "hidden",
     // Скрываем заголовок
-    icon: path.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
+    icon: a.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
     webPreferences: {
-      preload: path.join(__dirname$1, "preload.mjs"),
-      contextIsolation: true,
+      preload: a.join(p, "preload.mjs"),
+      contextIsolation: !0,
       // Изоляция контекста (безопасность)
-      nodeIntegration: false
+      nodeIntegration: !1
       // Запрет прямого доступа к Node.js
     }
-  });
-  if (VITE_DEV_SERVER_URL) {
-    win.loadURL(VITE_DEV_SERVER_URL);
-  } else {
-    win.loadFile(path.join(RENDERER_DIST, "index.html"));
-  }
+  }), m ? t.loadURL(m) : t.loadFile(a.join(h, "index.html"));
 }
-function readDirRecursive(dirPath) {
+function y(i) {
   try {
-    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-    const result = [];
-    for (const entry of entries) {
-      if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
-      const fullPath = path.join(dirPath, entry.name);
-      if (entry.isDirectory()) {
-        const children = readDirRecursive(fullPath);
-        if (children.length > 0) {
-          result.push({
-            name: entry.name,
-            path: fullPath,
-            isDirectory: true,
-            children
-          });
-        }
-      } else if (entry.name.endsWith(".md")) {
-        result.push({
-          name: entry.name,
-          path: fullPath,
-          isDirectory: false
+    const r = l.readdirSync(i, { withFileTypes: !0 }), o = [];
+    for (const e of r) {
+      if (e.name.startsWith(".") || e.name === "node_modules") continue;
+      const n = a.join(i, e.name);
+      if (e.isDirectory()) {
+        const c = y(n);
+        c.length > 0 && o.push({
+          name: e.name,
+          path: n,
+          isDirectory: !0,
+          children: c
         });
-      }
+      } else e.name.endsWith(".md") && o.push({
+        name: e.name,
+        path: n,
+        isDirectory: !1
+      });
     }
-    return result.sort((a, b) => {
-      if (a.isDirectory && !b.isDirectory) return -1;
-      if (!a.isDirectory && b.isDirectory) return 1;
-      return a.name.localeCompare(b.name);
-    });
+    return o.sort((e, n) => e.isDirectory && !n.isDirectory ? -1 : !e.isDirectory && n.isDirectory ? 1 : e.name.localeCompare(n.name));
   } catch {
     return [];
   }
 }
-ipcMain.handle("fs:readFile", async (_event, filePath) => {
-  return fs.readFileSync(filePath, "utf-8");
+s.handle("fs:readFile", async (i, r) => l.readFileSync(r, "utf-8"));
+s.handle("fs:writeFile", async (i, r, o) => {
+  l.writeFileSync(r, o, "utf-8");
 });
-ipcMain.handle("fs:writeFile", async (_event, filePath, content) => {
-  fs.writeFileSync(filePath, content, "utf-8");
-});
-ipcMain.handle("fs:readDir", async (_event, dirPath) => {
-  return readDirRecursive(dirPath);
-});
-ipcMain.handle("dialog:openFolder", async () => {
-  const result = await dialog.showOpenDialog({
+s.handle("fs:readDir", async (i, r) => y(r));
+s.handle("dialog:openFolder", async () => {
+  const i = await d.showOpenDialog({
     properties: ["openDirectory"],
     title: "Выберите рабочую папку"
   });
-  if (result.canceled || result.filePaths.length === 0) return null;
-  return result.filePaths[0];
+  return i.canceled || i.filePaths.length === 0 ? null : i.filePaths[0];
 });
-ipcMain.handle("dialog:openFile", async () => {
-  const result = await dialog.showOpenDialog({
+s.handle("dialog:openFile", async () => {
+  const i = await d.showOpenDialog({
     properties: ["openFile"],
     filters: [{ name: "Markdown", extensions: ["md"] }],
     title: "Открыть Markdown-файл"
   });
-  if (result.canceled || result.filePaths.length === 0) return null;
-  const filePath = result.filePaths[0];
-  const content = fs.readFileSync(filePath, "utf-8");
-  return { filePath, content };
+  if (i.canceled || i.filePaths.length === 0) return null;
+  const r = i.filePaths[0], o = l.readFileSync(r, "utf-8");
+  return { filePath: r, content: o };
 });
-ipcMain.handle("export:html", async (_event, htmlContent, defaultName) => {
-  const result = await dialog.showSaveDialog(win, {
+s.handle("export:html", async (i, r, o) => {
+  const e = await d.showSaveDialog(t, {
     title: "Экспорт в HTML",
-    defaultPath: defaultName,
+    defaultPath: o,
     filters: [{ name: "HTML Document", extensions: ["html"] }]
   });
-  if (result.canceled || !result.filePath) return false;
+  if (e.canceled || !e.filePath) return !1;
   try {
-    fs.writeFileSync(result.filePath, htmlContent, "utf-8");
-    return true;
-  } catch (err) {
-    console.error("Ошибка экспорта HTML:", err);
-    return false;
+    return l.writeFileSync(e.filePath, r, "utf-8"), !0;
+  } catch (n) {
+    return console.error("Ошибка экспорта HTML:", n), !1;
   }
 });
-ipcMain.handle("export:pdf", async (_event, htmlContent, defaultName) => {
-  const result = await dialog.showSaveDialog(win, {
+s.handle("export:pdf", async (i, r, o) => {
+  const e = await d.showSaveDialog(t, {
     title: "Экспорт в PDF",
-    defaultPath: defaultName,
+    defaultPath: o,
     filters: [{ name: "PDF Document", extensions: ["pdf"] }]
   });
-  if (result.canceled || !result.filePath) return false;
+  if (e.canceled || !e.filePath) return !1;
   try {
-    const printWin = new BrowserWindow({
-      show: false,
+    const n = new u({
+      show: !1,
       webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: true
+        nodeIntegration: !1,
+        contextIsolation: !0
       }
-    });
-    const dataUri = "data:text/html;charset=utf-8," + encodeURIComponent(htmlContent);
-    await printWin.loadURL(dataUri);
-    const pdfBuffer = await printWin.webContents.printToPDF({
-      printBackground: true,
+    }), c = a.join(g.tmpdir(), `type_club_export_${Date.now()}.html`);
+    l.writeFileSync(c, r, "utf-8"), await n.loadURL(`file://${c}`), await n.webContents.executeJavaScript("document.fonts.ready"), await new Promise((D) => setTimeout(D, 500));
+    const P = await n.webContents.printToPDF({
+      printBackground: !0,
       pageSize: "A4",
       margins: { marginType: "default" }
     });
-    fs.writeFileSync(result.filePath, pdfBuffer);
-    printWin.close();
-    return true;
-  } catch (err) {
-    console.error("Ошибка экспорта PDF:", err);
-    return false;
+    return l.writeFileSync(e.filePath, P), l.unlinkSync(c), n.close(), !0;
+  } catch (n) {
+    return console.error("Ошибка экспорта PDF:", n), !1;
   }
 });
-ipcMain.on("window:minimize", () => win == null ? void 0 : win.minimize());
-ipcMain.on("window:maximize", () => {
-  if (win == null ? void 0 : win.isMaximized()) {
-    win.unmaximize();
-  } else {
-    win == null ? void 0 : win.maximize();
-  }
+s.on("window:minimize", () => t == null ? void 0 : t.minimize());
+s.on("window:maximize", () => {
+  t != null && t.isMaximized() ? t.unmaximize() : t == null || t.maximize();
 });
-ipcMain.on("window:close", () => win == null ? void 0 : win.close());
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-    win = null;
-  }
+s.on("window:close", () => t == null ? void 0 : t.close());
+f.on("window-all-closed", () => {
+  process.platform !== "darwin" && (f.quit(), t = null);
 });
-app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
-  }
+f.on("activate", () => {
+  u.getAllWindows().length === 0 && w();
 });
-app.whenReady().then(createWindow);
+f.whenReady().then(w);
 export {
-  MAIN_DIST,
-  RENDERER_DIST,
-  VITE_DEV_SERVER_URL
+  x as MAIN_DIST,
+  h as RENDERER_DIST,
+  m as VITE_DEV_SERVER_URL
 };

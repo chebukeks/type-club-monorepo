@@ -90,15 +90,6 @@ export function MenuBar() {
         )}
       </div>
 
-      {/* Заглушки для будущего */}
-      {['Edit', 'Selection', 'View', 'Go', 'Run', 'Terminal', 'Help'].map(name => (
-        <button
-          key={name}
-          className="px-3 py-1 rounded hover:bg-[#313238] transition-colors"
-        >
-          {name}
-        </button>
-      ))}
     </div>
   )
 }
