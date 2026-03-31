@@ -1,30 +1,25 @@
 /**
  * Sidebar.tsx — Боковая панель File Explorer.
- * Позволяет:
- * - Открыть рабочую папку
- * - Просматривать дерево .md файлов
- * - Кликнуть по файлу для открытия во вкладке
  */
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useEditor } from '../context/EditorContext'
 import type { FileEntry } from '../types'
 
 export function Sidebar() {
-  const { state, openFolder, openFile } = useEditor()
+  const { state, dispatch, openFolder, openFile, createFile, createFolder } = useEditor()
 
   return (
-    <div className="w-60 min-w-[200px] max-w-[400px] bg-[#1e1f22] border-r border-[#2d2e32] flex flex-col h-full">
-      {/* Заголовок панели — высота h-9 совпадает с TabBar */}
+    <div className="w-60 min-w-[200px] max-w-[400px] bg-[var(--bg-surface)] border-r border-[var(--border-default)] flex flex-col h-full">
       <div
-        className="flex items-center justify-between border-b border-[#2d2e32]"
+        className="flex items-center justify-between border-b border-[var(--border-default)]"
         style={{ height: '36px', paddingLeft: '16px', paddingRight: '12px' }}
       >
-        <span className="text-[11px] font-semibold uppercase tracking-widest text-[#6a6e78]">
+        <span className="text-[11px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">
           Проводник
         </span>
         <button
           onClick={openFolder}
-          className="p-1 rounded hover:bg-[#2a2d33] text-[#6a6e78] hover:text-[#a0a4ab] transition-colors"
+          className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors"
           title="Открыть папку"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -34,22 +29,28 @@ export function Sidebar() {
           </svg>
         </button>
       </div>
-
-      {/* Дерево файлов */}
       <div className="flex-1 overflow-y-auto py-2">
-        {state.fileTree.length === 0 ? (
+        {state.fileTree.length === 0 && !state.creating ? (
           <EmptyState onOpenFolder={openFolder} />
         ) : (
           <div className="px-1">
+            {state.creating && (
+              <InlineCreateInput
+                type={state.creating.type}
+                onSubmit={(name) => {
+                  if (state.creating?.type === 'file') createFile(name)
+                  else createFolder(name)
+                }}
+                onCancel={() => dispatch({ type: 'STOP_CREATING' })}
+              />
+            )}
             {state.fileTree.map((entry) => (
               <FileTreeItem
                 key={entry.path}
                 entry={entry}
                 depth={0}
                 onFileClick={(filePath, fileName) => openFile(filePath, fileName)}
-                activeFilePath={
-                  state.tabs.find((t) => t.id === state.activeTabId)?.filePath || null
-                }
+                activeFilePath={state.tabs.find((t) => t.id === state.activeTabId)?.filePath || null}
               />
             ))}
           </div>
@@ -59,92 +60,78 @@ export function Sidebar() {
   )
 }
 
-/** Заглушка при пустом проводнике */
-function EmptyState({ onOpenFolder }: { onOpenFolder: () => void }) {
+function InlineCreateInput({ type, onSubmit, onCancel }: {
+  type: 'file' | 'folder'; onSubmit: (name: string) => void; onCancel: () => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  useEffect(() => { inputRef.current?.focus() }, [])
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') { const name = e.currentTarget.value.trim(); if (name) onSubmit(name); else onCancel() }
+    else if (e.key === 'Escape') onCancel()
+  }
   return (
-    <div className="flex flex-col items-center justify-center h-full px-6 text-center">
-      <svg
-        width="40"
-        height="40"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="text-[#3a3d44] mb-4"
-      >
-        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-      </svg>
-      <p className="text-[13px] text-[#6a6e78] mb-3">
-        Нет открытой папки
-      </p>
-      <button
-        onClick={onOpenFolder}
-        className="px-3 py-1.5 text-[12px] font-medium bg-[#6c8cff] text-white rounded-md hover:bg-[#5a7aef] transition-colors"
-      >
-        Открыть папку
-      </button>
+    <div className="flex items-center gap-1.5 rounded" style={{ padding: '4px 8px' }}>
+      {type === 'folder' ? (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-[var(--text-dim)]">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+        </svg>
+      ) : (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-[var(--accent)]">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+        </svg>
+      )}
+      <input ref={inputRef} type="text"
+        className="flex-1 bg-[var(--bg-hover)] text-[var(--text-primary)] text-[13px] border border-[var(--accent)] rounded px-1.5 py-0.5 outline-none"
+        placeholder={type === 'folder' ? 'Имя папки...' : 'Имя файла...'}
+        onKeyDown={handleKeyDown} onBlur={onCancel}
+      />
     </div>
   )
 }
 
-/** Рекурсивный элемент дерева файлов */
-function FileTreeItem({
-  entry,
-  depth,
-  onFileClick,
-  activeFilePath,
-}: {
-  entry: FileEntry
-  depth: number
-  onFileClick: (filePath: string, fileName: string) => void
-  activeFilePath: string | null
+function EmptyState({ onOpenFolder }: { onOpenFolder: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full px-6 text-center">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--text-disabled)] mb-4">
+        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+      </svg>
+      <p className="text-[13px] text-[var(--text-dim)] mb-3">Нет открытой папки</p>
+      <button onClick={onOpenFolder}
+        className="px-3 py-1.5 text-[12px] font-medium bg-[var(--accent)] text-white rounded-md hover:bg-[var(--accent-hover)] transition-colors"
+      >Открыть папку</button>
+    </div>
+  )
+}
+
+function FileTreeItem({ entry, depth, onFileClick, activeFilePath }: {
+  entry: FileEntry; depth: number;
+  onFileClick: (filePath: string, fileName: string) => void;
+  activeFilePath: string | null;
 }) {
-  const [isOpen, setIsOpen] = useState(depth < 1) // Первый уровень раскрыт по умолчанию
+  const [isOpen, setIsOpen] = useState(depth < 1)
   const isActive = entry.path === activeFilePath
 
   if (entry.isDirectory) {
     return (
       <div>
-        {/* Папка */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="w-full flex items-center gap-1.5 text-[13px] text-[#a0a4ab] hover:bg-[#2a2d33] rounded transition-colors"
-          style={{
-            paddingTop: '5px',
-            paddingBottom: '5px',
-            paddingLeft: `${depth * 12 + 8}px`,
-            paddingRight: '8px',
-          }}
+          className="w-full flex items-center gap-1.5 text-[13px] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] rounded transition-colors"
+          style={{ paddingTop: '5px', paddingBottom: '5px', paddingLeft: `${depth * 12 + 8}px`, paddingRight: '8px' }}
         >
-          {/* Стрелка раскрытия */}
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 12 12"
-            className={`transition-transform flex-shrink-0 ${isOpen ? 'rotate-90' : ''}`}
-            fill="currentColor"
-          >
+          <svg width="12" height="12" viewBox="0 0 12 12" className={`transition-transform flex-shrink-0 ${isOpen ? 'rotate-90' : ''}`} fill="currentColor">
             <path d="M4 2l4 4-4 4z" />
           </svg>
-          {/* Иконка папки */}
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-[#6a6e78]">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-[var(--text-dim)]">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
           </svg>
           <span className="truncate">{entry.name}</span>
         </button>
-        {/* Дочерние элементы */}
         {isOpen && entry.children && (
           <div>
             {entry.children.map((child) => (
-              <FileTreeItem
-                key={child.path}
-                entry={child}
-                depth={depth + 1}
-                onFileClick={onFileClick}
-                activeFilePath={activeFilePath}
-              />
+              <FileTreeItem key={child.path} entry={child} depth={depth + 1} onFileClick={onFileClick} activeFilePath={activeFilePath} />
             ))}
           </div>
         )}
@@ -152,24 +139,15 @@ function FileTreeItem({
     )
   }
 
-  // Файл
   return (
     <button
       onClick={() => onFileClick(entry.path, entry.name)}
       className={`w-full flex items-center gap-1.5 text-[13px] rounded transition-colors ${
-        isActive
-          ? 'bg-[#2a2d33] text-[#e1e1e3]'
-          : 'text-[#a0a4ab] hover:bg-[#2a2d33]'
+        isActive ? 'bg-[var(--bg-hover)] text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
       }`}
-      style={{
-        paddingTop: '5px',
-        paddingBottom: '5px',
-        paddingLeft: `${depth * 12 + 26}px`,
-        paddingRight: '8px',
-      }}
+      style={{ paddingTop: '5px', paddingBottom: '5px', paddingLeft: `${depth * 12 + 26}px`, paddingRight: '8px' }}
     >
-      {/* Иконка файла Markdown */}
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-[#6c8cff]">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-[var(--accent)]">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
         <polyline points="14 2 14 8 20 8" />
       </svg>

@@ -25,6 +25,11 @@ contextBridge.exposeInMainWorld('api', {
     return ipcRenderer.invoke('fs:readDir', dirPath)
   },
 
+  /** Создание директории */
+  createDir: (dirPath: string) => {
+    return ipcRenderer.invoke('fs:createDir', dirPath)
+  },
+
   // ==========================================
   // Диалоговые окна
   // ==========================================
@@ -39,6 +44,11 @@ contextBridge.exposeInMainWorld('api', {
     return ipcRenderer.invoke('dialog:openFile')
   },
 
+  /** Сохранить как... (диалог + запись) */
+  saveFileAs: (content: string, defaultName: string) => {
+    return ipcRenderer.invoke('dialog:saveFileAs', content, defaultName)
+  },
+
   /** Экспорт в HTML (откроет диалог сохранения) */
   exportHtml: (content: string, defaultName: string) => {
     return ipcRenderer.invoke('export:html', content, defaultName)
@@ -47,6 +57,20 @@ contextBridge.exposeInMainWorld('api', {
   /** Экспорт в PDF (откроет диалог сохранения) */
   exportPdf: (htmlContent: string, defaultName: string) => {
     return ipcRenderer.invoke('export:pdf', htmlContent, defaultName)
+  },
+
+  // ==========================================
+  // Хранилище настроек (electron-store)
+  // ==========================================
+
+  /** Получить значение из хранилища */
+  storeGet: (key: string) => {
+    return ipcRenderer.invoke('store:get', key)
+  },
+
+  /** Сохранить значение в хранилище */
+  storeSet: (key: string, value: unknown) => {
+    return ipcRenderer.invoke('store:set', key, value)
   },
 
   // ==========================================

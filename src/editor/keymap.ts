@@ -275,7 +275,7 @@ const customKeymap = keymap({
   'Mod-b': toggleMark(schema.marks.strong),
   'Mod-i': toggleMark(schema.marks.em),
   'Mod-e': toggleMark(schema.marks.code),
-  'Mod-Shift-s': toggleMark(schema.marks.s),
+  'Mod-Shift-x': toggleMark(schema.marks.s),
   'Mod-Shift-h': toggleMark(schema.marks.highlight),
   'Mod-Shift-.': wrapIn(schema.nodes.blockquote),
 

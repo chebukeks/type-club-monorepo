@@ -3,8 +3,16 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
 import os from 'node:os'
+import Store from 'electron-store'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+/** Хранилище настроек приложения */
+const store = new Store({
+  defaults: {
+    theme: 'dark',
+  },
+})
 
 /**
  * Структура сборки:
@@ -125,6 +133,11 @@ ipcMain.handle('fs:readDir', async (_event, dirPath: string): Promise<FileEntry[
   return readDirRecursive(dirPath)
 })
 
+// --- Создание директории ---
+ipcMain.handle('fs:createDir', async (_event, dirPath: string): Promise<void> => {
+  fs.mkdirSync(dirPath, { recursive: true })
+})
+
 // --- Диалог: открыть папку ---
 ipcMain.handle('dialog:openFolder', async (): Promise<string | null> => {
   const result = await dialog.showOpenDialog({
@@ -146,6 +159,24 @@ ipcMain.handle('dialog:openFile', async (): Promise<{ filePath: string; content:
   const filePath = result.filePaths[0]
   const content = fs.readFileSync(filePath, 'utf-8')
   return { filePath, content }
+})
+
+// --- Диалог: сохранить как... ---
+ipcMain.handle('dialog:saveFileAs', async (_event, content: string, defaultName: string): Promise<{ filePath: string } | null> => {
+  const result = await dialog.showSaveDialog(win!, {
+    title: 'Сохранить как...',
+    defaultPath: defaultName,
+    filters: [{ name: 'Markdown', extensions: ['md'] }]
+  })
+  if (result.canceled || !result.filePath) return null
+
+  try {
+    fs.writeFileSync(result.filePath, content, 'utf-8')
+    return { filePath: result.filePath }
+  } catch (err) {
+    console.error('Ошибка сохранения файла:', err)
+    return null
+  }
 })
 
 // --- Экспорт в HTML ---
@@ -216,6 +247,17 @@ ipcMain.handle('export:pdf', async (_event, htmlContent: string, defaultName: st
     console.error('Ошибка экспорта PDF:', err)
     return false
   }
+})
+
+// ============================================================
+// IPC-хэндлеры для хранилища настроек (electron-store)
+// ============================================================
+ipcMain.handle('store:get', async (_event, key: string) => {
+  return store.get(key)
+})
+
+ipcMain.handle('store:set', async (_event, key: string, value: unknown) => {
+  store.set(key as string, value)
 })
 
 // ============================================================

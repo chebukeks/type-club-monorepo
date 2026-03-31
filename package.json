@@ -21,6 +21,7 @@
     "@lezer/highlight": "^1.2.3",
     "@tailwindcss/vite": "^4.2.2",
     "@types/katex": "^0.16.8",
+    "electron-store": "^11.0.2",
     "highlight.js": "^11.11.1",
     "katex": "^0.16.44",
     "lucide-react": "^1.6.0",

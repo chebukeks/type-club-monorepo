@@ -11,6 +11,12 @@ export interface FileEntry {
   children?: FileEntry[];
 }
 
+/** Режим цветовой темы */
+export type ThemeMode = 'light' | 'dark' | 'system';
+
+/** Режим редактирования */
+export type EditorMode = 'raw' | 'seamless' | 'preview';
+
 /** Вкладка открытого файла в редакторе */
 export interface Tab {
   id: string;
@@ -18,6 +24,10 @@ export interface Tab {
   fileName: string;
   content: string;
   isModified: boolean;
+  /** Режим редактирования вкладки */
+  mode: EditorMode;
+  /** Счётчик для принудительного обновления */
+  refreshCounter: number;
 }
 
 /** Состояние приложения (для useReducer) */
@@ -30,6 +40,10 @@ export interface AppState {
   folderPath: string | null;
   /** Дерево файлов текущей папки */
   fileTree: FileEntry[];
+  /** Режим создания файла/папки (inline-ввод в Sidebar) */
+  creating: { type: 'file' | 'folder' } | null;
+  /** Текущая цветовая тема */
+  theme: ThemeMode;
 }
 
 /** Действия для редьюсера состояния */
@@ -39,30 +53,33 @@ export type AppAction =
   | { type: 'SET_ACTIVE_TAB'; payload: { tabId: string } }
   | { type: 'UPDATE_CONTENT'; payload: { tabId: string; content: string } }
   | { type: 'SET_FILE_TREE'; payload: { folderPath: string; fileTree: FileEntry[] } }
-  | { type: 'MARK_SAVED'; payload: { tabId: string } };
+  | { type: 'MARK_SAVED'; payload: { tabId: string } }
+  | { type: 'START_CREATING'; payload: { itemType: 'file' | 'folder' } }
+  | { type: 'STOP_CREATING' }
+  | { type: 'SET_THEME'; payload: { theme: ThemeMode } }
+  | { type: 'SET_TAB_MODE'; payload: { tabId: string; mode: EditorMode } }
+  | { type: 'REFRESH_TAB'; payload: { tabId: string } };
 
 /** API, доступный из Renderer-процесса через contextBridge */
 export interface IElectronAPI {
-  /** Чтение содержимого файла */
   readFile: (filePath: string) => Promise<string>;
-  /** Запись содержимого в файл */
   writeFile: (filePath: string, content: string) => Promise<void>;
-  /** Получение списка файлов и папок в директории */
   readDir: (dirPath: string) => Promise<FileEntry[]>;
-  /** Открытие диалога выбора папки */
+  createDir: (dirPath: string) => Promise<void>;
   openFolder: () => Promise<string | null>;
-  /** Открытие диалога выбора файла */
   openFile: () => Promise<{ filePath: string; content: string } | null>;
-  /** Управление окном */
+  saveFileAs: (content: string, defaultName: string) => Promise<{ filePath: string } | null>;
   minimizeWindow: () => void;
   maximizeWindow: () => void;
   closeWindow: () => void;
-  /** Экспорт */
   exportHtml: (content: string, defaultName: string) => Promise<boolean>;
   exportPdf: (content: string, defaultName: string) => Promise<boolean>;
+  /** Чтение настроек из electron-store */
+  storeGet: (key: string) => Promise<unknown>;
+  /** Запись настроек в electron-store */
+  storeSet: (key: string, value: unknown) => Promise<void>;
 }
 
-/** Расширение глобального Window для доступа к API */
 declare global {
   interface Window {
     api: IElectronAPI;
