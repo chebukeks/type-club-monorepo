@@ -14,8 +14,11 @@ export function Sidebar() {
 
   return (
     <div className="w-60 min-w-[200px] max-w-[400px] bg-[#1e1f22] border-r border-[#2d2e32] flex flex-col h-full">
-      {/* Заголовок панели */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[#2d2e32]">
+      {/* Заголовок панели — высота h-9 совпадает с TabBar */}
+      <div
+        className="flex items-center justify-between border-b border-[#2d2e32]"
+        style={{ height: '36px', paddingLeft: '16px', paddingRight: '12px' }}
+      >
         <span className="text-[11px] font-semibold uppercase tracking-widest text-[#6a6e78]">
           Проводник
         </span>
@@ -107,8 +110,13 @@ function FileTreeItem({
         {/* Папка */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="w-full flex items-center gap-1.5 px-2 py-1 text-[13px] text-[#a0a4ab] hover:bg-[#2a2d33] rounded transition-colors"
-          style={{ paddingLeft: `${depth * 12 + 8}px` }}
+          className="w-full flex items-center gap-1.5 text-[13px] text-[#a0a4ab] hover:bg-[#2a2d33] rounded transition-colors"
+          style={{
+            paddingTop: '5px',
+            paddingBottom: '5px',
+            paddingLeft: `${depth * 12 + 8}px`,
+            paddingRight: '8px',
+          }}
         >
           {/* Стрелка раскрытия */}
           <svg
@@ -148,12 +156,17 @@ function FileTreeItem({
   return (
     <button
       onClick={() => onFileClick(entry.path, entry.name)}
-      className={`w-full flex items-center gap-1.5 px-2 py-1 text-[13px] rounded transition-colors ${
+      className={`w-full flex items-center gap-1.5 text-[13px] rounded transition-colors ${
         isActive
           ? 'bg-[#2a2d33] text-[#e1e1e3]'
           : 'text-[#a0a4ab] hover:bg-[#2a2d33]'
       }`}
-      style={{ paddingLeft: `${depth * 12 + 26}px` }}
+      style={{
+        paddingTop: '5px',
+        paddingBottom: '5px',
+        paddingLeft: `${depth * 12 + 26}px`,
+        paddingRight: '8px',
+      }}
     >
       {/* Иконка файла Markdown */}
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-[#6c8cff]">

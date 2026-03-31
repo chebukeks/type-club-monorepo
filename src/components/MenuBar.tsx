@@ -55,18 +55,21 @@ export function MenuBar() {
   }
 
   return (
-    <div 
-      className="flex items-center text-[13px] text-[#cccccc] font-segoe select-none ml-2"
-      style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+    <div
+      className="flex items-center text-[13px] text-[#cccccc] select-none"
+      style={{
+        WebkitAppRegion: 'no-drag',
+        marginLeft: '0px',
+      } as React.CSSProperties}
       ref={menuRef}
     >
       {/* Меню File */}
       <div className="relative">
         <button
           onClick={() => toggleMenu('file')}
-          className={`px-3 py-1 rounded transition-colors ${
-            openMenu === 'file' ? 'bg-[#313238] text-white' : 'hover:bg-[#313238]'
-          }`}
+          className={`rounded transition-colors ${openMenu === 'file' ? 'bg-[#313238] text-white' : 'hover:bg-[#313238]'
+            }`}
+          style={{ padding: '2px 12px' }}
         >
           File
         </button>
@@ -74,13 +77,13 @@ export function MenuBar() {
         {openMenu === 'file' && (
           <div className="absolute top-full left-0 mt-1 w-48 py-1 bg-[#252526] border border-[#454545] rounded-md shadow-lg z-50">
             {/* Disabled if no active tab */}
-            <div 
+            <div
               className={`px-4 py-1.5 flex justify-between items-center ${activeTabId ? 'hover:bg-[#04395e] hover:text-white cursor-pointer' : 'text-[#6a6e78] cursor-default'}`}
               onClick={activeTabId ? handleExportHtml : undefined}
             >
               <span>Export to HTML...</span>
             </div>
-            <div 
+            <div
               className={`px-4 py-1.5 flex justify-between items-center ${activeTabId ? 'hover:bg-[#04395e] hover:text-white cursor-pointer' : 'text-[#6a6e78] cursor-default'}`}
               onClick={activeTabId ? handleExportPdf : undefined}
             >
@@ -89,7 +92,6 @@ export function MenuBar() {
           </div>
         )}
       </div>
-
     </div>
   )
 }

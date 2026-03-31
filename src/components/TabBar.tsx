@@ -22,11 +22,12 @@ export function TabBar() {
           <div
             key={tab.id}
             onClick={() => dispatch({ type: 'SET_ACTIVE_TAB', payload: { tabId: tab.id } })}
-            className={`group flex items-center gap-1.5 px-3 h-full cursor-pointer border-r border-[#2d2e32] transition-colors min-w-0 max-w-[180px] ${
+            className={`group flex items-center gap-1.5 h-full cursor-pointer border-r border-[#2d2e32] transition-colors min-w-0 max-w-[200px] ${
               isActive
                 ? 'bg-[#1a1b1e] text-[#e1e1e3] border-t-2 border-t-[#6c8cff]'
                 : 'text-[#6a6e78] hover:text-[#a0a4ab] hover:bg-[#232428] border-t-2 border-t-transparent'
             }`}
+            style={{ paddingLeft: '16px', paddingRight: '12px' }}
           >
             {/* Иконка файла */}
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 opacity-50">

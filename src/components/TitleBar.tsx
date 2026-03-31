@@ -12,14 +12,24 @@ export function TitleBar() {
   const { saveActiveFile } = useEditor()
 
   return (
-    <div className="flex items-center h-9 bg-[#1e1f22] border-b border-[#2d2e32] select-none">
+    <div
+      className="flex items-center h-9 bg-[#1e1f22] border-b border-[#2d2e32] select-none"
+      style={{ paddingLeft: '8px', paddingRight: '0' }}
+    >
       {/* Область перетаскивания окна */}
       <div
-        className="flex-1 flex items-center h-full px-3"
-        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+        className="flex-1 flex items-center h-full"
+        style={{
+          WebkitAppRegion: 'drag',
+          paddingLeft: '12px',
+          paddingRight: '12px',
+        } as React.CSSProperties}
       >
         {/* Логотип */}
-        <div className="flex items-center gap-2 text-[#a0a4ab] text-xs font-medium tracking-wide mr-2">
+        <div
+          className="flex items-center gap-2 text-[#a0a4ab] text-xs font-medium tracking-wide"
+          style={{ marginRight: '12px' }}
+        >
           <svg
             width="14"
             height="14"
@@ -40,21 +50,25 @@ export function TitleBar() {
 
         {/* Интерактивное Меню (File, Edit...) */}
         <MenuBar />
+      </div>
 
-        {/* Горячие клавиши (показываем как подсказку) */}
-        <div
-          className="ml-auto flex items-center gap-3 pr-4"
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      {/* Горячие клавиши (показываем как подсказку) */}
+      <div
+        className="flex items-center gap-3"
+        style={{
+          WebkitAppRegion: 'no-drag',
+          paddingLeft: '16px',
+          paddingRight: '16px',
+        } as React.CSSProperties}
+      >
+        <button
+          onClick={saveActiveFile}
+          className="text-[10px] text-[#6a6e78] hover:text-[#a0a4ab] transition-colors flex items-center gap-1"
+          title="Сохранить (Ctrl+S)"
         >
-          <button
-            onClick={saveActiveFile}
-            className="text-[10px] text-[#6a6e78] hover:text-[#a0a4ab] transition-colors flex items-center gap-1"
-            title="Сохранить (Ctrl+S)"
-          >
-            <kbd className="px-1 py-0.5 bg-[#2a2b30] rounded text-[9px]">Ctrl+S</kbd>
-            <span>Сохранить</span>
-          </button>
-        </div>
+          <kbd className="px-1 py-0.5 bg-[#2a2b30] rounded text-[9px]">Ctrl+S</kbd>
+          <span>Сохранить</span>
+        </button>
       </div>
 
       {/* Кнопки управления окном */}
