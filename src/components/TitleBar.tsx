@@ -37,7 +37,7 @@ export function TitleBar() {
           </svg>
           {/* Убираем текст 'Type Club', так как у нас теперь меню как в VS Code */}
         </div>
-        
+
         {/* Интерактивное Меню (File, Edit...) */}
         <MenuBar />
 
