@@ -117,7 +117,7 @@ export function getEditorStyles(): string {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 12px;
+  padding: 8px 16px;
   background: var(--codeblock-header);
   user-select: none;
 }
@@ -147,7 +147,7 @@ export function getEditorStyles(): string {
   font-size: 11px;
   color: var(--codeblock-copied);
 }
-.code-block-wrapper pre { margin: 0; padding: 12px; overflow-x: auto; }
+.ProseMirror .code-block-wrapper pre { margin: 0; padding: 16px; overflow-x: auto; }
 .code-block-content {
   font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
   font-size: 14px;

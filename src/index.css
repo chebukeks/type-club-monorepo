@@ -244,3 +244,22 @@ body {
   background-color: rgba(108, 140, 255, 0.05) !important;
   color: var(--text-dim) !important;
 }
+
+/* Пункты выпадающих меню */
+.menu-item {
+  padding: 8px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.menu-item.enabled {
+  cursor: pointer;
+}
+.menu-item.enabled:hover {
+  background: var(--menu-hover-bg);
+  color: var(--text-primary);
+}
+.menu-item.disabled {
+  color: var(--text-dim);
+  cursor: default;
+}

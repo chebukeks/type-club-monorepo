@@ -88,10 +88,7 @@ export function MenuBar() {
   const handleSetTheme = (t: ThemeMode) => { closeMenu(); setTheme(t) }
   const handleSetMode = (m: EditorMode) => { closeMenu(); if (activeTabId) setTabMode(activeTabId, m) }
 
-  const itemCls = (enabled: boolean) =>
-    `px-4 py-1.5 flex justify-between items-center ${
-      enabled ? 'hover:bg-[var(--menu-hover-bg)] hover:text-white cursor-pointer' : 'text-[var(--text-dim)] cursor-default'
-    }`
+  const itemCls = (enabled: boolean) => `menu-item ${enabled ? 'enabled' : 'disabled'}`
 
   const sep = <div className="border-t border-[var(--border-strong)] my-1" />
 
@@ -163,7 +160,7 @@ export function MenuBar() {
 
             {/* Тема — подменю */}
             <div
-              className="px-4 py-1.5 flex justify-between items-center hover:bg-[var(--menu-hover-bg)] hover:text-white cursor-pointer relative"
+              className="menu-item enabled relative"
               onMouseEnter={() => setSubmenu('theme')}
               onMouseLeave={() => setSubmenu(null)}
             >
@@ -188,7 +185,7 @@ export function MenuBar() {
 
             {/* Режим — подменю */}
             <div
-              className="px-4 py-1.5 flex justify-between items-center hover:bg-[var(--menu-hover-bg)] hover:text-white cursor-pointer relative"
+              className="menu-item enabled relative"
               onMouseEnter={() => setSubmenu('mode')}
               onMouseLeave={() => setSubmenu(null)}
             >
