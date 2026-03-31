@@ -7,7 +7,10 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies
 node_modules
+
+# Build output
 dist
 dist-ssr
 dist-electron
@@ -24,11 +27,24 @@ release/
 *.njsproj
 *.sln
 *.sw?
+
+# Environment
 .env
+.env.*
 
-# other
+# Agent / AI
 .agent
+.gemini
 
-# tests
+# Windows specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Tests & debug
 test-examples/
 test_bug.ts
+scripts/test_bug.ts
+
+# Electron builder cache
+*.blockmap
