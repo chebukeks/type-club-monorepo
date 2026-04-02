@@ -92,13 +92,29 @@ function InlineCreateInput({ type, onSubmit, onCancel }: {
 
 function EmptyState({ onOpenFolder }: { onOpenFolder: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center h-full px-6 text-center">
-      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--text-disabled)] mb-4">
+    <div
+      className="flex flex-col items-center justify-center h-full text-center"
+      style={{ gap: '20px', padding: '0 24px' }}
+    >
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-disabled)' }}>
         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
       </svg>
-      <p className="text-[13px] text-[var(--text-dim)] mb-3">Нет открытой папки</p>
-      <button onClick={onOpenFolder}
-        className="px-3 py-1.5 text-[12px] font-medium bg-[var(--accent)] text-white rounded-md hover:bg-[var(--accent-hover)] transition-colors"
+      <p style={{ fontSize: '13px', color: 'var(--text-dim)', margin: 0 }}>Нет открытой папки</p>
+      <button
+        onClick={onOpenFolder}
+        style={{
+          padding: '8px 20px',
+          fontSize: '13px',
+          fontWeight: 500,
+          background: 'var(--accent)',
+          color: 'white',
+          border: 'none',
+          borderRadius: '6px',
+          cursor: 'pointer',
+          transition: 'background 0.15s',
+        }}
+        onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-hover)')}
+        onMouseLeave={e => (e.currentTarget.style.background = 'var(--accent)')}
       >Открыть папку</button>
     </div>
   )

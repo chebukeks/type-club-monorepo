@@ -45,6 +45,7 @@ Desktop.ini
 test-examples/
 test_bug.ts
 scripts/test_bug.ts
+RELEASE_GUIDE.md
 
 # Electron builder cache
 *.blockmap

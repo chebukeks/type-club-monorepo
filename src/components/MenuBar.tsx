@@ -34,21 +34,21 @@ export function MenuBar() {
     const handleKeyDown = (e: KeyboardEvent) => {
       const ctrl = e.ctrlKey || e.metaKey
       const shift = e.shiftKey
-      const key = e.key.toLowerCase()
+      const code = e.code // физическая клавиша — не зависит от раскладки
 
-      if (ctrl && !shift && key === 's') { e.preventDefault(); saveActiveFile() }
-      else if (ctrl && shift && key === 's') { e.preventDefault(); saveActiveFileAs() }
-      else if (ctrl && !shift && key === 'o') { e.preventDefault(); openFileViaDialog() }
-      else if (ctrl && shift && key === 'o') { e.preventDefault(); openFolder() }
-      else if (ctrl && !shift && key === 'n') {
+      if (ctrl && !shift && code === 'KeyS') { e.preventDefault(); saveActiveFile() }
+      else if (ctrl && shift && code === 'KeyS') { e.preventDefault(); saveActiveFileAs() }
+      else if (ctrl && !shift && code === 'KeyO') { e.preventDefault(); openFileViaDialog() }
+      else if (ctrl && shift && code === 'KeyO') { e.preventDefault(); openFolder() }
+      else if (ctrl && !shift && code === 'KeyN') {
         e.preventDefault()
         if (folderPath) dispatch({ type: 'START_CREATING', payload: { itemType: 'file' } })
       }
-      else if (ctrl && shift && key === 'n') {
+      else if (ctrl && shift && code === 'KeyN') {
         e.preventDefault()
         if (folderPath) dispatch({ type: 'START_CREATING', payload: { itemType: 'folder' } })
       }
-      else if (e.key === 'F5') {
+      else if (e.code === 'F5') {
         e.preventDefault()
         if (activeTabId) refreshTab(activeTabId)
       }

@@ -84,20 +84,20 @@ export function MarkdownEditor() {
     const plugins: Plugin[] = isPreview
       ? [history(), dropCursor(), gapCursor(), syncPlugin]
       : [
-          ...getKeymapPlugins(),
-          getInputRulesPlugin(),
-          columnResizing({}),
-          tableEditing(),
-          tabPlugin,
-          seamlessPlugin,
-          syntaxHighlightPlugin,
-          linkTooltipPlugin(),
-          mathActivePlugin,
-          history(),
-          dropCursor(),
-          gapCursor(),
-          syncPlugin,
-        ]
+        ...getKeymapPlugins(),
+        getInputRulesPlugin(),
+        columnResizing({}),
+        tableEditing(),
+        tabPlugin,
+        seamlessPlugin,
+        syntaxHighlightPlugin,
+        linkTooltipPlugin(),
+        mathActivePlugin,
+        history(),
+        dropCursor(),
+        gapCursor(),
+        syncPlugin,
+      ]
 
     const editorState = EditorState.create({ doc, plugins })
 
@@ -138,22 +138,22 @@ export function MarkdownEditor() {
   // ============================================================
   if (!activeTab) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-[var(--bg-base)] text-[var(--text-disabled)]">
-        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="mb-6 opacity-40">
+      <div className="flex-1 flex flex-col items-center justify-center bg-[var(--bg-base)]" style={{ color: 'var(--text-disabled)' }}>
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '24px', opacity: 0.4 }}>
           <path d="M4 7V4h16v3" />
           <path d="M9 20h6" />
           <path d="M12 4v16" />
         </svg>
-        <h2 className="text-xl font-light text-[var(--text-dim)] mb-2">Type Club</h2>
-        <p className="text-[13px] text-[var(--text-disabled)]">Откройте файл или папку для начала работы</p>
-        <div className="mt-6 flex flex-col gap-2 text-[12px] text-[var(--text-disabled)]">
-          <span className="flex items-center gap-2">
-            <kbd className="px-1.5 py-0.5 bg-[var(--bg-hover)] rounded text-[11px] text-[var(--text-dim)]">Ctrl+O</kbd>
+        <h2 style={{ fontSize: '20px', fontWeight: 300, color: 'var(--text-dim)', marginBottom: '8px' }}>Type Club</h2>
+        <p style={{ fontSize: '13px', color: 'var(--text-disabled)', marginBottom: '20px' }}>Откройте файл или папку для начала работы</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '12px', color: 'var(--text-disabled)' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <kbd style={{ padding: '2px 6px', background: 'var(--bg-hover)', borderRadius: '4px', fontSize: '11px', color: 'var(--text-dim)' }}>Ctrl+O</kbd>
             Открыть файл
           </span>
-          <span className="flex items-center gap-2">
-            <kbd className="px-1.5 py-0.5 bg-[var(--bg-hover)] rounded text-[11px] text-[var(--text-dim)]">Ctrl+N</kbd>
-            Создать файл
+          <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <kbd style={{ padding: '2px 6px', background: 'var(--bg-hover)', borderRadius: '4px', fontSize: '11px', color: 'var(--text-dim)' }}>Ctrl+Shift+O</kbd>
+            Открыть папку
           </span>
         </div>
       </div>
