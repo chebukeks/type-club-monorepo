@@ -2,7 +2,7 @@
 
 ## Обзор
 
-Type Club — десктопный Markdown-редактор в стиле Typora с поддержкой LaTeX-формул, таблиц, task-lists и экспорта в HTML/PDF.
+Type Club — десктопный Markdown-редактор в стиле Typora с поддержкой LaTeX-формул, таблиц, task-lists и экспорта в HTML/PDF. Три режима редактирования: Seamless (Typora-стиль), Raw (исходный Markdown) и Preview (только просмотр).
 
 ### Стек технологий
 
@@ -11,12 +11,14 @@ Type Club — десктопный Markdown-редактор в стиле Typor
 | Electron 30 | Десктопная оболочка, доступ к файловой системе |
 | React 18 | UI-фреймворк |
 | TypeScript 5 | Язык (strict mode) |
-| ProseMirror | Ядро WYSIWYG-редактора |
+| ProseMirror | Ядро WYSIWYG-редактора (режимы Seamless/Raw) |
 | Vite 5 | Сборщик + HMR |
-| Tailwind CSS v4 | Стилизация |
+| Tailwind CSS v4 | Стилизация UI-компонентов |
 | KaTeX | Рендеринг LaTeX-формул |
-| markdown-it | Парсинг Markdown |
+| markdown-it | Парсинг Markdown → ProseMirror |
 | highlight.js | Подсветка синтаксиса в код-блоках |
+| electron-store | Персистентное хранилище настроек (тема и т.п.) |
+| lucide-react | Иконки UI |
 
 ---
 
@@ -47,7 +49,7 @@ npm run dev
 │                  Main Process                    │
 │  electron/main.ts                               │
 │  - Создание BrowserWindow (frameless)           │
-│  - IPC-хэндлеры (fs, dialog, export)           │
+│  - IPC-хэндлеры (fs, dialog, export, store)    │
 │  - Управление жизненным циклом приложения       │
 └─────────────┬───────────────────────────────────┘
               │ contextBridge (preload.ts)
@@ -55,9 +57,11 @@ npm run dev
 ┌─────────────▼───────────────────────────────────┐
 │               Renderer Process                   │
 │  src/                                            │
-│  - React UI (TitleBar, Sidebar, TabBar, Editor) │
+│  - React UI (TitleBar, MenuBar, Sidebar,        │
+│    TabBar, MarkdownEditor)                       │
 │  - ProseMirror (схема, плагины, nodeViews)      │
 │  - Состояние: EditorContext (useReducer)        │
+│  - Темы: light / dark / system                  │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -74,30 +78,33 @@ npm run dev
 ```
 type-club/
 ├── electron/                    # Electron (Main Process)
-│   ├── main.ts                  #   Главный процесс: окно, IPC, экспорт
+│   ├── main.ts                  #   Главный процесс: окно, IPC, экспорт, store
 │   ├── preload.ts               #   Bridge: contextBridge → window.api
 │   └── electron-env.d.ts        #   Типы process.env
 │
 ├── src/                         # React + ProseMirror (Renderer)
 │   ├── main.tsx                 #   Точка входа React
-│   ├── App.tsx                  #   Корневой layout: TitleBar + Sidebar + Editor
-│   ├── index.css                #   Глобальные стили + Tailwind v4
-│   ├── types.ts                 #   TypeScript-интерфейсы (FileEntry, Tab, IPC API)
+│   ├── App.tsx                  #   Корневой layout: TitleBar + MenuBar + Sidebar + TabBar + Editor
+│   ├── index.css                #   Глобальные стили + Tailwind v4 + CSS-переменные тем
+│   ├── types.ts                 #   TypeScript-интерфейсы (FileEntry, Tab, ThemeMode, EditorMode, IPC API)
+│   ├── vite-env.d.ts            #   Типы Vite
+│   │
+│   ├── assets/                  #   Статические ресурсы (импортируемые через Vite)
 │   │
 │   ├── context/
 │   │   └── EditorContext.tsx    #   Глобальное состояние (useReducer + Context)
 │   │
 │   ├── components/
 │   │   ├── TitleBar.tsx         #   Кастомный titlebar (frameless window)
-│   │   ├── MenuBar.tsx          #   Меню File → Export HTML/PDF
-│   │   ├── Sidebar.tsx          #   Файловый проводник (дерево .md)
+│   │   ├── MenuBar.tsx          #   Меню: File, Edit (заглушка), View (тема, режим)
+│   │   ├── Sidebar.tsx          #   Файловый проводник (дерево .md) + создание файлов/папок
 │   │   ├── TabBar.tsx           #   Панель вкладок
 │   │   └── MarkdownEditor.tsx   #   React-обёртка ProseMirror
 │   │
 │   └── editor/                  #   Ядро ProseMirror
 │       ├── schema.ts            #     Схема документа (ноды + марки)
-│       ├── markdownConfig.ts    #     Парсер + Сериализатор (MD ↔ PM)
-│       ├── keymap.ts            #     Горячие клавиши
+│       ├── markdownConfig.ts    #     Парсер + Сериализатор (MD ↔ PM) + generateExportHtml()
+│       ├── keymap.ts            #     Горячие клавиши редактора
 │       ├── inputRules.ts        #     Авто-форматирование при вводе
 │       ├── editorTheme.ts       #     CSS-стили WYSIWYG-отображения
 │       ├── seamlessPlugin.ts    #     Typora-стиль (бесшовные заголовки)
@@ -109,10 +116,14 @@ type-club/
 │       └── syntaxHighlightPlugin.ts # Подсветка синтаксиса
 │
 ├── public/                      # Статические ассеты (SVG-иконки)
+├── scripts/                     # Вспомогательные скрипты
+├── test-examples/               # Тестовые .md файлы и бэклог
 ├── electron-builder.json5       # Конфигурация сборки (Win/Mac/Linux)
 ├── vite.config.ts               # Конфигурация Vite + Electron plugin
-├── tsconfig.json                # TypeScript (src + electron)
+├── tsconfig.json                # TypeScript (src)
+├── tsconfig.node.json           # TypeScript (electron + vite config)
 ├── .eslintrc.cjs                # ESLint конфигурация
+├── RELEASE_GUIDE.md             # Гайд по релизу и сборке
 └── package.json                 # Зависимости и npm-скрипты
 ```
 
@@ -122,12 +133,34 @@ type-club/
 
 Состояние приложения хранится в `EditorContext.tsx` через `useReducer`:
 
+### Типы
+
 ```typescript
+/** Режим цветовой темы */
+type ThemeMode = 'light' | 'dark' | 'system'
+
+/** Режим редактирования */
+type EditorMode = 'raw' | 'seamless' | 'preview'
+
+/** Вкладка открытого файла */
+interface Tab {
+  id: string
+  filePath: string
+  fileName: string
+  content: string
+  isModified: boolean
+  mode: EditorMode          // Режим редактирования вкладки
+  refreshCounter: number    // Счётчик для принудительного обновления
+}
+
+/** Состояние приложения */
 interface AppState {
-  tabs: Tab[]              // Открытые вкладки
-  activeTabId: string | null  // Активная вкладка
-  folderPath: string | null   // Путь к рабочей папке
-  fileTree: FileEntry[]       // Дерево файлов
+  tabs: Tab[]                   // Открытые вкладки
+  activeTabId: string | null    // Активная вкладка
+  folderPath: string | null     // Путь к рабочей папке
+  fileTree: FileEntry[]         // Дерево файлов
+  creating: { type: 'file' | 'folder' } | null  // Режим создания (inline-ввод в Sidebar)
+  theme: ThemeMode              // Текущая цветовая тема
 }
 ```
 
@@ -141,6 +174,27 @@ interface AppState {
 | `UPDATE_CONTENT` | Обновить содержимое (при редактировании) |
 | `SET_FILE_TREE` | Установить дерево файлов после открытия папки |
 | `MARK_SAVED` | Пометить вкладку как сохранённую |
+| `START_CREATING` | Начать создание файла/папки (показать inline-ввод в Sidebar) |
+| `STOP_CREATING` | Отменить создание файла/папки |
+| `SET_THEME` | Установить тему (light / dark / system) |
+| `SET_TAB_MODE` | Установить режим редактирования вкладки (raw / seamless / preview) |
+| `REFRESH_TAB` | Принудительно обновить содержимое вкладки |
+
+### Методы EditorContext
+
+| Метод | Описание |
+|---|---|
+| `openFile(filePath, fileName)` | Прочитать файл и открыть вкладку |
+| `saveActiveFile()` | Сохранить активную вкладку |
+| `saveActiveFileAs()` | Сохранить как... (диалог) |
+| `openFolder()` | Открыть папку (диалог) |
+| `openFileViaDialog()` | Открыть файл через диалог |
+| `createFile(fileName)` | Создать .md файл в текущей папке |
+| `createFolder(folderName)` | Создать подпапку в текущей папке |
+| `refreshFileTree()` | Обновить дерево файлов |
+| `setTheme(theme)` | Установить тему + сохранить в electron-store |
+| `setTabMode(tabId, mode)` | Установить режим редактирования |
+| `refreshTab(tabId)` | Принудительно обновить вкладку |
 
 ---
 
@@ -195,13 +249,15 @@ interface AppState {
 | `readFile(path)` | Чтение файла (UTF-8) |
 | `writeFile(path, content)` | Запись файла |
 | `readDir(path)` | Рекурсивное чтение директории (только .md) |
+| `createDir(path)` | Создание директории |
 
 ### Диалоги
 
 | Метод | Описание |
 |---|---|
 | `openFolder()` | Выбор рабочей папки |
-| `openFile()` | Выбор .md файла |
+| `openFile()` | Выбор .md файла → `{ filePath, content }` |
+| `saveFileAs(content, defaultName)` | Сохранить как... → `{ filePath }` |
 
 ### Экспорт
 
@@ -209,6 +265,13 @@ interface AppState {
 |---|---|
 | `exportHtml(content, name)` | Экспорт в HTML |
 | `exportPdf(content, name)` | Экспорт в PDF (через скрытое окно Chromium) |
+
+### Хранилище настроек (electron-store)
+
+| Метод | Описание |
+|---|---|
+| `storeGet(key)` | Получить значение из хранилища |
+| `storeSet(key, value)` | Сохранить значение в хранилище |
 
 ### Управление окном
 
@@ -230,12 +293,27 @@ interface AppState {
 
 ## Горячие клавиши
 
+> **Примечание:** Глобальные шорткаты используют `e.code` (физическая клавиша) для корректной работы в любой раскладке.
+
+### Глобальные (MenuBar)
+
+| Комбинация | Действие |
+|---|---|
+| `Ctrl+S` | Сохранить |
+| `Ctrl+Shift+S` | Сохранить как... |
+| `Ctrl+O` | Открыть файл |
+| `Ctrl+Shift+O` | Открыть папку |
+| `Ctrl+N` | Создать файл (если открыта папка) |
+| `Ctrl+Shift+N` | Создать папку (если открыта папка) |
+| `F5` | Обновить вкладку |
+
+### Редактор (ProseMirror keymap)
+
 | Комбинация | Действие |
 |---|---|
 | `Ctrl+B` | Жирный текст |
 | `Ctrl+I` | Курсив |
 | `Ctrl+E` | Инлайн-код |
-| `Ctrl+S` | Сохранить файл |
 | `Ctrl+Z` / `Ctrl+Y` | Undo / Redo |
 | `Ctrl+Shift+S` | Зачёркивание |
 | `Ctrl+Shift+H` | Выделение (highlight) |
@@ -245,7 +323,29 @@ interface AppState {
 
 ---
 
+## Меню приложения (MenuBar)
+
+### File
+- Создать файл / Создать папку
+- Открыть файл / Открыть папку
+- Сохранить / Сохранить как...
+- Export to HTML / Export to PDF
+
+### Edit
+- *(заглушка — пока пусто)*
+
+### View
+- Обновить (F5)
+- Тема → Светлая / Тёмная / Системная
+- Режим → Raw / Seamless / Preview
+
+---
+
 ## Стилизация
+
+### Темы
+
+Приложение поддерживает три режима темы: `light`, `dark`, `system`. Тема хранится в `electron-store` и применяется через атрибут `data-theme` на `<html>`. CSS-переменные определены в `src/index.css`.
 
 ### Дизайн-токены (тёмная тема)
 
@@ -271,7 +371,21 @@ Danger:            #e81123
 
 - Tailwind CSS v4 классы для компонентов (`src/components/`)
 - CSS-in-JS (строки-шаблоны) для ProseMirror тема (`src/editor/editorTheme.ts`)
-- Глобальные стили в `src/index.css`
+- Глобальные стили и CSS-переменные тем в `src/index.css`
+
+### Единый дизайн dropdown/popup
+
+Все всплывающие панели (MenuBar, SettingsPopup, StatsToast и любые будущие) **обязаны** следовать единому дизайн-паттерну:
+
+```
+Контейнер:    bg-[var(--bg-elevated)]  border border-[var(--border-strong)]  rounded-md  shadow-lg  py-1  z-50
+Пункт:        CSS-класс .menu-item  (padding: 8px 20px, flex, justify-content: space-between)
+Hover:        .menu-item.enabled:hover → background: var(--menu-hover-bg)
+Разделители:  border-t border-[var(--border-strong)] my-1
+Текст:        text-[13px], вторичный текст/шорткаты — text-[11px] text-[var(--text-dim)]
+```
+
+**НЕ** использовать: `rounded-lg`, произвольные padding, кастомные hover-цвета для popup-элементов.
 
 ---
 
@@ -295,6 +409,8 @@ npm run preview  # Preview собранного фронтенда (без Elect
 - **Linux**: AppImage
 - Артефакты → `release/{version}/`
 
+Подробнее: см. `RELEASE_GUIDE.md`
+
 ---
 
 ## Рекомендации по разработке
@@ -313,3 +429,9 @@ npm run preview  # Preview собранного фронтенда (без Elect
 
 5. **PDF-экспорт** использует скрытое окно Chromium + `printToPDF()`. Временный HTML
    сохраняется на диск (не data URI!) из-за CORS-ограничений для шрифтов KaTeX
+
+6. **Горячие клавиши** используют `e.code` (физический код клавиши) вместо `e.key`,
+   чтобы работать корректно в любой раскладке клавиатуры
+
+7. **Настройки** хранятся через `electron-store` (IPC: `store:get`, `store:set`).
+   Тема загружается при старте приложения из хранилища

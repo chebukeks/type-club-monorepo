@@ -74,6 +74,20 @@ contextBridge.exposeInMainWorld('api', {
   },
 
   // ==========================================
+  // Спеллчекер
+  // ==========================================
+
+  /** Включить/выключить проверку орфографии */
+  setSpellcheck: (enabled: boolean): Promise<void> => {
+    return ipcRenderer.invoke('spellcheck:set', enabled)
+  },
+
+  /** Получить текущее состояние спеллчекера */
+  getSpellcheck: (): Promise<boolean> => {
+    return ipcRenderer.invoke('spellcheck:get')
+  },
+
+  // ==========================================
   // Управление окном (frameless window)
   // ==========================================
 

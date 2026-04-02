@@ -22,6 +22,21 @@ export function getEditorStyles(): string {
   caret-color: var(--editor-caret);
 }
 
+.ProseMirror.is-over-limit {
+  caret-color: #ec404eff;
+}
+
+@keyframes shake-editor {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-1px); }
+  75% { transform: translateX(1px); }
+  100% { transform: translateX(0); }
+}
+
+.shake-animation {
+  animation: shake-editor 0.15s ease-in-out;
+}
+
 .ProseMirror ::selection {
   background: var(--editor-selection);
 }

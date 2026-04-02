@@ -1,16 +1,18 @@
 /**
  * App.tsx — Корневой компонент приложения Type Club.
- * Собирает макет: TitleBar, Sidebar, TabBar, MarkdownEditor.
+ * Собирает макет: TitleBar, Sidebar, TabBar, MarkdownEditor, StatsToast.
  * Оборачивает всё в EditorProvider для управления состоянием.
  */
-import { EditorProvider } from './context/EditorContext'
+import { EditorProvider, useEditor } from './context/EditorContext'
 import { TitleBar } from './components/TitleBar'
 import { Sidebar } from './components/Sidebar'
 import { TabBar } from './components/TabBar'
 import { MarkdownEditor } from './components/MarkdownEditor'
+import { StatsToast } from './components/StatsToast'
 
 /** Внутренний компонент — макет приложения */
 function AppLayout() {
+  const { state } = useEditor()
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[var(--bg-base)] text-[var(--text-primary)]">
       {/* Шапка окна */}
@@ -21,10 +23,11 @@ function AppLayout() {
         {/* Левая панель — файловый проводник */}
         <Sidebar />
 
-        {/* Правая панель — вкладки + редактор */}
-        <div className="flex flex-col flex-1 overflow-hidden">
+        {/* Правая панель — вкладки + редактор + StatsToast */}
+        <div className="relative flex flex-col flex-1 overflow-hidden">
           <TabBar />
           <MarkdownEditor />
+          {state.showStats && <StatsToast />}
         </div>
       </div>
     </div>

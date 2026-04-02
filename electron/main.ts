@@ -11,6 +11,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const store = new Store({
   defaults: {
     theme: 'dark',
+    autosave: true,
+    spellcheck: true,
+    showStats: true,
   },
 })
 
@@ -50,6 +53,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.mjs'),
       contextIsolation: true,         // Изоляция контекста (безопасность)
       nodeIntegration: false,         // Запрет прямого доступа к Node.js
+      spellcheck: store.get('spellcheck', true) as boolean,
     },
   })
 
@@ -258,6 +262,23 @@ ipcMain.handle('store:get', async (_event, key: string) => {
 
 ipcMain.handle('store:set', async (_event, key: string, value: unknown) => {
   store.set(key as string, value)
+})
+
+// ============================================================
+// IPC-хэндлеры для спеллчекера
+// ============================================================
+
+/** Включить/выключить проверку орфографии */
+ipcMain.handle('spellcheck:set', async (_event, enabled: boolean) => {
+  if (win) {
+    win.webContents.session.setSpellCheckerEnabled(enabled)
+  }
+  store.set('spellcheck', enabled)
+})
+
+/** Получить текущее состояние спеллчекера */
+ipcMain.handle('spellcheck:get', async () => {
+  return store.get('spellcheck', true) as boolean
 })
 
 // ============================================================

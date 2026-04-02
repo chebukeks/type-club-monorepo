@@ -30,6 +30,19 @@ export interface Tab {
   refreshCounter: number;
 }
 
+/** Тип ограничения (символы или слова) */
+export type LimitType = 'chars' | 'words';
+
+/** Настройка ограничения для вкладки */
+export interface WordLimit {
+  /** Включено ли ограничение */
+  enabled: boolean;
+  /** Значение лимита */
+  value: number;
+  /** По чему ограничение: символы или слова */
+  type: LimitType;
+}
+
 /** Состояние приложения (для useReducer) */
 export interface AppState {
   /** Список открытых вкладок */
@@ -44,6 +57,12 @@ export interface AppState {
   creating: { type: 'file' | 'folder' } | null;
   /** Текущая цветовая тема */
   theme: ThemeMode;
+  /** Автосохранение включено */
+  autosave: boolean;
+  /** Ограничение по символам/словам для активной вкладки */
+  wordLimit: WordLimit;
+  /** Показывать ли плашку статистики */
+  showStats: boolean;
 }
 
 /** Действия для редьюсера состояния */
@@ -58,7 +77,10 @@ export type AppAction =
   | { type: 'STOP_CREATING' }
   | { type: 'SET_THEME'; payload: { theme: ThemeMode } }
   | { type: 'SET_TAB_MODE'; payload: { tabId: string; mode: EditorMode } }
-  | { type: 'REFRESH_TAB'; payload: { tabId: string } };
+  | { type: 'REFRESH_TAB'; payload: { tabId: string } }
+  | { type: 'SET_AUTOSAVE'; payload: { enabled: boolean } }
+  | { type: 'SET_SHOW_STATS'; payload: { enabled: boolean } }
+  | { type: 'SET_WORD_LIMIT'; payload: WordLimit };
 
 /** API, доступный из Renderer-процесса через contextBridge */
 export interface IElectronAPI {
@@ -78,6 +100,10 @@ export interface IElectronAPI {
   storeGet: (key: string) => Promise<unknown>;
   /** Запись настроек в electron-store */
   storeSet: (key: string, value: unknown) => Promise<void>;
+  /** Включить/выключить спеллчекер */
+  setSpellcheck: (enabled: boolean) => Promise<void>;
+  /** Получить текущее состояние спеллчекера */
+  getSpellcheck: () => Promise<boolean>;
 }
 
 declare global {

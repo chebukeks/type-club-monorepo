@@ -2,7 +2,7 @@
  * MarkdownEditor.tsx — React-обёртка для ProseMirror.
  * Поддерживает три режима: Raw (textarea), Seamless (ProseMirror), Preview (read-only ProseMirror).
  */
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import 'katex/dist/katex.min.css'
 import { EditorState, Plugin } from 'prosemirror-state'
 import { EditorView } from 'prosemirror-view'
@@ -39,9 +39,28 @@ export function MarkdownEditor() {
   const { state, dispatch } = useEditor()
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
+  const [editorView, setEditorView] = useState<EditorView | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
+  const content = activeTab?.content || ''
+  const isOverLimitRef = useRef(false)
+  const stats = useMemo(() => {
+    const text = content.trim()
+    const chars = text.length
+    const words = text ? text.split(/\s+/).filter(Boolean).length : 0
+    return { chars, words }
+  }, [content])
+  
+  useEffect(() => {
+    if (!state.wordLimit.enabled) {
+      isOverLimitRef.current = false
+      return
+    }
+    const currentValue = state.wordLimit.type === 'chars' ? stats.chars : stats.words
+    isOverLimitRef.current = currentValue > state.wordLimit.value
+  }, [state.wordLimit, stats])
+
   const dispatchRef = useRef(dispatch)
   dispatchRef.current = dispatch
 
@@ -68,7 +87,17 @@ export function MarkdownEditor() {
 
     // Плагин синхронизации изменений → контекст
     const syncPlugin = new Plugin({
-      view() {
+      props: {
+        handleKeyDown(view, event) {
+          if (event.key !== 'Backspace' && event.key !== 'Delete' && isOverLimitRef.current) {
+            view.dom.classList.remove('shake-animation')
+            void view.dom.offsetWidth // force reflow
+            view.dom.classList.add('shake-animation')
+          }
+          return false
+        }
+      },
+      view(_view) {
         return {
           update(view, prevState) {
             if (!view.state.doc.eq(prevState.doc)) {
@@ -128,10 +157,22 @@ export function MarkdownEditor() {
     }
 
     viewRef.current = view
+    setEditorView(view)
     if (!isPreview) view.focus()
 
-    return () => { view.destroy(); viewRef.current = null }
+    return () => { view.destroy(); viewRef.current = null; setEditorView(null) }
   }, [activeTab?.id, activeTab?.mode, activeTab?.refreshCounter])
+
+  // --- Обновление класса is-over-limit ---
+  useEffect(() => {
+    if (editorView) {
+      if (isOverLimitRef.current) {
+        editorView.dom.classList.add('is-over-limit')
+      } else {
+        editorView.dom.classList.remove('is-over-limit')
+      }
+    }
+  }, [isOverLimitRef.current, editorView])
 
   // ============================================================
   // Заглушка при отсутствии открытых вкладок

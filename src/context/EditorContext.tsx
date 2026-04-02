@@ -1,8 +1,8 @@
 /**
  * EditorContext.tsx — Централизованное управление состоянием приложения.
  */
-import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react'
-import type { AppState, AppAction, FileEntry, ThemeMode, EditorMode } from '../types'
+import React, { createContext, useContext, useReducer, useCallback, useEffect, useRef } from 'react'
+import type { AppState, AppAction, FileEntry, ThemeMode, EditorMode, WordLimit } from '../types'
 
 // ============================================================
 // Начальное состояние
@@ -14,6 +14,9 @@ const initialState: AppState = {
   fileTree: [],
   creating: null,
   theme: 'dark',
+  autosave: true,
+  wordLimit: { enabled: false, value: 1000, type: 'chars' },
+  showStats: true,
 }
 
 // ============================================================
@@ -91,6 +94,12 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, tabs: state.tabs.map((t) =>
         t.id === action.payload.tabId ? { ...t, refreshCounter: t.refreshCounter + 1 } : t
       )}
+    case 'SET_AUTOSAVE':
+      return { ...state, autosave: action.payload.enabled }
+    case 'SET_SHOW_STATS':
+      return { ...state, showStats: action.payload.enabled }
+    case 'SET_WORD_LIMIT':
+      return { ...state, wordLimit: action.payload }
     default:
       return state
   }
@@ -113,6 +122,9 @@ interface EditorContextValue {
   setTheme: (theme: ThemeMode) => Promise<void>
   setTabMode: (tabId: string, mode: EditorMode) => void
   refreshTab: (tabId: string) => void
+  setAutosave: (enabled: boolean) => Promise<void>
+  setShowStats: (enabled: boolean) => Promise<void>
+  setWordLimit: (limit: WordLimit) => void
 }
 
 const EditorContext = createContext<EditorContextValue | null>(null)
@@ -120,7 +132,7 @@ const EditorContext = createContext<EditorContextValue | null>(null)
 export function EditorProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState)
 
-  // --- Инициализация темы при загрузке ---
+  // --- Инициализация темы и autosave при загрузке ---
   useEffect(() => {
     (async () => {
       try {
@@ -128,6 +140,12 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         const theme = savedTheme || 'dark'
         dispatch({ type: 'SET_THEME', payload: { theme } })
         applyThemeToDOM(theme)
+
+        const savedAutosave = await window.api.storeGet('autosave') as boolean | undefined
+        dispatch({ type: 'SET_AUTOSAVE', payload: { enabled: savedAutosave !== false } })
+
+        const savedStats = await window.api.storeGet('showStats') as boolean | undefined
+        dispatch({ type: 'SET_SHOW_STATS', payload: { enabled: savedStats !== false } })
       } catch {
         applyThemeToDOM('dark')
       }
@@ -257,6 +275,58 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: 'REFRESH_TAB', payload: { tabId } })
   }, [])
 
+  // --- Установить автосохранение ---
+  const setAutosave = useCallback(async (enabled: boolean) => {
+    dispatch({ type: 'SET_AUTOSAVE', payload: { enabled } })
+    try { await window.api.storeSet('autosave', enabled) } catch {}
+  }, [])
+
+  // --- Установить показ статистики ---
+  const setShowStats = useCallback(async (enabled: boolean) => {
+    dispatch({ type: 'SET_SHOW_STATS', payload: { enabled } })
+    try { await window.api.storeSet('showStats', enabled) } catch {}
+  }, [])
+
+  // --- Установить лимит ---
+  const setWordLimit = useCallback((limit: WordLimit) => {
+    dispatch({ type: 'SET_WORD_LIMIT', payload: limit })
+  }, [])
+
+  // ============================================================
+  // Автосохранение: debounce 5 сек после последнего изменения
+  // ============================================================
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const saveActiveFileRef = useRef(saveActiveFile)
+  saveActiveFileRef.current = saveActiveFile
+
+  const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
+  const isModified = activeTab?.isModified ?? false
+
+  useEffect(() => {
+    if (!state.autosave || !isModified) return
+
+    autosaveTimerRef.current = setTimeout(() => {
+      saveActiveFileRef.current()
+    }, 5000)
+
+    return () => {
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
+    }
+  }, [state.autosave, isModified, activeTab?.content])
+
+  // --- Автосохранение при потере фокуса окна ---
+  useEffect(() => {
+    if (!state.autosave) return
+    const handleBlur = () => {
+      const tab = state.tabs.find((t) => t.id === state.activeTabId)
+      if (tab?.isModified) {
+        saveActiveFileRef.current()
+      }
+    }
+    window.addEventListener('blur', handleBlur)
+    return () => window.removeEventListener('blur', handleBlur)
+  }, [state.autosave, state.tabs, state.activeTabId])
+
   return (
     <EditorContext.Provider value={{
       state, dispatch,
@@ -264,6 +334,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       openFileViaDialog, saveActiveFileAs,
       createFile, createFolder, refreshFileTree,
       setTheme, setTabMode, refreshTab,
+      setAutosave, setShowStats, setWordLimit,
     }}>
       {children}
     </EditorContext.Provider>
