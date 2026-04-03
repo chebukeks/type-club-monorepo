@@ -62,6 +62,56 @@ export function getEditorStyles(): string {
   margin-right: 2px;
 }
 
+/* Сворачивание заголовков */
+.editor-heading {
+  position: relative;
+}
+
+.heading-fold-btn {
+  position: absolute;
+  left: -24px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+  padding: 0;
+}
+
+.editor-heading:hover .heading-fold-btn {
+  opacity: 1;
+}
+
+.heading-fold-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.heading-fold-btn svg {
+  transition: transform 0.2s;
+}
+
+.is-folded .heading-fold-btn {
+  opacity: 1;
+}
+
+.is-folded .heading-fold-btn svg {
+  transform: rotate(-90deg);
+}
+
+.folded-content {
+  display: none !important;
+}
+
 /* Цитаты */
 .ProseMirror blockquote {
   border-left: 4px solid var(--editor-blockquote-border);

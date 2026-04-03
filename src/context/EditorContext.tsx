@@ -17,6 +17,7 @@ const initialState: AppState = {
   autosave: true,
   wordLimit: { enabled: false, value: 1000, type: 'chars' },
   showStats: true,
+  activeToc: [],
 }
 
 // ============================================================
@@ -100,6 +101,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, showStats: action.payload.enabled }
     case 'SET_WORD_LIMIT':
       return { ...state, wordLimit: action.payload }
+    case 'SET_ACTIVE_TOC':
+      return { ...state, activeToc: action.payload }
     default:
       return state
   }

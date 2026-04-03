@@ -23,6 +23,9 @@ import { mathActivePlugin } from '../editor/mathActivePlugin'
 import { MathBlockView } from '../editor/mathBlockView'
 import { getEditorStyles } from '../editor/editorTheme'
 import { useEditor } from '../context/EditorContext'
+import { tocPlugin } from '../editor/tocPlugin'
+import { foldingPlugin } from '../editor/foldingPlugin'
+import { HeadingView } from '../editor/headingView'
 
 // Inject CSS один раз
 let styleInjected = false
@@ -124,8 +127,9 @@ export function MarkdownEditor() {
         mathActivePlugin,
         history(),
         dropCursor(),
-        gapCursor(),
         syncPlugin,
+        foldingPlugin,
+        tocPlugin((toc) => dispatchRef.current({ type: 'SET_ACTIVE_TOC', payload: toc })),
       ]
 
     const editorState = EditorState.create({ doc, plugins })
@@ -135,6 +139,7 @@ export function MarkdownEditor() {
       state: editorState,
       editable: () => !isPreview,
       nodeViews: isPreview ? undefined : {
+        heading: (node, view, getPos) => new HeadingView(node, view, getPos),
         code_block: (node, view, getPos) => new CodeBlockView(node, view, getPos),
         math_block: (node, view, getPos) => new MathBlockView(node, view, getPos),
       },
@@ -173,6 +178,25 @@ export function MarkdownEditor() {
       }
     }
   }, [isOverLimitRef.current, editorView])
+
+  // --- Скролл к заголовку ---
+  useEffect(() => {
+    const handleScrollTo = (e: Event) => {
+      if (!editorView) return
+      const customEvent = e as CustomEvent<{ pos: number }>
+      const pos = customEvent.detail.pos
+      try {
+        const domNode = editorView.nodeDOM(pos)
+        if (domNode instanceof Element) {
+          domNode.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      } catch (err) {
+        console.error('Ошибка при скролле к оглавлению:', err)
+      }
+    }
+    window.addEventListener('editor-scroll-to', handleScrollTo)
+    return () => window.removeEventListener('editor-scroll-to', handleScrollTo)
+  }, [editorView])
 
   // ============================================================
   // Заглушка при отсутствии открытых вкладок

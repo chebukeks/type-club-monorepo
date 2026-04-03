@@ -3,7 +3,7 @@
  */
 import { useState, useEffect, useRef } from 'react'
 import { useEditor } from '../context/EditorContext'
-import type { FileEntry } from '../types'
+import type { FileEntry, TocItem } from '../types'
 
 export function Sidebar() {
   const { state, dispatch, openFolder, openFile, createFile, createFolder } = useEditor()
@@ -51,6 +51,7 @@ export function Sidebar() {
                 depth={0}
                 onFileClick={(filePath, fileName) => openFile(filePath, fileName)}
                 activeFilePath={state.tabs.find((t) => t.id === state.activeTabId)?.filePath || null}
+                activeToc={state.activeToc || []}
               />
             ))}
           </div>
@@ -120,12 +121,14 @@ function EmptyState({ onOpenFolder }: { onOpenFolder: () => void }) {
   )
 }
 
-function FileTreeItem({ entry, depth, onFileClick, activeFilePath }: {
+function FileTreeItem({ entry, depth, onFileClick, activeFilePath, activeToc }: {
   entry: FileEntry; depth: number;
   onFileClick: (filePath: string, fileName: string) => void;
   activeFilePath: string | null;
+  activeToc: TocItem[];
 }) {
   const [isOpen, setIsOpen] = useState(depth < 1)
+  const [isTocOpen, setIsTocOpen] = useState(true)
   const isActive = entry.path === activeFilePath
 
   if (entry.isDirectory) {
@@ -147,7 +150,7 @@ function FileTreeItem({ entry, depth, onFileClick, activeFilePath }: {
         {isOpen && entry.children && (
           <div>
             {entry.children.map((child) => (
-              <FileTreeItem key={child.path} entry={child} depth={depth + 1} onFileClick={onFileClick} activeFilePath={activeFilePath} />
+              <FileTreeItem key={child.path} entry={child} depth={depth + 1} onFileClick={onFileClick} activeFilePath={activeFilePath} activeToc={activeToc} />
             ))}
           </div>
         )}
@@ -156,18 +159,49 @@ function FileTreeItem({ entry, depth, onFileClick, activeFilePath }: {
   }
 
   return (
-    <button
-      onClick={() => onFileClick(entry.path, entry.name)}
-      className={`w-full flex items-center gap-1.5 text-[13px] rounded transition-colors ${
+    <div>
+      <div className={`w-full flex items-center gap-1.5 text-[13px] rounded transition-colors group ${
         isActive ? 'bg-[var(--bg-hover)] text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
-      }`}
-      style={{ paddingTop: '5px', paddingBottom: '5px', paddingLeft: `${depth * 12 + 26}px`, paddingRight: '8px' }}
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-[var(--accent)]">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-        <polyline points="14 2 14 8 20 8" />
-      </svg>
-      <span className="truncate">{entry.name}</span>
-    </button>
+      }`} style={{ paddingLeft: `${depth * 12 + (isActive && activeToc.length > 0 ? 8 : 26)}px`, paddingRight: '1px' }}>
+        {isActive && activeToc.length > 0 && (
+          <button onClick={() => setIsTocOpen(!isTocOpen)} className="p-1 rounded hover:bg-[var(--border-default)]">
+            <svg width="10" height="10" viewBox="0 0 12 12" className={`transition-transform flex-shrink-0 text-[var(--text-dim)] ${isTocOpen ? 'rotate-90' : ''}`} fill="currentColor">
+              <path d="M4 2l4 4-4 4z" />
+            </svg>
+          </button>
+        )}
+        <button
+          onClick={() => onFileClick(entry.path, entry.name)}
+          className="flex-1 flex items-center gap-1.5 overflow-hidden"
+          style={{ paddingTop: '5px', paddingBottom: '5px' }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-[var(--accent)]">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+          </svg>
+          <span className="truncate">{entry.name}</span>
+        </button>
+      </div>
+      {isActive && isTocOpen && activeToc.length > 0 && (
+        <div className="mt-0.5">
+          {activeToc.map((toc) => (
+            <button
+              key={toc.id}
+              onClick={() => window.dispatchEvent(new CustomEvent('editor-scroll-to', { detail: { pos: toc.pos } }))}
+              className="w-full text-left truncate text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded transition-colors"
+              style={{
+                paddingTop: '3px', paddingBottom: '3px',
+                paddingLeft: `${depth * 12 + 26 + (toc.level - 1) * 12}px`,
+                paddingRight: '8px'
+              }}
+              title={toc.text}
+            >
+              <span className="opacity-50 mr-1">#</span>
+              {toc.text}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

@@ -1,9 +1,9 @@
 {
   "name": "type-club",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.1",
   "description": "A modern Markdown editor with LaTeX support.",
-  "author": "type-club-team",
+  "author": "chebukek",
   "type": "module",
   "scripts": {
     "dev": "vite",

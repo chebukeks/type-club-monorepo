@@ -11,6 +11,14 @@ export interface FileEntry {
   children?: FileEntry[];
 }
 
+/** Элемент оглавления (TOC) документа */
+export interface TocItem {
+  id: string;
+  text: string;
+  level: number;
+  pos: number;
+}
+
 /** Режим цветовой темы */
 export type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -63,6 +71,8 @@ export interface AppState {
   wordLimit: WordLimit;
   /** Показывать ли плашку статистики */
   showStats: boolean;
+  /** Оглавление активного файла */
+  activeToc: TocItem[];
 }
 
 /** Действия для редьюсера состояния */
@@ -80,7 +90,8 @@ export type AppAction =
   | { type: 'REFRESH_TAB'; payload: { tabId: string } }
   | { type: 'SET_AUTOSAVE'; payload: { enabled: boolean } }
   | { type: 'SET_SHOW_STATS'; payload: { enabled: boolean } }
-  | { type: 'SET_WORD_LIMIT'; payload: WordLimit };
+  | { type: 'SET_WORD_LIMIT'; payload: WordLimit }
+  | { type: 'SET_ACTIVE_TOC'; payload: TocItem[] };
 
 /** API, доступный из Renderer-процесса через contextBridge */
 export interface IElectronAPI {
