@@ -393,5 +393,26 @@ export function getEditorStyles(): string {
 .ProseMirror:not(.preview-mode) li.task-list-item::before {
   cursor: pointer;
 }
+
+/* ==========================================
+   Режимы акцентирования (Focus Mode)
+   ========================================== */
+
+/* Общее приглушение для режима "Абзац" и "Предложение" */
+.focus-mode-paragraph .ProseMirror > *:not(.focus-active-paragraph),
+.focus-mode-sentence .ProseMirror > *:not(.focus-active-paragraph) {
+  opacity: 0.25;
+}
+
+.focus-mode-paragraph .ProseMirror > *,
+.focus-mode-sentence .ProseMirror > * {
+  transition: opacity 0.3s ease-in-out;
+}
+
+/* Приглушение несвязанных предложений внутри активного абзаца */
+.focus-mode-sentence .focus-dimmed {
+  opacity: 0.25;
+  transition: opacity 0.3s ease-in-out;
+}
 `
 }

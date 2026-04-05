@@ -27,6 +27,7 @@ import { tocPlugin } from '../editor/tocPlugin'
 import { foldingPlugin } from '../editor/foldingPlugin'
 import { HeadingView } from '../editor/headingView'
 import { interactivePlugin } from '../editor/interactivePlugin'
+import { focusModePlugin } from '../editor/focusModePlugin'
 
 // Inject CSS один раз
 let styleInjected = false
@@ -72,6 +73,14 @@ export function MarkdownEditor() {
   useEffect(() => {
     isTypewriterModeRef.current = state.typewriterMode
   }, [state.typewriterMode])
+
+  const isFocusModeRef = useRef(state.focusMode)
+  useEffect(() => {
+    isFocusModeRef.current = state.focusMode
+    if (editorView) {
+      editorView.dispatch(editorView.state.tr.setMeta('focusModeUpdate', true))
+    }
+  }, [state.focusMode, editorView])
 
   // ============================================================
   // ProseMirror (Seamless / Preview режимы)
@@ -144,6 +153,10 @@ export function MarkdownEditor() {
               const caretCenterY = (coords.top + coords.bottom) / 2
               const containerCenterY = containerRect.top + (containerRect.height / 2)
               
+              // Для режима "Три строчки" передаем координату маске
+              const maskY = caretCenterY - containerRect.top
+              scrollContainer.style.setProperty('--focus-mask-y', `${maskY}px`)
+              
               const offset = caretCenterY - containerCenterY
               if (Math.abs(offset) > 1) {
                 // Если offset слишком большой, smooth может не успевать или дергаться. 
@@ -156,9 +169,11 @@ export function MarkdownEditor() {
       }
     })
 
+    const focusPlugin = focusModePlugin(() => isFocusModeRef.current)
+
     // Набор плагинов зависит от режима
     const plugins: Plugin[] = isPreview
-      ? [history(), dropCursor(), gapCursor(), syncPlugin, interactivePlugin, typewriterPlugin]
+      ? [history(), dropCursor(), gapCursor(), syncPlugin, interactivePlugin, typewriterPlugin, focusPlugin]
       : [
         ...getKeymapPlugins(),
         getInputRulesPlugin(),
@@ -175,6 +190,7 @@ export function MarkdownEditor() {
         foldingPlugin,
         interactivePlugin,
         typewriterPlugin,
+        focusPlugin,
         tocPlugin((toc) => dispatchRef.current({ type: 'SET_ACTIVE_TOC', payload: toc })),
       ]
 
@@ -291,8 +307,20 @@ export function MarkdownEditor() {
   // ============================================================
   // Seamless / Preview — ProseMirror
   // ============================================================
+  
+  const focusClass = state.focusMode === 'paragraph' ? 'focus-mode-paragraph' 
+    : state.focusMode === 'sentence' ? 'focus-mode-sentence' 
+    : state.focusMode === 'lines' ? 'focus-mode-lines' : ''
+    
   return (
-    <div className={`flex-1 overflow-auto bg-[var(--bg-base)] ${state.typewriterMode ? 'typewriter-mode' : ''}`}>
+    <div 
+      className={`flex-1 overflow-auto bg-[var(--bg-base)] ${state.typewriterMode ? 'typewriter-mode' : ''} ${focusClass}`}
+      style={{
+        maskImage: state.focusMode === 'lines' ? 'linear-gradient(to bottom, transparent calc(var(--focus-mask-y, 50%) - 100px), black calc(var(--focus-mask-y, 50%) - 30px), black calc(var(--focus-mask-y, 50%) + 30px), transparent calc(var(--focus-mask-y, 50%) + 100px))' : 'none',
+        WebkitMaskImage: state.focusMode === 'lines' ? 'linear-gradient(to bottom, transparent calc(var(--focus-mask-y, 50%) - 100px), black calc(var(--focus-mask-y, 50%) - 30px), black calc(var(--focus-mask-y, 50%) + 30px), transparent calc(var(--focus-mask-y, 50%) + 100px))' : 'none',
+        transition: 'mask-image 0.3s'
+      }}
+    >
       <div 
         ref={editorRef} 
         className="h-full w-full" 

@@ -1,16 +1,16 @@
 import { useState, useRef, useEffect } from 'react'
 import { useEditor } from '../context/EditorContext'
 import { generateExportHtml } from '../editor/markdownConfig'
-import type { Tab, ThemeMode, EditorMode } from '../types'
+import type { Tab, ThemeMode, EditorMode, FocusMode } from '../types'
 
 export function MenuBar() {
   const {
     state, dispatch,
     saveActiveFile, openFolder,
     openFileViaDialog, saveActiveFileAs,
-    setTheme, setTabMode, refreshTab,
+    setTheme, setTabMode, refreshTab, setFocusMode,
   } = useEditor()
-  const { activeTabId, tabs, folderPath, theme } = state
+  const { activeTabId, tabs, folderPath, theme, focusMode } = state
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const [submenu, setSubmenu] = useState<string | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -87,6 +87,7 @@ export function MenuBar() {
   const handleRefresh = () => { closeMenu(); if (activeTabId) refreshTab(activeTabId) }
   const handleSetTheme = (t: ThemeMode) => { closeMenu(); setTheme(t) }
   const handleSetMode = (m: EditorMode) => { closeMenu(); if (activeTabId) setTabMode(activeTabId, m) }
+  const handleSetFocusMode = (m: FocusMode) => { closeMenu(); setFocusMode(m) }
 
   const itemCls = (enabled: boolean) => `menu-item ${enabled ? 'enabled' : 'disabled'}`
 
@@ -207,9 +208,38 @@ export function MenuBar() {
                 </div>
               )}
             </div>
+
+            {/* Акцентировать — подменю */}
+            <div
+              className="menu-item enabled relative"
+              onMouseEnter={() => setSubmenu('focus')}
+              onMouseLeave={() => setSubmenu(null)}
+            >
+              <span>Акцентировать</span>
+              <span className="text-[11px]">▸</span>
+              {submenu === 'focus' && (
+                <div className="absolute left-full top-0 ml-0.5 w-52 py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50"
+                  onMouseEnter={() => setSubmenu('focus')} onMouseLeave={() => setSubmenu(null)}
+                >
+                  <div className={`${itemCls(true)} gap-2`} onClick={() => handleSetFocusMode('none')}>
+                    <span>{focusMode === 'none' ? '●' : '○'} Ничего</span>
+                  </div>
+                  <div className={`${itemCls(true)} gap-2`} onClick={() => handleSetFocusMode('paragraph')}>
+                    <span>{focusMode === 'paragraph' ? '●' : '○'} Абзац</span>
+                  </div>
+                  <div className={`${itemCls(true)} gap-2`} onClick={() => handleSetFocusMode('lines')}>
+                    <span>{focusMode === 'lines' ? '●' : '○'} Три строчки</span>
+                  </div>
+                  <div className={`${itemCls(true)} gap-2`} onClick={() => handleSetFocusMode('sentence')}>
+                    <span>{focusMode === 'sentence' ? '●' : '○'} Тек. предложение</span>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
     </div>
   )
 }
+

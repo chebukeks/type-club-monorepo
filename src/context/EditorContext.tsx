@@ -2,7 +2,7 @@
  * EditorContext.tsx — Централизованное управление состоянием приложения.
  */
 import React, { createContext, useContext, useReducer, useCallback, useEffect, useRef } from 'react'
-import type { AppState, AppAction, FileEntry, ThemeMode, EditorMode, WordLimit } from '../types'
+import type { AppState, AppAction, FileEntry, ThemeMode, EditorMode, WordLimit, FocusMode } from '../types'
 
 // ============================================================
 // Начальное состояние
@@ -19,6 +19,7 @@ const initialState: AppState = {
   showStats: true,
   activeToc: [],
   typewriterMode: false,
+  focusMode: 'none',
 }
 
 // ============================================================
@@ -106,6 +107,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, activeToc: action.payload }
     case 'SET_TYPEWRITER_MODE':
       return { ...state, typewriterMode: action.payload.enabled }
+    case 'SET_FOCUS_MODE':
+      return { ...state, focusMode: action.payload.mode }
     default:
       return state
   }
@@ -132,6 +135,7 @@ interface EditorContextValue {
   setShowStats: (enabled: boolean) => Promise<void>
   setWordLimit: (limit: WordLimit) => void
   setTypewriterMode: (enabled: boolean) => Promise<void>
+  setFocusMode: (mode: FocusMode) => Promise<void>
 }
 
 const EditorContext = createContext<EditorContextValue | null>(null)
@@ -156,7 +160,10 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
 
         const savedTypewriter = await window.api.storeGet('typewriterMode') as boolean | undefined
         dispatch({ type: 'SET_TYPEWRITER_MODE', payload: { enabled: savedTypewriter === true } })
-      } catch {
+
+        const savedFocusMode = await window.api.storeGet('focusMode') as FocusMode | undefined
+        dispatch({ type: 'SET_FOCUS_MODE', payload: { mode: savedFocusMode || 'none' } })
+      } catch (e) {
         applyThemeToDOM('dark')
       }
     })()
@@ -176,7 +183,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     try {
       const content = await window.api.readFile(filePath)
       dispatch({ type: 'OPEN_FILE', payload: { filePath, fileName, content } })
-    } catch (err) { console.error('Ошибка чтения файла:', err) }
+    } catch (err) { /* ignore */ }
   }, [])
 
   // --- Сохранить ---
@@ -196,7 +203,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       if (!folderPath) return
       const fileTree: FileEntry[] = await window.api.readDir(folderPath)
       dispatch({ type: 'SET_FILE_TREE', payload: { folderPath, fileTree } })
-    } catch (err) { console.error('Ошибка открытия папки:', err) }
+    } catch (err) { /* ignore */ }
   }, [])
 
   // --- Открыть файл через диалог ---
@@ -204,9 +211,9 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     try {
       const result = await window.api.openFile()
       if (!result) return
-      const fileName = result.filePath.replace(/^.*[\/]/, '') || 'untitled.md'
+      const fileName = result.filePath.replace(/^.*[/]/, '') || 'untitled.md'
       dispatch({ type: 'OPEN_FILE', payload: { filePath: result.filePath, fileName, content: result.content } })
-    } catch (err) { console.error('Ошибка открытия файла:', err) }
+    } catch (err) { /* ignore */ }
   }, [])
 
   // --- Сохранить как... ---
@@ -216,13 +223,13 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     try {
       const result = await window.api.saveFileAs(activeTab.content, activeTab.fileName)
       if (!result) return
-      const fileName = result.filePath.replace(/^.*[\/]/, '') || 'untitled.md'
+      const fileName = result.filePath.replace(/^.*[/]/, '') || 'untitled.md'
       dispatch({ type: 'OPEN_FILE', payload: { filePath: result.filePath, fileName, content: activeTab.content } })
       if (state.folderPath) {
         const fileTree: FileEntry[] = await window.api.readDir(state.folderPath)
         dispatch({ type: 'SET_FILE_TREE', payload: { folderPath: state.folderPath, fileTree } })
       }
-    } catch (err) { console.error('Ошибка сохранения файла:', err) }
+    } catch (err) { /* ignore */ }
   }, [state.tabs, state.activeTabId, state.folderPath])
 
   // --- Создать .md файл ---
@@ -265,14 +272,14 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     try {
       const fileTree: FileEntry[] = await window.api.readDir(state.folderPath)
       dispatch({ type: 'SET_FILE_TREE', payload: { folderPath: state.folderPath, fileTree } })
-    } catch (err) { console.error('Ошибка обновления дерева файлов:', err) }
+    } catch (err) { /* ignore */ }
   }, [state.folderPath])
 
   // --- Установить тему ---
   const setTheme = useCallback(async (theme: ThemeMode) => {
     dispatch({ type: 'SET_THEME', payload: { theme } })
     applyThemeToDOM(theme)
-    try { await window.api.storeSet('theme', theme) } catch {}
+    try { await window.api.storeSet('theme', theme) } catch (e) { /* ignore */ }
   }, [])
 
   // --- Установить режим вкладки ---
@@ -288,19 +295,25 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
   // --- Установить автосохранение ---
   const setAutosave = useCallback(async (enabled: boolean) => {
     dispatch({ type: 'SET_AUTOSAVE', payload: { enabled } })
-    try { await window.api.storeSet('autosave', enabled) } catch {}
+    try { await window.api.storeSet('autosave', enabled) } catch (e) { /* ignore */ }
   }, [])
 
   // --- Установить показ статистики ---
   const setShowStats = useCallback(async (enabled: boolean) => {
     dispatch({ type: 'SET_SHOW_STATS', payload: { enabled } })
-    try { await window.api.storeSet('showStats', enabled) } catch {}
+    try { await window.api.storeSet('showStats', enabled) } catch (e) { /* ignore */ }
   }, [])
 
   // --- Установить режим печатной машинки ---
   const setTypewriterMode = useCallback(async (enabled: boolean) => {
     dispatch({ type: 'SET_TYPEWRITER_MODE', payload: { enabled } })
-    try { await window.api.storeSet('typewriterMode', enabled) } catch {}
+    try { await window.api.storeSet('typewriterMode', enabled) } catch (e) { /* ignore */ }
+  }, [])
+
+  // --- Установить режим акцентирования ---
+  const setFocusMode = useCallback(async (mode: FocusMode) => {
+    dispatch({ type: 'SET_FOCUS_MODE', payload: { mode } })
+    try { await window.api.storeSet('focusMode', mode) } catch (e) { /* ignore */ }
   }, [])
 
   // --- Установить лимит ---
@@ -351,7 +364,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       createFile, createFolder, refreshFileTree,
       setTheme, setTabMode, refreshTab,
       setAutosave, setShowStats, setWordLimit,
-      setTypewriterMode,
+      setTypewriterMode, setFocusMode,
     }}>
       {children}
     </EditorContext.Provider>

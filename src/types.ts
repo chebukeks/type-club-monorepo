@@ -25,6 +25,9 @@ export type ThemeMode = 'light' | 'dark' | 'system';
 /** Режим редактирования */
 export type EditorMode = 'raw' | 'seamless' | 'preview';
 
+/** Режим акцентирования (Фокус) */
+export type FocusMode = 'none' | 'paragraph' | 'sentence' | 'lines';
+
 /** Вкладка открытого файла в редакторе */
 export interface Tab {
   id: string;
@@ -75,6 +78,8 @@ export interface AppState {
   activeToc: TocItem[];
   /** Режим печатной машинки */
   typewriterMode: boolean;
+  /** Режим акцентирования */
+  focusMode: FocusMode;
 }
 
 /** Действия для редьюсера состояния */
@@ -94,7 +99,8 @@ export type AppAction =
   | { type: 'SET_SHOW_STATS'; payload: { enabled: boolean } }
   | { type: 'SET_WORD_LIMIT'; payload: WordLimit }
   | { type: 'SET_ACTIVE_TOC'; payload: TocItem[] }
-  | { type: 'SET_TYPEWRITER_MODE'; payload: { enabled: boolean } };
+  | { type: 'SET_TYPEWRITER_MODE'; payload: { enabled: boolean } }
+  | { type: 'SET_FOCUS_MODE'; payload: { mode: FocusMode } };
 
 /** API, доступный из Renderer-процесса через contextBridge */
 export interface IElectronAPI {
