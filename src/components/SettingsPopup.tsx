@@ -11,7 +11,7 @@ interface SettingsPopupProps {
 }
 
 export function SettingsPopup({ onClose }: SettingsPopupProps) {
-  const { state, setAutosave, setShowStats } = useEditor()
+  const { state, setAutosave, setShowStats, setTypewriterMode } = useEditor()
   const [spellcheck, setSpellcheckState] = useState(true)
   const popupRef = useRef<HTMLDivElement>(null)
 
@@ -80,6 +80,14 @@ export function SettingsPopup({ onClose }: SettingsPopupProps) {
       <div className="menu-item enabled" onClick={handleSpellcheckToggle}>
         <span>Проверка орфографии</span>
         <ToggleSwitch enabled={spellcheck} />
+      </div>
+
+      <div className="border-t border-[var(--border-strong)] my-1" />
+
+      {/* Режим печатной машинки */}
+      <div className="menu-item enabled" onClick={() => setTypewriterMode(!state.typewriterMode)}>
+        <span>Режим печатной машинки</span>
+        <ToggleSwitch enabled={state.typewriterMode} />
       </div>
 
       <div className="border-t border-[var(--border-strong)] my-1" />

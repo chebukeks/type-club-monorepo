@@ -68,6 +68,11 @@ export function MarkdownEditor() {
   const dispatchRef = useRef(dispatch)
   dispatchRef.current = dispatch
 
+  const isTypewriterModeRef = useRef(state.typewriterMode)
+  useEffect(() => {
+    isTypewriterModeRef.current = state.typewriterMode
+  }, [state.typewriterMode])
+
   // ============================================================
   // ProseMirror (Seamless / Preview режимы)
   // ============================================================
@@ -113,9 +118,47 @@ export function MarkdownEditor() {
       },
     })
 
+    // Плагин режима печатной машинки
+    const typewriterPlugin = new Plugin({
+      props: {
+        handleScrollToSelection() {
+          return isTypewriterModeRef.current // отключаем дефолтный скролл, если режим включен
+        }
+      },
+      view() {
+        return {
+          update(view, prevState) {
+            if (!isTypewriterModeRef.current) return
+            if (!view.state.selection.eq(prevState.selection) || !view.state.doc.eq(prevState.doc)) {
+              const { head } = view.state.selection
+              let coords: { top: number, bottom: number }
+              try {
+                coords = view.coordsAtPos(head)
+              } catch (e) {
+                return
+              }
+              const scrollContainer = view.dom.closest('.overflow-auto') as HTMLElement
+              if (!scrollContainer) return
+              
+              const containerRect = scrollContainer.getBoundingClientRect()
+              const caretCenterY = (coords.top + coords.bottom) / 2
+              const containerCenterY = containerRect.top + (containerRect.height / 2)
+              
+              const offset = caretCenterY - containerCenterY
+              if (Math.abs(offset) > 1) {
+                // Если offset слишком большой, smooth может не успевать или дергаться. 
+                // Браузеры хорошо справляются с scrollBy smooth.
+                scrollContainer.scrollBy({ top: offset, behavior: 'smooth' })
+              }
+            }
+          }
+        }
+      }
+    })
+
     // Набор плагинов зависит от режима
     const plugins: Plugin[] = isPreview
-      ? [history(), dropCursor(), gapCursor(), syncPlugin, interactivePlugin]
+      ? [history(), dropCursor(), gapCursor(), syncPlugin, interactivePlugin, typewriterPlugin]
       : [
         ...getKeymapPlugins(),
         getInputRulesPlugin(),
@@ -131,6 +174,7 @@ export function MarkdownEditor() {
         syncPlugin,
         foldingPlugin,
         interactivePlugin,
+        typewriterPlugin,
         tocPlugin((toc) => dispatchRef.current({ type: 'SET_ACTIVE_TOC', payload: toc })),
       ]
 
@@ -248,8 +292,11 @@ export function MarkdownEditor() {
   // Seamless / Preview — ProseMirror
   // ============================================================
   return (
-    <div className="flex-1 overflow-auto bg-[var(--bg-base)]">
-      <div ref={editorRef} className="h-full w-full" />
+    <div className={`flex-1 overflow-auto bg-[var(--bg-base)] ${state.typewriterMode ? 'typewriter-mode' : ''}`}>
+      <div 
+        ref={editorRef} 
+        className="h-full w-full" 
+      />
     </div>
   )
 }

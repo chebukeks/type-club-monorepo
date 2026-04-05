@@ -20,6 +20,12 @@ export function getEditorStyles(): string {
   outline: none;
   min-height: 100%;
   caret-color: var(--editor-caret);
+  transition: padding 0.3s ease-in-out;
+}
+
+.typewriter-mode .ProseMirror {
+  padding-top: 70vh;
+  padding-bottom: 70vh;
 }
 
 .ProseMirror.is-over-limit {

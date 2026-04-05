@@ -73,6 +73,8 @@ export interface AppState {
   showStats: boolean;
   /** Оглавление активного файла */
   activeToc: TocItem[];
+  /** Режим печатной машинки */
+  typewriterMode: boolean;
 }
 
 /** Действия для редьюсера состояния */
@@ -91,7 +93,8 @@ export type AppAction =
   | { type: 'SET_AUTOSAVE'; payload: { enabled: boolean } }
   | { type: 'SET_SHOW_STATS'; payload: { enabled: boolean } }
   | { type: 'SET_WORD_LIMIT'; payload: WordLimit }
-  | { type: 'SET_ACTIVE_TOC'; payload: TocItem[] };
+  | { type: 'SET_ACTIVE_TOC'; payload: TocItem[] }
+  | { type: 'SET_TYPEWRITER_MODE'; payload: { enabled: boolean } };
 
 /** API, доступный из Renderer-процесса через contextBridge */
 export interface IElectronAPI {

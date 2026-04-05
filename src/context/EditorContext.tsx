@@ -18,6 +18,7 @@ const initialState: AppState = {
   wordLimit: { enabled: false, value: 1000, type: 'chars' },
   showStats: true,
   activeToc: [],
+  typewriterMode: false,
 }
 
 // ============================================================
@@ -103,6 +104,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, wordLimit: action.payload }
     case 'SET_ACTIVE_TOC':
       return { ...state, activeToc: action.payload }
+    case 'SET_TYPEWRITER_MODE':
+      return { ...state, typewriterMode: action.payload.enabled }
     default:
       return state
   }
@@ -128,6 +131,7 @@ interface EditorContextValue {
   setAutosave: (enabled: boolean) => Promise<void>
   setShowStats: (enabled: boolean) => Promise<void>
   setWordLimit: (limit: WordLimit) => void
+  setTypewriterMode: (enabled: boolean) => Promise<void>
 }
 
 const EditorContext = createContext<EditorContextValue | null>(null)
@@ -149,6 +153,9 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
 
         const savedStats = await window.api.storeGet('showStats') as boolean | undefined
         dispatch({ type: 'SET_SHOW_STATS', payload: { enabled: savedStats !== false } })
+
+        const savedTypewriter = await window.api.storeGet('typewriterMode') as boolean | undefined
+        dispatch({ type: 'SET_TYPEWRITER_MODE', payload: { enabled: savedTypewriter === true } })
       } catch {
         applyThemeToDOM('dark')
       }
@@ -290,6 +297,12 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     try { await window.api.storeSet('showStats', enabled) } catch {}
   }, [])
 
+  // --- Установить режим печатной машинки ---
+  const setTypewriterMode = useCallback(async (enabled: boolean) => {
+    dispatch({ type: 'SET_TYPEWRITER_MODE', payload: { enabled } })
+    try { await window.api.storeSet('typewriterMode', enabled) } catch {}
+  }, [])
+
   // --- Установить лимит ---
   const setWordLimit = useCallback((limit: WordLimit) => {
     dispatch({ type: 'SET_WORD_LIMIT', payload: limit })
@@ -338,6 +351,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       createFile, createFolder, refreshFileTree,
       setTheme, setTabMode, refreshTab,
       setAutosave, setShowStats, setWordLimit,
+      setTypewriterMode,
     }}>
       {children}
     </EditorContext.Provider>
