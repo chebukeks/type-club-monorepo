@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
@@ -62,6 +62,26 @@ function createWindow() {
   } else {
     win.loadFile(path.join(RENDERER_DIST, 'index.html'))
   }
+
+  // Запрещаем создавать новые окна через target="_blank" или window.open
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url)
+    return { action: 'deny' }
+  })
+
+  // Запрещаем навигацию основного окна по внешним ссылкам
+  win.webContents.on('will-navigate', (event, url) => {
+    // В dev режиме разрешаем навигацию по localhost (HMR, релоады и т.д.)
+    if (VITE_DEV_SERVER_URL && url.startsWith(VITE_DEV_SERVER_URL)) return
+    
+    // В проде разрешаем навигацию по index.html
+    const isLocalFile = url.startsWith('file:') && url.includes('index.html')
+    if (isLocalFile) return
+
+    // Все остальные навигации (например youtube.com) блокируем и открываем в браузере
+    event.preventDefault()
+    shell.openExternal(url)
+  })
 }
 
 // ============================================================
@@ -293,6 +313,7 @@ ipcMain.on('window:maximize', () => {
   }
 })
 ipcMain.on('window:close', () => win?.close())
+ipcMain.on('window:openExternal', (_event, url: string) => shell.openExternal(url))
 
 // ============================================================
 // Жизненный цикл приложения

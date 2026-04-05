@@ -358,5 +358,34 @@ export function getEditorStyles(): string {
 .ProseMirror.preview-mode a:hover {
   text-decoration: underline;
 }
+
+/* ==========================================
+   Спойлеры
+   ========================================== */
+.pm-spoiler {
+  background: var(--bg-hover);
+  border-radius: 4px;
+  padding: 0 4px;
+  transition: all 0.2s ease;
+}
+
+/* В Preview режиме спойлеры скрыты черным фоном (цвет текста прозрачный или совпадает с фоном) */
+.ProseMirror.preview-mode .pm-spoiler {
+  background: var(--bg-active);
+  color: transparent;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ProseMirror.preview-mode .pm-spoiler.is-revealed {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  user-select: text;
+}
+
+/* Интерактивные чекбоксы курсор */
+.ProseMirror:not(.preview-mode) li.task-list-item::before {
+  cursor: pointer;
+}
 `
 }

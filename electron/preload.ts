@@ -99,4 +99,7 @@ contextBridge.exposeInMainWorld('api', {
 
   /** Закрыть окно */
   closeWindow: () => ipcRenderer.send('window:close'),
+
+  /** Открыть внешнюю ссылку в браузере */
+  openExternal: (url: string) => ipcRenderer.send('window:openExternal', url),
 })

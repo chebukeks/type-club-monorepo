@@ -43,6 +43,9 @@ const createTableOnEnter: Command = (state, dispatch) => {
   if ($head.parent.type.name !== 'paragraph') return false
   
   const text = $head.parent.textContent
+  // Если это спойлер (начинается и заканчивается на ||), не расцениваем это как таблицу
+  if (/^\|\|.*\|\|$/.test(text)) return false
+
   const match = text.match(/^\|(.+)\|$/)
   if (!match) return false
 

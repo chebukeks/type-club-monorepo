@@ -105,6 +105,7 @@ export interface IElectronAPI {
   minimizeWindow: () => void;
   maximizeWindow: () => void;
   closeWindow: () => void;
+  openExternal: (url: string) => void;
   exportHtml: (content: string, defaultName: string) => Promise<boolean>;
   exportPdf: (content: string, defaultName: string) => Promise<boolean>;
   /** Чтение настроек из electron-store */

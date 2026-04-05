@@ -26,6 +26,7 @@ import { useEditor } from '../context/EditorContext'
 import { tocPlugin } from '../editor/tocPlugin'
 import { foldingPlugin } from '../editor/foldingPlugin'
 import { HeadingView } from '../editor/headingView'
+import { interactivePlugin } from '../editor/interactivePlugin'
 
 // Inject CSS один раз
 let styleInjected = false
@@ -114,7 +115,7 @@ export function MarkdownEditor() {
 
     // Набор плагинов зависит от режима
     const plugins: Plugin[] = isPreview
-      ? [history(), dropCursor(), gapCursor(), syncPlugin]
+      ? [history(), dropCursor(), gapCursor(), syncPlugin, interactivePlugin]
       : [
         ...getKeymapPlugins(),
         getInputRulesPlugin(),
@@ -129,6 +130,7 @@ export function MarkdownEditor() {
         dropCursor(),
         syncPlugin,
         foldingPlugin,
+        interactivePlugin,
         tocPlugin((toc) => dispatchRef.current({ type: 'SET_ACTIVE_TOC', payload: toc })),
       ]
 
@@ -143,17 +145,6 @@ export function MarkdownEditor() {
         code_block: (node, view, getPos) => new CodeBlockView(node, view, getPos),
         math_block: (node, view, getPos) => new MathBlockView(node, view, getPos),
       },
-      handleClickOn: isPreview ? (_view, _pos, _node, _nodePos, event) => {
-        // В Preview-режиме ссылки кликабельны
-        const target = event.target as HTMLElement
-        const link = target.closest('a')
-        if (link) {
-          const href = link.getAttribute('href')
-          if (href) window.open(href, '_blank')
-          return true
-        }
-        return false
-      } : undefined,
     })
 
     // Добавляем CSS-класс для Preview

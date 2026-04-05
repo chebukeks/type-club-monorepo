@@ -149,6 +149,7 @@ function getMarkSyntax(mark: import('prosemirror-model').Mark): { open: string, 
     case 'code': return { open: '`', close: '`' }
     case 's': return { open: '~~', close: '~~' }
     case 'highlight': return { open: '==', close: '==' }
+    case 'spoiler': return { open: '||', close: '||' }
     case 'link': {
       const href = mark.attrs.href || ''
       const title = mark.attrs.title ? ` "${mark.attrs.title}"` : ''

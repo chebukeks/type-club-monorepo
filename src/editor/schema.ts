@@ -232,5 +232,9 @@ export const schema = new Schema({
       parseDOM: [{ tag: 'mark' }],
       toDOM() { return ['mark', 0] },
     },
+    spoiler: {
+      parseDOM: [{ tag: 'span.pm-spoiler' }],
+      toDOM() { return ['span', { class: 'pm-spoiler' }, 0] },
+    },
   },
 })

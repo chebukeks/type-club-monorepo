@@ -232,6 +232,12 @@ export function getInputRulesPlugin(): Plugin {
         schema.marks.highlight
       ),
 
+      // Инлайн: ||text|| → spoiler
+      markInputRule(
+        /\|\|([^|]+)\|\|$/,
+        schema.marks.spoiler
+      ),
+
       // Формулы
       singleMathInlineRule(),
 

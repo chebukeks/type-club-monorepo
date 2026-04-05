@@ -74,6 +74,75 @@ function texmathFixPlugin(md: MarkdownIt) {
   })
 }
 
+// Переопределяем правило text, чтобы оно останавливалось на символе '|' (0x7c)
+function patchedTextRule(state: any, silent: boolean) {
+  let pos = state.pos
+  while (pos < state.posMax) {
+    const ch = state.src.charCodeAt(pos)
+    if (ch === 0x7c /* | */) break
+    switch (ch) {
+      case 0x0a: case 0x21: case 0x23: case 0x24: case 0x25: case 0x26: case 0x2a: case 0x2b: 
+      case 0x2d: case 0x3a: case 0x3c: case 0x3d: case 0x3e: case 0x40: case 0x5b: case 0x5c: 
+      case 0x5d: case 0x5e: case 0x5f: case 0x60: case 0x7b: case 0x7d: case 0x7e:
+        break
+      default:
+        pos++
+        continue
+    }
+    break
+  }
+  if (pos === state.pos) return false
+  if (!silent) state.pending += state.src.slice(state.pos, pos)
+  state.pos = pos
+  return true
+}
+
+// Кастомный плагин для парсинга спойлеров ||text||
+function spoilerInlinePlugin(md: MarkdownIt) {
+  // Меняем стандартное правило text, чтобы парсер проверял наши спойлеры
+  md.inline.ruler.at('text', patchedTextRule)
+
+  md.inline.ruler.before('emphasis', 'spoiler', (state: any, silent: boolean) => {
+    const max = state.posMax
+    const start = state.pos
+    const marker = state.src.charCodeAt(start)
+
+    // Ищем ||
+    if (marker !== 0x7c /* | */) return false
+    if (start + 1 >= max || state.src.charCodeAt(start + 1) !== 0x7c) return false
+
+    let end = start + 2
+    // Ищем закрывающие ||
+    while (end < max - 1) {
+      if (state.src.charCodeAt(end) === 0x7c && state.src.charCodeAt(end + 1) === 0x7c) {
+        break
+      }
+      end++
+    }
+
+    if (end >= max - 1) return false // не нашли закрывающие, это не спойлер
+    if (silent) return false // если silent мод, нам достаточно просто вернуть true (ниже) и не добавлять токены
+
+    const tokenOpen = state.push('spoiler_open', 'span', 1)
+    tokenOpen.markup = '||'
+    tokenOpen.attrs = [['class', 'pm-spoiler']]
+    
+    // Рекурсивно парсим внутренний контент, чтобы поддерживать вложенные марки
+    state.md.inline.parse(
+      state.src.slice(start + 2, end),
+      state.md,
+      state.env,
+      state.tokens
+    )
+
+    const tokenClose = state.push('spoiler_close', 'span', -1)
+    tokenClose.markup = '||'
+
+    state.pos = end + 2
+    return true
+  })
+}
+
 // ============================================================
 // Парсер: Markdown → ProseMirror doc
 // ============================================================
@@ -86,6 +155,7 @@ const md = new MarkdownIt('default', { html: false })
   .use(taskListPlugin)
   .use(texmath, { engine: katex, delimiters: 'dollars' })
   .use(texmathFixPlugin)
+  .use(spoilerInlinePlugin)
 
 /**
  * Парсер.
@@ -125,6 +195,7 @@ export const markdownParser = new MarkdownParser(schema, md, {
   code_inline: { mark: 'code', noCloseToken: true },
   s: { mark: 's' },
   mark: { mark: 'highlight' },
+  spoiler: { mark: 'spoiler' },
 
   // Игнорируемые токены (не в MVP)
   code_block: { block: 'code_block', noCloseToken: true },
@@ -368,6 +439,12 @@ export const markdownSerializer = new MarkdownSerializer(
       mixable: true,
       expelEnclosingWhitespace: true,
     },
+    spoiler: {
+      open: '||',
+      close: '||',
+      mixable: true,
+      expelEnclosingWhitespace: true,
+    },
   }
 )
 
@@ -461,6 +538,7 @@ export function generateExportHtml(markdown: string): string {
     .use(texmath, { engine: katex, delimiters: 'dollars' })
     .use(taskListsPlugin, { enabled: true, label: true })
     .use(markPlugin)
+    .use(spoilerInlinePlugin)
 
   // Конвертируем Markdown в HTML тело
   const bodyHtml = exportMd.render(markdown)
