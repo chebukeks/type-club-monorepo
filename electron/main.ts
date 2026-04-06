@@ -17,6 +17,51 @@ const store = new Store({
   },
 })
 
+/** Пути к файлам, переданные через командную строку при старте */
+const initialFiles: string[] = []
+
+/**
+ * Извлекает пути к существующим .md файлам из аргументов командной строки.
+ */
+function getFilesFromArgs(argv: string[]): string[] {
+  return argv.filter(arg => {
+    // Пропускаем флаги и сам путь к исполняемому файлу/точке входа
+    if (arg.startsWith('-')) return false
+    if (!arg.endsWith('.md')) return false
+    try {
+      return fs.existsSync(arg) && fs.statSync(arg).isFile()
+    } catch {
+      return false
+    }
+  })
+}
+
+// Первичный сбор файлов при запуске
+initialFiles.push(...getFilesFromArgs(process.argv))
+
+// ============================================================
+// Проверка на единственность экземпляра приложения
+// ============================================================
+const gotTheLock = app.requestSingleInstanceLock()
+
+if (!gotTheLock) {
+  app.quit()
+} else {
+  app.on('second-instance', (_event, commandLine) => {
+    // При попытке запуска второго экземпляра — фокусируем текущее окно
+    if (win) {
+      if (win.isMinimized()) win.restore()
+      win.focus()
+      
+      // Передаем новые файлы в Renderer процесс
+      const additionalFiles = getFilesFromArgs(commandLine)
+      if (additionalFiles.length > 0) {
+        win.webContents.send('app:open-files', additionalFiles)
+      }
+    }
+  })
+}
+
 /**
  * Структура сборки:
  * ├─┬─ dist/          — собранный фронтенд
@@ -314,6 +359,13 @@ ipcMain.on('window:maximize', () => {
 })
 ipcMain.on('window:close', () => win?.close())
 ipcMain.on('window:openExternal', (_event, url: string) => shell.openExternal(url))
+
+// ============================================================
+// IPC-хэндлеры для открытия файлов при старте
+// ============================================================
+ipcMain.handle('app:get-files-to-open', () => {
+  return initialFiles
+})
 
 // ============================================================
 // Жизненный цикл приложения

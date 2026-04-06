@@ -125,6 +125,10 @@ export interface IElectronAPI {
   setSpellcheck: (enabled: boolean) => Promise<void>;
   /** Получить текущее состояние спеллчекера */
   getSpellcheck: () => Promise<boolean>;
+  /** Получить файлы, переданные при старте (Open with...) */
+  getFilesToOpen: () => Promise<string[]>;
+  /** Подписаться на открытие новых файлов (когда приложение уже запущен) */
+  onOpenFiles: (callback: (paths: string[]) => void) => () => void;
 }
 
 declare global {

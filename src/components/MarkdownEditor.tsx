@@ -56,7 +56,7 @@ export function MarkdownEditor() {
     const words = text ? text.split(/\s+/).filter(Boolean).length : 0
     return { chars, words }
   }, [content])
-  
+
   useEffect(() => {
     if (!state.wordLimit.enabled) {
       isOverLimitRef.current = false
@@ -148,15 +148,15 @@ export function MarkdownEditor() {
               }
               const scrollContainer = view.dom.closest('.overflow-auto') as HTMLElement
               if (!scrollContainer) return
-              
+
               const containerRect = scrollContainer.getBoundingClientRect()
               const caretCenterY = (coords.top + coords.bottom) / 2
               const containerCenterY = containerRect.top + (containerRect.height / 2)
-              
+
               // Для режима "Три строчки" передаем координату маске
               const maskY = caretCenterY - containerRect.top
               scrollContainer.style.setProperty('--focus-mask-y', `${maskY}px`)
-              
+
               const offset = caretCenterY - containerCenterY
               if (Math.abs(offset) > 1) {
                 // Если offset слишком большой, smooth может не успевать или дергаться. 
@@ -307,23 +307,23 @@ export function MarkdownEditor() {
   // ============================================================
   // Seamless / Preview — ProseMirror
   // ============================================================
-  
-  const focusClass = state.focusMode === 'paragraph' ? 'focus-mode-paragraph' 
-    : state.focusMode === 'sentence' ? 'focus-mode-sentence' 
-    : state.focusMode === 'lines' ? 'focus-mode-lines' : ''
-    
+
+  const focusClass = state.focusMode === 'paragraph' ? 'focus-mode-paragraph'
+    : state.focusMode === 'sentence' ? 'focus-mode-sentence'
+      : state.focusMode === 'lines' ? 'focus-mode-lines' : ''
+
   return (
-    <div 
+    <div
       className={`flex-1 overflow-auto bg-[var(--bg-base)] ${state.typewriterMode ? 'typewriter-mode' : ''} ${focusClass}`}
       style={{
-        maskImage: state.focusMode === 'lines' ? 'linear-gradient(to bottom, transparent calc(var(--focus-mask-y, 50%) - 100px), black calc(var(--focus-mask-y, 50%) - 30px), black calc(var(--focus-mask-y, 50%) + 30px), transparent calc(var(--focus-mask-y, 50%) + 100px))' : 'none',
-        WebkitMaskImage: state.focusMode === 'lines' ? 'linear-gradient(to bottom, transparent calc(var(--focus-mask-y, 50%) - 100px), black calc(var(--focus-mask-y, 50%) - 30px), black calc(var(--focus-mask-y, 50%) + 30px), transparent calc(var(--focus-mask-y, 50%) + 100px))' : 'none',
+        maskImage: state.focusMode === 'lines' ? 'linear-gradient(to bottom, rgba(0, 0, 0, 0.3) calc(var(--focus-mask-y, 50%) - 50px), black calc(var(--focus-mask-y, 50%) - 30px), black calc(var(--focus-mask-y, 50%) + 30px), rgba(0, 0, 0, 0.3) calc(var(--focus-mask-y, 50%) + 50px))' : 'none',
+        WebkitMaskImage: state.focusMode === 'lines' ? 'linear-gradient(to bottom, rgba(0, 0, 0, 0.3) calc(var(--focus-mask-y, 50%) - 50px), black calc(var(--focus-mask-y, 50%) - 30px), black calc(var(--focus-mask-y, 50%) + 30px), rgba(0, 0, 0, 0.3) calc(var(--focus-mask-y, 50%) + 50px))' : 'none',
         transition: 'mask-image 0.3s'
       }}
     >
-      <div 
-        ref={editorRef} 
-        className="h-full w-full" 
+      <div
+        ref={editorRef}
+        className="h-full w-full"
       />
     </div>
   )

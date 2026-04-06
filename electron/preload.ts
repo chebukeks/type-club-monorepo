@@ -102,4 +102,20 @@ contextBridge.exposeInMainWorld('api', {
 
   /** Открыть внешнюю ссылку в браузере */
   openExternal: (url: string) => ipcRenderer.send('window:openExternal', url),
+
+  // ==========================================
+  // Открытие файлов через систему
+  // ==========================================
+
+  /** Получить файлы, переданные при старте (Open with...) */
+  getFilesToOpen: (): Promise<string[]> => {
+    return ipcRenderer.invoke('app:get-files-to-open')
+  },
+
+  /** Подписаться на открытие новых файлов (когда приложение уже запущено) */
+  onOpenFiles: (callback: (paths: string[]) => void) => {
+    const subscription = (_event: unknown, paths: string[]) => callback(paths)
+    ipcRenderer.on('app:open-files', subscription)
+    return () => ipcRenderer.off('app:open-files', subscription)
+  },
 })

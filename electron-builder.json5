@@ -4,6 +4,14 @@
   "appId": "com.type-club.app",
   "asar": true,
   "productName": "TypeClub",
+  "fileAssociations": [
+    {
+      "ext": "md",
+      "name": "Markdown",
+      "role": "Editor",
+      "icon": "public/electron-vite.svg"
+    }
+  ],
   "directories": {
     "output": "release/${version}"
   },

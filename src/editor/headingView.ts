@@ -2,7 +2,7 @@ import { Node } from 'prosemirror-model'
 import { EditorView, NodeView } from 'prosemirror-view'
 
 const chevronSvg = `<svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
-  <path d="M4 2l4 4-4 4z"></path>
+  <path d="M4 2l4 4-4 4z" transform="rotate(90, 6, 6)"></path>
 </svg>`
 
 export class HeadingView implements NodeView {
@@ -20,7 +20,7 @@ export class HeadingView implements NodeView {
     const level = node.attrs.level
     this.dom = document.createElement(`h${level}`)
     this.dom.classList.add('editor-heading')
-    
+
     const foldBtn = document.createElement('button')
     foldBtn.className = 'heading-fold-btn'
     foldBtn.contentEditable = 'false'
@@ -47,7 +47,7 @@ export class HeadingView implements NodeView {
     this.node = node
     return true
   }
-  
+
   ignoreMutation(mutation: any) {
     // Ignore mutations on the button itself
     if (mutation.type !== 'selection' && mutation.target && mutation.target.nodeType === 1 && (mutation.target as Element).closest('.heading-fold-btn')) {

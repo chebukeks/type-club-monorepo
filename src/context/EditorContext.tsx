@@ -163,6 +163,28 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
 
         const savedFocusMode = await window.api.storeGet('focusMode') as FocusMode | undefined
         dispatch({ type: 'SET_FOCUS_MODE', payload: { mode: savedFocusMode || 'none' } })
+
+        const lastFolder = await window.api.storeGet('lastFolderPath') as string | undefined
+        if (lastFolder) {
+          try {
+            const fileTree = await window.api.readDir(lastFolder)
+            // Устанавливаем дерево, если удалось прочитать (даже если пусто)
+            dispatch({ type: 'SET_FILE_TREE', payload: { folderPath: lastFolder, fileTree } })
+          } catch (e) {
+            console.error('Не удалось восстановить папку:', e)
+          }
+        }
+
+        // --- Обработка файлов, переданных при старте (Open with...) ---
+        const startupFiles = await window.api.getFilesToOpen()
+        for (const p of startupFiles) {
+          const name = p.replace(/^.*[\\/]/, '') || 'untitled.md'
+          // Используем dispatch напрямую, так как openFile определен позже
+          try {
+            const content = await window.api.readFile(p)
+            dispatch({ type: 'OPEN_FILE', payload: { filePath: p, fileName: name, content } })
+          } catch (err) { /* ignore */ }
+        }
       } catch (e) {
         applyThemeToDOM('dark')
       }
@@ -177,6 +199,20 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     mql.addEventListener('change', handler)
     return () => mql.removeEventListener('change', handler)
   }, [state.theme])
+  
+  // --- Подписка на открытие новых файлов (когда приложение уже запущено) ---
+  useEffect(() => {
+    const unsubscribe = window.api.onOpenFiles((paths) => {
+      paths.forEach(async (p) => {
+        const name = p.replace(/^.*[\\/]/, '') || 'untitled.md'
+        try {
+          const content = await window.api.readFile(p)
+          dispatch({ type: 'OPEN_FILE', payload: { filePath: p, fileName: name, content } })
+        } catch (err) { /* ignore */ }
+      })
+    })
+    return unsubscribe
+  }, [])
 
   // --- Открыть файл ---
   const openFile = useCallback(async (filePath: string, fileName: string) => {
@@ -203,6 +239,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       if (!folderPath) return
       const fileTree: FileEntry[] = await window.api.readDir(folderPath)
       dispatch({ type: 'SET_FILE_TREE', payload: { folderPath, fileTree } })
+      await window.api.storeSet('lastFolderPath', folderPath)
     } catch (err) { /* ignore */ }
   }, [])
 
