@@ -9,7 +9,7 @@
       "ext": "md",
       "name": "Markdown",
       "role": "Editor",
-      "icon": "public/electron-vite.svg"
+      "icon": "public/file_icon/md-file"
     }
   ],
   "directories": {
