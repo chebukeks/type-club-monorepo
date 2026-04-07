@@ -9,7 +9,7 @@
       "ext": "md",
       "name": "Markdown",
       "role": "Editor",
-      "icon": "public/file_icon/md-file"
+      "icon": "public/file_icon/file-md"
     }
   ],
   "directories": {
