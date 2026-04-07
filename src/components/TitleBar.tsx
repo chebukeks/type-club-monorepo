@@ -28,21 +28,13 @@ export function TitleBar() {
           className="flex items-center gap-2 text-[var(--text-muted)] text-xs font-medium tracking-wide"
           style={{ marginRight: '12px' }}
         >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="text-[var(--accent)]"
-          >
-            <path d="M4 7V4h16v3" />
-            <path d="M9 20h6" />
-            <path d="M12 4v16" />
-          </svg>
+          <img
+            src="/icon.svg"
+            alt="Logo"
+            width="16"
+            height="16"
+            className="block opacity-80"
+          />
         </div>
 
         {/* Интерактивное Меню */}
@@ -56,7 +48,7 @@ export function TitleBar() {
       >
         {/* Иконка пользователя (заглушка) */}
         <button
-          onClick={() => {/* заглушка — пока ничего не делает */}}
+          onClick={() => {/* заглушка — пока ничего не делает */ }}
           className="w-9 h-full flex items-center justify-center text-[var(--text-dim)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)] transition-colors"
           title="Аккаунт"
         >
@@ -70,11 +62,10 @@ export function TitleBar() {
         <div className="relative h-full">
           <button
             onClick={() => setShowSettings(!showSettings)}
-            className={`w-9 h-full flex items-center justify-center transition-colors ${
-              showSettings
+            className={`w-9 h-full flex items-center justify-center transition-colors ${showSettings
                 ? 'bg-[var(--bg-active)] text-[var(--text-primary)]'
                 : 'text-[var(--text-dim)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)]'
-            }`}
+              }`}
             title="Настройки"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
