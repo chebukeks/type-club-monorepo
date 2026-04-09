@@ -405,15 +405,17 @@ export function getEditorStyles(): string {
   opacity: 0.25;
 }
 
-.focus-mode-paragraph .ProseMirror > *,
-.focus-mode-sentence .ProseMirror > * {
+/* Плавное появление ТОЛЬКО для активного элемента.
+   Элементы, теряющие фокус, гаснут мгновенно — это убирает моргание
+   при переключении между абзацами (из-за удаления inline focus-dimmed декораций). */
+.focus-mode-paragraph .ProseMirror > .focus-active-paragraph,
+.focus-mode-sentence .ProseMirror > .focus-active-paragraph {
   transition: opacity 0.3s ease-in-out;
 }
 
 /* Приглушение несвязанных предложений внутри активного абзаца */
 .focus-mode-sentence .focus-dimmed {
   opacity: 0.25;
-  transition: opacity 0.3s ease-in-out;
 }
 `
 }
