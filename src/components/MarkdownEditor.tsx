@@ -4,8 +4,10 @@
  */
 import { useEffect, useRef, useState, useMemo } from 'react'
 import 'katex/dist/katex.min.css'
+import katex from 'katex'
 import { EditorState, Plugin } from 'prosemirror-state'
-import { EditorView } from 'prosemirror-view'
+import { EditorView, NodeView } from 'prosemirror-view'
+import { Node as PMNode } from 'prosemirror-model'
 import { history } from 'prosemirror-history'
 import { dropCursor } from 'prosemirror-dropcursor'
 import { gapCursor } from 'prosemirror-gapcursor'
@@ -38,6 +40,48 @@ function injectStyles() {
   style.textContent = getEditorStyles()
   document.head.appendChild(style)
   styleInjected = true
+}
+
+/**
+ * Минимальный NodeView для math_inline в Preview-режиме.
+ * Показывает только отрендеренный KaTeX, скрывая исходный текст.
+ */
+class MathInlinePreviewView implements NodeView {
+  dom: HTMLElement
+  node: PMNode
+
+  constructor(node: PMNode) {
+    this.node = node
+    this.dom = document.createElement('span')
+    this.dom.className = 'math-inline-preview'
+    this.dom.contentEditable = 'false'
+    this.renderMath()
+  }
+
+  renderMath() {
+    const text = this.node.textContent?.trim() || ''
+    this.dom.innerHTML = ''
+    if (!text) {
+      this.dom.innerHTML = '<span style="color: grey; opacity: 0.5;">Empty Math</span>'
+      return
+    }
+    try {
+      katex.render(text, this.dom, { throwOnError: false, displayMode: false })
+    } catch (e) {
+      this.dom.textContent = text
+    }
+  }
+
+  update(node: PMNode) {
+    if (node.type !== this.node.type) return false
+    this.node = node
+    this.renderMath()
+    return true
+  }
+
+  // Нет contentDOM — ProseMirror не будет управлять содержимым
+  stopEvent() { return true }
+  ignoreMutation() { return true }
 }
 
 export function MarkdownEditor() {
@@ -200,10 +244,14 @@ export function MarkdownEditor() {
     const view = new EditorView(editorRef.current, {
       state: editorState,
       editable: () => !isPreview,
-      nodeViews: isPreview ? undefined : {
+      nodeViews: {
         heading: (node, view, getPos) => new HeadingView(node, view, getPos),
         code_block: (node, view, getPos) => new CodeBlockView(node, view, getPos),
         math_block: (node, view, getPos) => new MathBlockView(node, view, getPos),
+        ...(isPreview ? {
+          // В Preview режиме math_inline рендерим только KaTeX (без UI редактирования)
+          math_inline: (node: PMNode) => new MathInlinePreviewView(node),
+        } : {}),
       },
     })
 

@@ -17,7 +17,7 @@ Type Club — десктопный Markdown-редактор в стиле Typor
 | KaTeX | Рендеринг LaTeX-формул |
 | markdown-it | Парсинг Markdown → ProseMirror |
 | highlight.js | Подсветка синтаксиса в код-блоках |
-| electron-store | Персистентное хранилище настроек (тема и т.п.) |
+| electron-store | Персистентное хранилище настроек (тема, autosave и т.п.) |
 | lucide-react | Иконки UI |
 
 ---
@@ -49,8 +49,10 @@ npm run dev
 │                  Main Process                    │
 │  electron/main.ts                               │
 │  - Создание BrowserWindow (frameless)           │
-│  - IPC-хэндлеры (fs, dialog, export, store)    │
+│  - IPC-хэндлеры (fs, dialog, export, store,    │
+│    spellcheck, file association)                 │
 │  - Управление жизненным циклом приложения       │
+│  - Single instance lock + Open with...          │
 └─────────────┬───────────────────────────────────┘
               │ contextBridge (preload.ts)
               │ window.api.*
@@ -58,7 +60,8 @@ npm run dev
 │               Renderer Process                   │
 │  src/                                            │
 │  - React UI (TitleBar, MenuBar, Sidebar,        │
-│    TabBar, MarkdownEditor)                       │
+│    TabBar, MarkdownEditor, SettingsPopup,        │
+│    StatsToast)                                   │
 │  - ProseMirror (схема, плагины, nodeViews)      │
 │  - Состояние: EditorContext (useReducer)        │
 │  - Темы: light / dark / system                  │
@@ -78,13 +81,13 @@ npm run dev
 ```
 type-club/
 ├── electron/                    # Electron (Main Process)
-│   ├── main.ts                  #   Главный процесс: окно, IPC, экспорт, store
+│   ├── main.ts                  #   Главный процесс: окно, IPC, экспорт, store, spellcheck
 │   ├── preload.ts               #   Bridge: contextBridge → window.api
 │   └── electron-env.d.ts        #   Типы process.env
 │
 ├── src/                         # React + ProseMirror (Renderer)
 │   ├── main.tsx                 #   Точка входа React
-│   ├── App.tsx                  #   Корневой layout: TitleBar + MenuBar + Sidebar + TabBar + Editor
+│   ├── App.tsx                  #   Корневой layout: TitleBar + Sidebar + TabBar + Editor + StatsToast
 │   ├── index.css                #   Глобальные стили + Tailwind v4 + CSS-переменные тем
 │   ├── types.ts                 #   TypeScript-интерфейсы (FileEntry, Tab, ThemeMode, EditorMode, IPC API)
 │   ├── vite-env.d.ts            #   Типы Vite
@@ -95,11 +98,13 @@ type-club/
 │   │   └── EditorContext.tsx    #   Глобальное состояние (useReducer + Context)
 │   │
 │   ├── components/
-│   │   ├── TitleBar.tsx         #   Кастомный titlebar (frameless window)
-│   │   ├── MenuBar.tsx          #   Меню: File, Edit (заглушка), View (тема, режим)
+│   │   ├── TitleBar.tsx         #   Кастомный titlebar (frameless window) + кнопка ⚙ настроек
+│   │   ├── MenuBar.tsx          #   Меню: File, Edit (заглушка), View (тема, режим, акцентирование)
 │   │   ├── Sidebar.tsx          #   Файловый проводник (дерево .md) + создание файлов/папок
 │   │   ├── TabBar.tsx           #   Панель вкладок
-│   │   └── MarkdownEditor.tsx   #   React-обёртка ProseMirror
+│   │   ├── MarkdownEditor.tsx   #   React-обёртка ProseMirror
+│   │   ├── SettingsPopup.tsx    #   Всплывающие настройки (автосохр., спеллчекер, машинка, статистика)
+│   │   └── StatsToast.tsx       #   Плашка статистики: символы, слова, предложения, время чтения, лимит
 │   │
 │   └── editor/                  #   Ядро ProseMirror
 │       ├── schema.ts            #     Схема документа (ноды + марки)
@@ -113,7 +118,12 @@ type-club/
 │       ├── mathInlineView.ts    #     NodeView: инлайн-формулы ($...$)
 │       ├── mathActivePlugin.ts  #     Переключение редактирования/рендера формул
 │       ├── linkTooltipPlugin.ts #     Тултип при наведении на ссылку
-│       └── syntaxHighlightPlugin.ts # Подсветка синтаксиса
+│       ├── syntaxHighlightPlugin.ts # Подсветка синтаксиса
+│       ├── focusModePlugin.ts   #     Режим акцентирования (абзац / предложение / три строчки)
+│       ├── foldingPlugin.ts     #     Сворачивание заголовков
+│       ├── headingView.ts       #     NodeView: заголовки (стрелочка для свёртывания)
+│       ├── interactivePlugin.ts #     Интерактивные элементы (чекбоксы task-list в Preview)
+│       └── tocPlugin.ts         #     Плагин оглавления (Table of Contents)
 │
 ├── public/                      # Статические ассеты (SVG-иконки)
 ├── scripts/                     # Вспомогательные скрипты
@@ -142,6 +152,27 @@ type ThemeMode = 'light' | 'dark' | 'system'
 /** Режим редактирования */
 type EditorMode = 'raw' | 'seamless' | 'preview'
 
+/** Режим акцентирования (Фокус) */
+type FocusMode = 'none' | 'paragraph' | 'sentence' | 'lines'
+
+/** Тип ограничения (символы или слова) */
+type LimitType = 'chars' | 'words'
+
+/** Настройка ограничения для вкладки */
+interface WordLimit {
+  enabled: boolean
+  value: number
+  type: LimitType
+}
+
+/** Элемент оглавления (TOC) документа */
+interface TocItem {
+  id: string
+  text: string
+  level: number
+  pos: number
+}
+
 /** Вкладка открытого файла */
 interface Tab {
   id: string
@@ -161,6 +192,12 @@ interface AppState {
   fileTree: FileEntry[]         // Дерево файлов
   creating: { type: 'file' | 'folder' } | null  // Режим создания (inline-ввод в Sidebar)
   theme: ThemeMode              // Текущая цветовая тема
+  autosave: boolean             // Автосохранение включено
+  wordLimit: WordLimit          // Ограничение по символам/словам
+  showStats: boolean            // Показывать ли плашку статистики
+  activeToc: TocItem[]          // Оглавление активного файла
+  typewriterMode: boolean       // Режим печатной машинки
+  focusMode: FocusMode          // Режим акцентирования
 }
 ```
 
@@ -179,6 +216,12 @@ interface AppState {
 | `SET_THEME` | Установить тему (light / dark / system) |
 | `SET_TAB_MODE` | Установить режим редактирования вкладки (raw / seamless / preview) |
 | `REFRESH_TAB` | Принудительно обновить содержимое вкладки |
+| `SET_AUTOSAVE` | Включить/выключить автосохранение |
+| `SET_SHOW_STATS` | Показать/скрыть плашку статистики |
+| `SET_WORD_LIMIT` | Установить ограничение по символам/словам |
+| `SET_ACTIVE_TOC` | Обновить оглавление активного файла |
+| `SET_TYPEWRITER_MODE` | Включить/выключить режим печатной машинки |
+| `SET_FOCUS_MODE` | Установить режим акцентирования |
 
 ### Методы EditorContext
 
@@ -195,6 +238,30 @@ interface AppState {
 | `setTheme(theme)` | Установить тему + сохранить в electron-store |
 | `setTabMode(tabId, mode)` | Установить режим редактирования |
 | `refreshTab(tabId)` | Принудительно обновить вкладку |
+| `setAutosave(enabled)` | Включить/выключить автосохранение + сохранить в store |
+| `setShowStats(enabled)` | Показать/скрыть статистику + сохранить в store |
+| `setWordLimit(limit)` | Установить лимит символов/слов |
+| `setTypewriterMode(enabled)` | Включить/выключить режим печатной машинки + сохранить в store |
+| `setFocusMode(mode)` | Установить режим акцентирования + сохранить в store |
+
+### Автосохранение
+
+Автосохранение реализовано в `EditorContext.tsx`:
+- **Debounce 5 секунд** — после последнего изменения контента
+- **При потере фокуса окна** (`blur`) — мгновенное сохранение
+- Включается/выключается через `SettingsPopup`
+- Состояние персистируется в `electron-store` (ключ `autosave`)
+
+### Инициализация при запуске
+
+При старте из `electron-store` восстанавливаются:
+- Тема (`theme`)
+- Автосохранение (`autosave`)
+- Показ статистики (`showStats`)
+- Режим печатной машинки (`typewriterMode`)
+- Режим акцентирования (`focusMode`)
+- Последняя открытая папка (`lastFolderPath`)
+- Файлы, переданные через "Open with..." (`getFilesToOpen`)
 
 ---
 
@@ -228,7 +295,32 @@ interface AppState {
 **Марки (инлайн-стили):**
 - `strong` (**жирный**), `em` (*курсив*), `code` (`код`)
 - `s` (~~зачёркнутый~~), `highlight` (==выделение==)
+- `spoiler` (||спойлер||)
 - `link` ([текст](url))
+
+### Плагины ProseMirror
+
+| Файл | Назначение |
+|---|---|
+| `keymap.ts` | Горячие клавиши (форматирование, таблицы, математика) |
+| `inputRules.ts` | Авто-форматирование при вводе (заголовки, списки и т.д.) |
+| `seamlessPlugin.ts` | Typora-стиль: бесшовные заголовки |
+| `mathActivePlugin.ts` | Переключение редактирования/рендера формул |
+| `linkTooltipPlugin.ts` | Тултип при наведении на ссылку |
+| `syntaxHighlightPlugin.ts` | Подсветка синтаксиса в код-блоках |
+| `focusModePlugin.ts` | Режим акцентирования (абзац, предложение, три строчки) |
+| `foldingPlugin.ts` | Сворачивание заголовков по клику на стрелочку |
+| `interactivePlugin.ts` | Интерактивные элементы (чекбоксы в preview) |
+| `tocPlugin.ts` | Извлечение оглавления из документа |
+
+### NodeViews
+
+| Файл | Назначение |
+|---|---|
+| `codeBlockView.ts` | Блоки кода + подсветка highlight.js |
+| `mathBlockView.ts` | Блочные формулы (KaTeX) |
+| `mathInlineView.ts` | Инлайн-формулы ($...$) |
+| `headingView.ts` | Заголовки со стрелочкой для свёртывания |
 
 ### Добавление нового элемента
 
@@ -273,6 +365,13 @@ interface AppState {
 | `storeGet(key)` | Получить значение из хранилища |
 | `storeSet(key, value)` | Сохранить значение в хранилище |
 
+### Спеллчекер
+
+| Метод | Описание |
+|---|---|
+| `setSpellcheck(enabled)` | Включить/выключить проверку орфографии |
+| `getSpellcheck()` | Получить текущее состояние спеллчекера |
+
 ### Управление окном
 
 | Метод | Описание |
@@ -280,6 +379,14 @@ interface AppState {
 | `minimizeWindow()` | Свернуть |
 | `maximizeWindow()` | Развернуть/восстановить |
 | `closeWindow()` | Закрыть |
+| `openExternal(url)` | Открыть ссылку во внешнем браузере |
+
+### Открытие файлов через систему (File Association)
+
+| Метод | Описание |
+|---|---|
+| `getFilesToOpen()` | Получить файлы, переданные при старте (Open with...) |
+| `onOpenFiles(callback)` | Подписка на открытие файлов, когда приложение уже запущено |
 
 ### Добавление нового IPC-канала
 
@@ -315,11 +422,15 @@ interface AppState {
 | `Ctrl+I` | Курсив |
 | `Ctrl+E` | Инлайн-код |
 | `Ctrl+Z` / `Ctrl+Y` | Undo / Redo |
-| `Ctrl+Shift+S` | Зачёркивание |
+| `Ctrl+Shift+X` | Зачёркивание |
 | `Ctrl+Shift+H` | Выделение (highlight) |
 | `Ctrl+Shift+.` | Блок-цитата |
 | `Tab` / `Shift+Tab` | Вложенность списков / навигация в таблицах |
-| `Escape` | Выход из блока кода / таблицы / формулы |
+| `Enter` | Умный Enter: таблицы → math block → таблицы → split list item |
+| `$` | Закрытие инлайн-формулы (выход из math_inline) |
+| `Space` | Пустая формула → разворачивание в текст |
+| `Escape` | Выход из блока кода / таблицы / формулы / math_inline |
+| `Backspace` | Удаление пустой math_inline / удаление выделенной строки таблицы |
 
 ---
 
@@ -338,6 +449,30 @@ interface AppState {
 - Обновить (F5)
 - Тема → Светлая / Тёмная / Системная
 - Режим → Raw / Seamless / Preview
+- Акцентировать → Ничего / Абзац / Три строчки / Тек. предложение
+
+---
+
+## Настройки (SettingsPopup)
+
+Открывается через кнопку ⚙ в `TitleBar`. Содержит:
+
+| Настройка | Описание | Хранение |
+|---|---|---|
+| Автосохранение | debounce 5 сек + сохранение при потере фокуса | `electron-store: autosave` |
+| Проверка орфографии | Системный спеллчекер Chromium | IPC `spellcheck:set/get` |
+| Режим печатной машинки | Каретка всегда в центре экрана | `electron-store: typewriterMode` |
+| Статистика | Показать/скрыть StatsToast | `electron-store: showStats` |
+
+---
+
+## Статистика (StatsToast)
+
+Плавающая плашка в правом нижнем углу. Показывается при `state.showStats === true`.
+
+- **Компактный вид:** счётчик символов (или `текущее / лимит`)
+- **Развёрнутый вид** (при наведении): символы, слова, предложения, время чтения
+- **Лимит:** задать ограничение по символам или словам, визуальная индикация превышения (красный / жёлтый)
 
 ---
 
@@ -434,4 +569,14 @@ npm run preview  # Preview собранного фронтенда (без Elect
    чтобы работать корректно в любой раскладке клавиатуры
 
 7. **Настройки** хранятся через `electron-store` (IPC: `store:get`, `store:set`).
-   Тема загружается при старте приложения из хранилища
+   Тема, autosave, showStats, typewriterMode, focusMode загружаются при старте из хранилища
+
+8. **Автосохранение** — debounce 5 сек после последнего изменения + мгновенное
+   сохранение при потере фокуса окна. Управляется через SettingsPopup
+
+9. **File Association** — приложение поддерживает "Open with..." через single instance
+   lock. Файлы, переданные при запуске, обрабатываются через `getFilesToOpen()`;
+   файлы, поступающие к уже запущенному экземпляру — через `onOpenFiles(callback)`
+
+10. **Последняя папка** — путь к рабочей папке автоматически сохраняется в
+    `electron-store` (ключ `lastFolderPath`) и восстанавливается при следующем запуске
