@@ -63,9 +63,17 @@ export function getEditorStyles(): string {
   color: var(--editor-prefix);
   font-weight: 400;
   font-size: 0.65em;
+  line-height: inherit;
+  vertical-align: baseline;
   user-select: none;
   pointer-events: none;
   margin-right: 2px;
+  display: none;
+}
+
+/* Показываем префикс только когда курсор внутри заголовка */
+.heading-cursor-inside .pm-heading-prefix {
+  display: inline;
 }
 
 /* Сворачивание заголовков */

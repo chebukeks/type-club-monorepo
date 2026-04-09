@@ -11,6 +11,7 @@ export class HeadingView implements NodeView {
   node: Node
   view: EditorView
   getPos: () => number | undefined
+  prefixSpan: HTMLElement
 
   constructor(node: Node, view: EditorView, getPos: () => number | undefined) {
     this.node = node
@@ -27,18 +28,26 @@ export class HeadingView implements NodeView {
     foldBtn.innerHTML = chevronSvg
     foldBtn.onmousedown = (e) => {
       e.preventDefault()
-      e.stopPropagation() // Prevent selection
+      e.stopPropagation()
       const pos = this.getPos()
       if (typeof pos === 'number') {
         view.dispatch(view.state.tr.setMeta('toggleFold', pos))
       }
     }
 
+    // Префикс (# / ## / ###...) — рендерится напрямую в DOM, а не через декорацию.
+    // Это предотвращает проблему layout'а, когда пустой заголовок ломает строку.
+    this.prefixSpan = document.createElement('span')
+    this.prefixSpan.className = 'pm-heading-prefix'
+    this.prefixSpan.textContent = '#'.repeat(level) + ' '
+    this.prefixSpan.contentEditable = 'false'
+
     const contentSpan = document.createElement('span')
     contentSpan.className = 'heading-content'
     this.contentDOM = contentSpan
 
     this.dom.appendChild(foldBtn)
+    this.dom.appendChild(this.prefixSpan)
     this.dom.appendChild(this.contentDOM)
   }
 
@@ -49,9 +58,12 @@ export class HeadingView implements NodeView {
   }
 
   ignoreMutation(mutation: any) {
-    // Ignore mutations on the button itself
-    if (mutation.type !== 'selection' && mutation.target && mutation.target.nodeType === 1 && (mutation.target as Element).closest('.heading-fold-btn')) {
-      return true
+    // Игнорируем мутации на кнопке сворачивания и префиксе
+    if (mutation.type !== 'selection' && mutation.target && mutation.target.nodeType === 1) {
+      const el = mutation.target as Element
+      if (el.closest('.heading-fold-btn') || el.closest('.pm-heading-prefix')) {
+        return true
+      }
     }
     return false
   }

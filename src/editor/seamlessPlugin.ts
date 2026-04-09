@@ -50,7 +50,7 @@ function buildDecorations(state: import('prosemirror-state').EditorState): Decor
   const cursorPos = state.selection.from
   const decorations: Decoration[] = []
 
-  // --- Заголовки: показываем `# ` когда курсор внутри ---
+  // --- Заголовки: добавляем класс, когда курсор внутри (для показа префикса) ---
   doc.descendants((node, pos) => {
     if (node.type === schema.nodes.heading) {
       const headingStart = pos
@@ -58,18 +58,8 @@ function buildDecorations(state: import('prosemirror-state').EditorState): Decor
       const cursorInside = cursorPos >= headingStart && cursorPos <= headingEnd
 
       if (cursorInside) {
-        // Добавляем widget с `# ` в начало содержимого заголовка
-        const level = node.attrs.level as number
-        const prefix = '#'.repeat(level) + ' '
-
         decorations.push(
-          Decoration.widget(pos + 1, () => {
-            const span = document.createElement('span')
-            span.className = 'pm-heading-prefix'
-            span.textContent = prefix
-            span.contentEditable = 'false'
-            return span
-          }, { side: -1, key: `heading-prefix-${pos}` })
+          Decoration.node(pos, pos + node.nodeSize, { class: 'heading-cursor-inside' })
         )
       }
 
