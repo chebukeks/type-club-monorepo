@@ -116,7 +116,32 @@ export function MarkdownEditor() {
   const isTypewriterModeRef = useRef(state.typewriterMode)
   useEffect(() => {
     isTypewriterModeRef.current = state.typewriterMode
-  }, [state.typewriterMode])
+
+    // При включении режима печатной машинки — сразу прокрутить к каретке,
+    // иначе padding-top: 70vh сдвигает контент вниз и виден огромный пробел.
+    if (state.typewriterMode && editorView) {
+      requestAnimationFrame(() => {
+        const { head } = editorView.state.selection
+        const scrollContainer = editorView.dom.closest('.overflow-auto') as HTMLElement
+        if (!scrollContainer) return
+
+        try {
+          const coords = editorView.coordsAtPos(head)
+          const containerRect = scrollContainer.getBoundingClientRect()
+          const caretCenterY = (coords.top + coords.bottom) / 2
+          const containerCenterY = containerRect.top + containerRect.height / 2
+          const offset = caretCenterY - containerCenterY
+          if (Math.abs(offset) > 1) {
+            scrollContainer.scrollBy({ top: offset })
+          }
+        } catch {
+          // Если coordsAtPos не удался — прокрутить к началу контента
+          const paddingTop = parseFloat(getComputedStyle(editorView.dom).paddingTop) || 0
+          scrollContainer.scrollTop = Math.max(0, paddingTop - scrollContainer.clientHeight / 2)
+        }
+      })
+    }
+  }, [state.typewriterMode, editorView])
 
   const isFocusModeRef = useRef(state.focusMode)
   useEffect(() => {
