@@ -272,6 +272,58 @@ const mathDollarCommand: Command = (state, dispatch) => {
 
 // =========================================================
 
+// Команда: Backspace в начале заголовка уменьшает уровень (h3→h2→h1→paragraph)
+const headingBackspace: Command = (state, dispatch) => {
+  const { $head } = state.selection
+  if (!state.selection.empty) return false
+  if ($head.parent.type.name !== 'heading') return false
+  if ($head.parentOffset !== 0) return false // только в крайней левой позиции
+
+  const level = $head.parent.attrs.level
+  if (dispatch) {
+    const pos = $head.before()
+    const end = $head.after()
+    if (level <= 1) {
+      // h1 → paragraph: заменяем заголовок на параграф с тем же содержимым
+      const content = $head.parent.content
+      const tr = state.tr.replaceWith(pos, end, schema.nodes.paragraph.create(null, content))
+      tr.setSelection(TextSelection.near(tr.doc.resolve(pos + 1)))
+      dispatch(tr)
+    } else {
+      // h3→h2, h2→h1 и т.д.: уменьшаем уровень
+      const tr = state.tr.setNodeMarkup(pos, undefined, { level: level - 1 })
+      dispatch(tr)
+    }
+  }
+  return true
+}
+
+// Команда: установить уровень заголовка (Ctrl+1..6)
+// Работает только с параграфами и заголовками.
+function setHeadingLevel(level: number): Command {
+  return (state, dispatch) => {
+    const { $head } = state.selection
+    const parentType = $head.parent.type.name
+    if (parentType !== 'paragraph' && parentType !== 'heading') return false
+
+    if (dispatch) {
+      const pos = $head.before()
+      if (parentType === 'heading' && $head.parent.attrs.level === level) {
+        // Если уже такой уровень — превращаем обратно в параграф
+        const content = $head.parent.content
+        const tr = state.tr.replaceWith(pos, $head.after(), schema.nodes.paragraph.create(null, content))
+        tr.setSelection(TextSelection.near(tr.doc.resolve(pos + 1)))
+        dispatch(tr)
+      } else {
+        // Превращаем в заголовок нужного уровня
+        const tr = state.tr.setNodeMarkup(pos, schema.nodes.heading, { level })
+        dispatch(tr)
+      }
+    }
+    return true
+  }
+}
+
 /** Кастомные горячие клавиши */
 const customKeymap = keymap({
   // Форматирование
@@ -282,6 +334,14 @@ const customKeymap = keymap({
   'Mod-Shift-h': toggleMark(schema.marks.highlight),
   'Mod-Shift-.': wrapIn(schema.nodes.blockquote),
 
+  // Уровни заголовков
+  'Mod-1': setHeadingLevel(1),
+  'Mod-2': setHeadingLevel(2),
+  'Mod-3': setHeadingLevel(3),
+  'Mod-4': setHeadingLevel(4),
+  'Mod-5': setHeadingLevel(5),
+  'Mod-6': setHeadingLevel(6),
+
   // Умный Enter: цепочка команд (первая вернувшая true перехватывает событие)
   'Enter': chainCommands(
     tableEnterNav,
@@ -290,8 +350,8 @@ const customKeymap = keymap({
     splitListItem(schema.nodes.list_item)
   ),
 
-  // Математика и табличный бэкспэйс
-  'Backspace': chainCommands(mathBackspaceCommand, tableBackspaceCommand),
+  // Математика, заголовки и табличный бэкспэйс
+  'Backspace': chainCommands(mathBackspaceCommand, headingBackspace, tableBackspaceCommand),
   'Delete': mathDeleteCommand,
   'Space': mathSpaceCommand,
   '$': mathDollarCommand,
