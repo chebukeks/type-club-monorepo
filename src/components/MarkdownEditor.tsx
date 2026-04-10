@@ -197,41 +197,61 @@ export function MarkdownEditor() {
     })
 
     // Плагин режима печатной машинки
+    const isMouseSelectingRef = { current: false }
+
+    function typewriterScrollToHead(view: EditorView) {
+      const { head } = view.state.selection
+      let coords: { top: number, bottom: number }
+      try {
+        coords = view.coordsAtPos(head)
+      } catch (e) {
+        return
+      }
+      const scrollContainer = view.dom.closest('.overflow-auto') as HTMLElement
+      if (!scrollContainer) return
+
+      const containerRect = scrollContainer.getBoundingClientRect()
+      const caretCenterY = (coords.top + coords.bottom) / 2
+      const containerCenterY = containerRect.top + (containerRect.height / 2)
+
+      // Для режима "Три строчки" передаем координату маске
+      const maskY = caretCenterY - containerRect.top
+      scrollContainer.style.setProperty('--focus-mask-y', `${maskY}px`)
+
+      const offset = caretCenterY - containerCenterY
+      if (Math.abs(offset) > 1) {
+        scrollContainer.scrollBy({ top: offset, behavior: 'smooth' })
+      }
+    }
+
     const typewriterPlugin = new Plugin({
       props: {
         handleScrollToSelection() {
-          return isTypewriterModeRef.current // отключаем дефолтный скролл, если режим включен
-        }
+          return isTypewriterModeRef.current
+        },
+        handleDOMEvents: {
+          mousedown: () => {
+            isMouseSelectingRef.current = true
+            return false
+          },
+          mouseup: (_view) => {
+            isMouseSelectingRef.current = false
+            // После клика / завершения выделения — прокручиваем к каретке.
+            // rAF нужен, чтобы selection успел обновиться.
+            if (isTypewriterModeRef.current) {
+              requestAnimationFrame(() => typewriterScrollToHead(_view))
+            }
+            return false
+          },
+        },
       },
       view() {
         return {
           update(view, prevState) {
             if (!isTypewriterModeRef.current) return
+            if (isMouseSelectingRef.current) return
             if (!view.state.selection.eq(prevState.selection) || !view.state.doc.eq(prevState.doc)) {
-              const { head } = view.state.selection
-              let coords: { top: number, bottom: number }
-              try {
-                coords = view.coordsAtPos(head)
-              } catch (e) {
-                return
-              }
-              const scrollContainer = view.dom.closest('.overflow-auto') as HTMLElement
-              if (!scrollContainer) return
-
-              const containerRect = scrollContainer.getBoundingClientRect()
-              const caretCenterY = (coords.top + coords.bottom) / 2
-              const containerCenterY = containerRect.top + (containerRect.height / 2)
-
-              // Для режима "Три строчки" передаем координату маске
-              const maskY = caretCenterY - containerRect.top
-              scrollContainer.style.setProperty('--focus-mask-y', `${maskY}px`)
-
-              const offset = caretCenterY - containerCenterY
-              if (Math.abs(offset) > 1) {
-                // Если offset слишком большой, smooth может не успевать или дергаться. 
-                // Браузеры хорошо справляются с scrollBy smooth.
-                scrollContainer.scrollBy({ top: offset, behavior: 'smooth' })
-              }
+              typewriterScrollToHead(view)
             }
           }
         }
