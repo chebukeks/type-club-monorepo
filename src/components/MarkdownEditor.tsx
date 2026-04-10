@@ -196,10 +196,20 @@ export function MarkdownEditor() {
       },
     })
 
-    // Плагин режима печатной машинки
+    // Плагин режима печатной машинки + отслеживание позиции маски "три строчки"
     const isMouseSelectingRef = { current: false }
+    // Абсолютная позиция каретки в документе (относительно верха контента, а не viewport)
+    const caretDocY = { current: -1 }
 
-    function typewriterScrollToHead(view: EditorView) {
+    /** Обновить CSS-переменную позиции маски по сохранённой document-позиции каретки */
+    function updateFocusMaskFromDocY(scrollContainer: HTMLElement) {
+      if (caretDocY.current < 0) return
+      const maskY = caretDocY.current - scrollContainer.scrollTop
+      scrollContainer.style.setProperty('--focus-mask-y', `${maskY}px`)
+    }
+
+    /** Сохранить document-позицию каретки и обновить маску */
+    function updateCaretDocY(view: EditorView) {
       const { head } = view.state.selection
       let coords: { top: number, bottom: number }
       try {
@@ -212,12 +222,19 @@ export function MarkdownEditor() {
 
       const containerRect = scrollContainer.getBoundingClientRect()
       const caretCenterY = (coords.top + coords.bottom) / 2
+      // Сохраняем позицию каретки в координатах документа (не viewport)
+      caretDocY.current = (caretCenterY - containerRect.top) + scrollContainer.scrollTop
+      updateFocusMaskFromDocY(scrollContainer)
+
+      return { scrollContainer, caretCenterY, containerRect }
+    }
+
+    function typewriterScrollToHead(view: EditorView) {
+      const result = updateCaretDocY(view)
+      if (!result) return
+
+      const { scrollContainer, caretCenterY, containerRect } = result
       const containerCenterY = containerRect.top + (containerRect.height / 2)
-
-      // Для режима "Три строчки" передаем координату маске
-      const maskY = caretCenterY - containerRect.top
-      scrollContainer.style.setProperty('--focus-mask-y', `${maskY}px`)
-
       const offset = caretCenterY - containerCenterY
       if (Math.abs(offset) > 1) {
         scrollContainer.scrollBy({ top: offset, behavior: 'smooth' })
@@ -236,22 +253,45 @@ export function MarkdownEditor() {
           },
           mouseup: (_view) => {
             isMouseSelectingRef.current = false
-            // После клика / завершения выделения — прокручиваем к каретке.
-            // rAF нужен, чтобы selection успел обновиться.
             if (isTypewriterModeRef.current) {
               requestAnimationFrame(() => typewriterScrollToHead(_view))
+            } else {
+              // Без typewriter — просто обновляем позицию маски
+              requestAnimationFrame(() => updateCaretDocY(_view))
             }
             return false
           },
         },
       },
       view() {
+        let scrollHandler: (() => void) | null = null
+        let scrollContainer: HTMLElement | null = null
+
         return {
           update(view, prevState) {
-            if (!isTypewriterModeRef.current) return
-            if (isMouseSelectingRef.current) return
-            if (!view.state.selection.eq(prevState.selection) || !view.state.doc.eq(prevState.doc)) {
-              typewriterScrollToHead(view)
+            // Привязываем scroll listener при первом update
+            if (!scrollHandler) {
+              scrollContainer = view.dom.closest('.overflow-auto') as HTMLElement
+              if (scrollContainer) {
+                scrollHandler = () => updateFocusMaskFromDocY(scrollContainer!)
+                scrollContainer.addEventListener('scroll', scrollHandler, { passive: true })
+              }
+            }
+
+            const selectionOrDocChanged = !view.state.selection.eq(prevState.selection) || !view.state.doc.eq(prevState.doc)
+
+            if (selectionOrDocChanged && !isMouseSelectingRef.current) {
+              if (isTypewriterModeRef.current) {
+                typewriterScrollToHead(view)
+              } else {
+                // Без typewriter — обновляем только позицию маски
+                updateCaretDocY(view)
+              }
+            }
+          },
+          destroy() {
+            if (scrollHandler && scrollContainer) {
+              scrollContainer.removeEventListener('scroll', scrollHandler)
             }
           }
         }
