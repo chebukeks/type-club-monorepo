@@ -320,9 +320,42 @@ export function getEditorStyles(): string {
 }
 .ProseMirror s { text-decoration: line-through; color: var(--editor-strike); }
 .ProseMirror mark { background: var(--editor-mark-bg); color: var(--editor-mark-text); border-radius: 3px; padding: 0 2px; }
+/* Inline mark syntax — через ::before / ::after псевдоэлементы.
+   Не создают отдельных DOM-нод, не переносятся на новую строку
+   отдельно от текста, не взаимодействуют с trailing BR. */
+.pm-mark-start::before {
+  content: attr(data-mark-open);
+  color: var(--editor-syntax);
+  font-weight: 400;
+  font-style: normal;
+  text-decoration: none;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85em;
+  line-height: 0;
+  vertical-align: baseline;
+  background: none;
+  padding: 0;
+  border-radius: 0;
+}
+.pm-mark-end::after {
+  content: attr(data-mark-close);
+  color: var(--editor-syntax);
+  font-weight: 400;
+  font-style: normal;
+  text-decoration: none;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85em;
+  line-height: 0;
+  vertical-align: baseline;
+  background: none;
+  padding: 0;
+  border-radius: 0;
+}
+/* Widget-стиль — только для пустых марок (storedMarks без текста) */
 .pm-mark-syntax {
   color: var(--editor-syntax); font-weight: 400; font-style: normal;
   font-family: 'Inter', sans-serif; font-size: 0.85em; user-select: none; pointer-events: none;
+  line-height: 0; vertical-align: baseline;
 }
 
 /* Горизонтальная линия */

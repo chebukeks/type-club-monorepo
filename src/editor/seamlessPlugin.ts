@@ -85,26 +85,35 @@ function buildDecorations(state: import('prosemirror-state').EditorState): Decor
     const range = findMarkRange(parent, $from.parentOffset, mark.type, parentStart)
     
     if (range) {
-      // Марка применена к существующему тексту
-      decorations.push(
-        Decoration.widget(range.from, () => {
-          const span = document.createElement('span')
-          span.className = 'pm-mark-syntax'
-          span.textContent = syntax.open
-          return span
-        }, { side: -1, key: `mark-open-${range.from}-${mark.type.name}` })
-      )
-
-      decorations.push(
-        Decoration.widget(range.to, () => {
-          const span = document.createElement('span')
-          span.className = 'pm-mark-syntax'
-          span.textContent = syntax.close
-          return span
-        }, { side: 1, key: `mark-close-${range.to}-${mark.type.name}` })
-      )
+      // Марка применена к существующему тексту.
+      // Используем inline-декорации + CSS ::before / ::after вместо widget-декораций,
+      // чтобы псевдоэлементы были частью того же inline-бокса и не переносились
+      // на новую строку отдельно от текста.
+      if (range.to - range.from === 1) {
+        // Один символ — оба маркера на одном элементе
+        decorations.push(
+          Decoration.inline(range.from, range.to, {
+            class: 'pm-mark-start pm-mark-end',
+            'data-mark-open': syntax.open,
+            'data-mark-close': syntax.close,
+          })
+        )
+      } else {
+        decorations.push(
+          Decoration.inline(range.from, range.from + 1, {
+            class: 'pm-mark-start',
+            'data-mark-open': syntax.open,
+          })
+        )
+        decorations.push(
+          Decoration.inline(range.to - 1, range.to, {
+            class: 'pm-mark-end',
+            'data-mark-close': syntax.close,
+          })
+        )
+      }
     } else if (state.selection.empty) {
-      // Марка активна (storedMarks), но текста ещё нет
+      // Марка активна (storedMarks), но текста ещё нет — тут нужны widget-декорации
       decorations.push(
         Decoration.widget(cursorPos, () => {
           const span = document.createElement('span')
