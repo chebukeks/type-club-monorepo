@@ -39,21 +39,23 @@ export const foldingPlugin = new Plugin({
       state.doc.forEach((node, offset) => {
         if (node.type.name === 'heading') {
           const level = node.attrs.level as number
+          // Заголовок того же или более высокого уровня завершает
+          // секцию свёрнутого заголовка
           if (level <= currentFoldLevel) {
             currentFoldLevel = 100
           }
-          
-          if (foldedPosList.has(offset)) {
+
+          // Если мы внутри свёрнутой секции — прячем заголовок,
+          // независимо от его собственного состояния сворачивания
+          if (currentFoldLevel < 100) {
+            decos.push(Decoration.node(offset, offset + node.nodeSize, { class: 'folded-content' }))
+          } else if (foldedPosList.has(offset)) {
             decos.push(Decoration.node(offset, offset + node.nodeSize, { class: 'is-folded' }))
-            if (level < currentFoldLevel) {
-               currentFoldLevel = level
-            }
-          } else if (currentFoldLevel < 100) {
-             decos.push(Decoration.node(offset, offset + node.nodeSize, { class: 'folded-content' }))
+            currentFoldLevel = level
           }
         } else {
           if (currentFoldLevel < 100) {
-             decos.push(Decoration.node(offset, offset + node.nodeSize, { class: 'folded-content' }))
+            decos.push(Decoration.node(offset, offset + node.nodeSize, { class: 'folded-content' }))
           }
         }
       })

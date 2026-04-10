@@ -242,7 +242,7 @@ export function MarkdownEditor() {
 
     // Набор плагинов зависит от режима
     const plugins: Plugin[] = isPreview
-      ? [history(), dropCursor(), gapCursor(), syncPlugin, interactivePlugin, typewriterPlugin, focusPlugin]
+      ? [history(), dropCursor(), gapCursor(), syncPlugin, foldingPlugin, interactivePlugin, typewriterPlugin, focusPlugin]
       : [
         ...getKeymapPlugins(),
         getInputRulesPlugin(),
