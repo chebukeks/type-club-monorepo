@@ -101,20 +101,37 @@ export function SettingsPopup({ onClose }: SettingsPopupProps) {
   )
 }
 
-/** Мини-компонент toggle-переключателя */
+/** Мини-компонент toggle-переключателя.
+ *  Использует постоянный border (прозрачный при вкл.) для стабильных размеров. */
 function ToggleSwitch({ enabled }: { enabled: boolean }) {
   return (
     <div
-      className="relative w-8 h-[18px] rounded-full transition-colors duration-200"
       style={{
+        position: 'relative',
+        width: 40,
+        height: 22,
+        borderRadius: 11,
         backgroundColor: enabled ? 'var(--accent)' : 'var(--bg-input)',
-        border: enabled ? 'none' : '1px solid var(--border-strong)',
+        border: `1px solid ${enabled ? 'transparent' : 'var(--border-strong)'}`,
+        transition: 'background-color 0.3s, border-color 0.3s',
+        cursor: 'pointer',
+        flexShrink: 0,
       }}
     >
       <div
-        className="absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform duration-200"
         style={{
-          transform: enabled ? 'translateX(15px)' : 'translateX(2px)',
+          position: 'absolute',
+          top: 0,
+          bottom: 0,
+          margin: 'auto 0',
+          left: 2,
+          width: 14,
+          height: 14,
+          borderRadius: '50%',
+          backgroundColor: 'white',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+          transition: 'transform 0.3s',
+          transform: enabled ? 'translateX(18px)' : 'translateX(0)',
         }}
       />
     </div>
