@@ -1,6 +1,5 @@
-import { Plugin, PluginKey } from 'prosemirror-state'
+import { Plugin, PluginKey, NodeSelection, TextSelection } from 'prosemirror-state'
 import { Decoration, DecorationSet } from 'prosemirror-view'
-import { NodeSelection } from 'prosemirror-state'
 import katex from 'katex'
 
 const mathActiveKey = new PluginKey('mathActive')
@@ -23,18 +22,36 @@ export const mathActivePlugin = new Plugin({
     decorations(state) {
       return mathActiveKey.getState(state)
     },
-    handleClick(view, _pos, event) {
+    handleClick(view, pos, event) {
       const target = event.target as HTMLElement
+      console.log('[mathActivePlugin] handleClick activated. Click pos:', pos, 'target:', target)
+      
       const renderEl = target.closest('.math-inline-render') as HTMLElement
       if (renderEl) {
-        const nodePos = parseInt(renderEl.dataset.pos || '-1', 10)
-        if (nodePos > -1) {
-          const { TextSelection } = require('prosemirror-state')
+        process.env.NODE_ENV === 'development' && console.log('[mathActivePlugin] Found .math-inline-render!', renderEl)
+        let clickPos = parseInt(renderEl.dataset.pos || '-1', 10)
+        
+        // Попробуем получить позицию через view.posAtDOM как резервный вариант
+        if (clickPos === -1) {
+           try {
+              const domPos = view.posAtDOM(renderEl, 0)
+              if (domPos > 0) clickPos = domPos
+           } catch (e) {
+              console.warn('[mathActivePlugin] error getting posAtDOM:', e)
+           }
+        }
+        
+        process.env.NODE_ENV === 'development' && console.log('[mathActivePlugin] click target evaluated pos:', clickPos)
+        
+        if (clickPos > -1) {
           const tr = view.state.tr
-          // Ставим курсор внутрь формулы
-          view.dispatch(tr.setSelection(TextSelection.create(view.state.doc, nodePos + 1)))
+          
+          process.env.NODE_ENV === 'development' && console.log('[mathActivePlugin] Setting selection to start editing at pos:', clickPos + 1)
+          view.dispatch(tr.setSelection(TextSelection.create(view.state.doc, clickPos + 1)))
           return true
         }
+      } else {
+        process.env.NODE_ENV === 'development' && console.log('[mathActivePlugin] Target is NOT math-inline-render. closest() returned null.')
       }
       return false
     }

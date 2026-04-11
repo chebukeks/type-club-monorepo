@@ -253,7 +253,7 @@ export function getEditorStyles(): string {
 .math-inline.is-active::before { content: "$"; color: var(--math-dollar); }
 .math-inline.is-active::after { content: "$"; color: var(--math-dollar); }
 .math-inline-render-anchor { position: relative; display: inline; }
-.math-inline-render { font-size: 1rem; color: var(--math-render); pointer-events: none; user-select: none; }
+.math-inline-render { font-size: 1rem; color: var(--math-render); cursor: text; user-select: none; }
 .math-inline-preview { display: inline-block; font-size: 1rem; color: var(--math-render); user-select: none; }
 .math-inline-tooltip-anchor { position: relative; display: inline; width: 0; height: 0; }
 .math-inline-tooltip {

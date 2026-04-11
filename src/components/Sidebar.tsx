@@ -22,10 +22,8 @@ export function Sidebar() {
           className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors"
           title="Открыть папку"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-            <line x1="12" y1="11" x2="12" y2="17" />
-            <line x1="9" y1="14" x2="15" y2="14" />
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-folder-open-icon lucide-folder-open">
+            <path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2" />
           </svg>
         </button>
       </div>
@@ -160,9 +158,8 @@ function FileTreeItem({ entry, depth, onFileClick, activeFilePath, activeToc }: 
 
   return (
     <div>
-      <div className={`w-full flex items-center gap-1.5 text-[13px] rounded transition-colors group ${
-        isActive ? 'bg-[var(--bg-hover)] text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
-      }`} style={{ paddingLeft: `${depth * 12 + (isActive && activeToc.length > 0 ? 8 : 26)}px`, paddingRight: '1px' }}>
+      <div className={`w-full flex items-center gap-1.5 text-[13px] rounded transition-colors group ${isActive ? 'bg-[var(--bg-hover)] text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
+        }`} style={{ paddingLeft: `${depth * 12 + (isActive && activeToc.length > 0 ? 8 : 26)}px`, paddingRight: '1px' }}>
         {isActive && activeToc.length > 0 && (
           <button onClick={() => setIsTocOpen(!isTocOpen)} className="p-1 rounded hover:bg-[var(--border-default)]">
             <svg width="10" height="10" viewBox="0 0 12 12" className={`transition-transform flex-shrink-0 text-[var(--text-dim)] ${isTocOpen ? 'rotate-90' : ''}`} fill="currentColor">
