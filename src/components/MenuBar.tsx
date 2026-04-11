@@ -8,7 +8,7 @@ export function MenuBar() {
     state, dispatch,
     saveActiveFile, openFolder,
     openFileViaDialog, saveActiveFileAs,
-    startCreating,
+    startCreating, startRenaming,
     setTheme, setTabMode, refreshTab, setFocusMode,
   } = useEditor()
   const { activeTabId, tabs, folderPath, theme, focusMode } = state
@@ -53,10 +53,16 @@ export function MenuBar() {
         e.preventDefault()
         if (activeTabId) refreshTab(activeTabId)
       }
+      else if (e.code === 'F2') {
+        if (activeTab) {
+          e.preventDefault()
+          startRenaming(activeTab.filePath, 'file')
+        }
+      }
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [saveActiveFile, saveActiveFileAs, openFileViaDialog, openFolder, folderPath, dispatch, activeTabId, refreshTab])
+  }, [saveActiveFile, saveActiveFileAs, openFileViaDialog, openFolder, folderPath, dispatch, activeTabId, activeTab, refreshTab, startRenaming, startCreating])
 
   const closeMenu = () => { setOpenMenu(null); setSubmenu(null) }
   const toggleMenu = (name: string) => {

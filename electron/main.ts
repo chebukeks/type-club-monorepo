@@ -238,6 +238,21 @@ ipcMain.handle('fs:createDir', async (_event, dirPath: string): Promise<void> =>
   fs.mkdirSync(dirPath, { recursive: true })
 })
 
+// --- Переименование ---
+ipcMain.handle('fs:rename', async (_event, oldPath: string, newPath: string): Promise<void> => {
+  fs.renameSync(oldPath, newPath)
+})
+
+// --- Удаление (в корзину) ---
+ipcMain.handle('fs:delete', async (_event, filePath: string): Promise<void> => {
+  await shell.trashItem(filePath)
+})
+
+// --- Показать в проводнике ---
+ipcMain.on('shell:showItemInFolder', (_event, filePath: string) => {
+  shell.showItemInFolder(filePath)
+})
+
 // --- Диалог: открыть папку ---
 ipcMain.handle('dialog:openFolder', async (): Promise<string | null> => {
   const result = await dialog.showOpenDialog({
@@ -277,6 +292,20 @@ ipcMain.handle('dialog:saveFileAs', async (_event, content: string, defaultName:
     console.error('Ошибка сохранения файла:', err)
     return null
   }
+})
+
+// --- Диалог: подтверждение удаления ---
+ipcMain.handle('dialog:confirmDelete', async (_event, itemName: string): Promise<boolean> => {
+  const result = await dialog.showMessageBox(win!, {
+    type: 'warning',
+    buttons: ['Удалить', 'Отмена'],
+    defaultId: 1,
+    cancelId: 1,
+    title: 'Подтверждение удаления',
+    message: `Вы действительно хотите удалить '${itemName}'?`,
+    detail: 'Файл или папка будет перемещен в корзину.'
+  })
+  return result.response === 0
 })
 
 // --- Экспорт в HTML ---

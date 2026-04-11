@@ -6,7 +6,7 @@ import { useEditor } from '../context/EditorContext'
 import type { FileEntry, TocItem } from '../types'
 
 export function Sidebar() {
-  const { state, dispatch, openFolder, openFile, createFile, createFolder, setActiveExplorerPath, refreshFileTree, setShowEmptyFolders } = useEditor()
+  const { state, dispatch, openFolder, openFile, createFile, createFolder, setActiveExplorerPath, refreshFileTree, setShowEmptyFolders, startRenaming, deleteItem, showInExplorer } = useEditor()
 
   const filterTree = (nodes: FileEntry[]): FileEntry[] => {
     return nodes.reduce<FileEntry[]>((acc, node) => {
@@ -24,6 +24,26 @@ export function Sidebar() {
   }
 
   const visibleTree = filterTree(state.fileTree)
+
+  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, path: string, type: 'file' | 'folder', name: string } | null>(null)
+
+  useEffect(() => {
+    const handleGlobalClick = () => setContextMenu(null)
+    if (contextMenu) {
+      document.addEventListener('click', handleGlobalClick)
+      window.addEventListener('scroll', handleGlobalClick, true)
+    }
+    return () => {
+      document.removeEventListener('click', handleGlobalClick)
+      window.removeEventListener('scroll', handleGlobalClick, true)
+    }
+  }, [contextMenu])
+
+  const handleContextMenu = (e: React.MouseEvent, path: string, type: 'file' | 'folder', name: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setContextMenu({ x: e.clientX, y: e.clientY, path, type, name })
+  }
 
   return (
     <div className="w-60 min-w-[200px] max-w-[400px] bg-[var(--bg-surface)] border-r border-[var(--border-default)] flex flex-col h-full">
@@ -98,6 +118,7 @@ export function Sidebar() {
                 entry={entry}
                 depth={0}
                 onFileClick={(filePath, fileName) => openFile(filePath, fileName)}
+                onContextMenu={handleContextMenu}
                 activeFilePath={state.tabs.find((t) => t.id === state.activeTabId)?.filePath || null}
                 activeToc={state.activeToc || []}
               />
@@ -105,6 +126,52 @@ export function Sidebar() {
           </div>
         )}
       </div>
+
+      {contextMenu && (
+        <div
+          className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
+          style={{ top: contextMenu.y, left: contextMenu.x, minWidth: '160px' }}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          <button className="menu-item enabled" onClick={() => { startRenaming(contextMenu.path, contextMenu.type); setContextMenu(null) }}>
+            Переименовать
+          </button>
+          <div className="border-t border-[var(--border-strong)] my-1" />
+          <button className="menu-item enabled" style={{ color: 'var(--text-danger)' }} onClick={() => { deleteItem(contextMenu.path, contextMenu.type, contextMenu.name); setContextMenu(null) }}>
+            Удалить
+          </button>
+           <div className="border-t border-[var(--border-strong)] my-1" />
+          <button className="menu-item enabled" onClick={() => { showInExplorer(contextMenu.path); setContextMenu(null) }}>
+            Открыть в проводнике
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function InlineRenameInput({ initialValue, depth, onSubmit, onCancel }: {
+  initialValue: string; depth: number; onSubmit: (name: string) => void; onCancel: () => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [value, setValue] = useState(initialValue)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+    inputRef.current?.select()
+  }, [])
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') { const name = value.trim(); if (name) onSubmit(name); else onCancel() }
+    else if (e.key === 'Escape') onCancel()
+  }
+  return (
+    <div className="flex items-center gap-1.5 rounded" style={{ paddingTop: '2px', paddingBottom: '2px', paddingLeft: `${depth * 12 + 26}px`, paddingRight: '8px' }}>
+      <input ref={inputRef} type="text"
+        value={value} onChange={e => setValue(e.target.value)}
+        className="flex-1 bg-[var(--bg-hover)] text-[var(--text-primary)] text-[13px] border border-[var(--accent)] rounded px-1.5 py-0.5 outline-none"
+        onKeyDown={handleKeyDown} onBlur={() => { const name = value.trim(); if (name && name !== initialValue) onSubmit(name); else onCancel() }}
+      />
     </div>
   )
 }
@@ -169,13 +236,14 @@ function EmptyState({ onOpenFolder }: { onOpenFolder: () => void }) {
   )
 }
 
-function FileTreeItem({ entry, depth, onFileClick, activeFilePath, activeToc }: {
+function FileTreeItem({ entry, depth, onFileClick, onContextMenu, activeFilePath, activeToc }: {
   entry: FileEntry; depth: number;
   onFileClick: (filePath: string, fileName: string) => void;
+  onContextMenu: (e: React.MouseEvent, path: string, type: 'file' | 'folder', name: string) => void;
   activeFilePath: string | null;
   activeToc: TocItem[];
 }) {
-  const { state, dispatch, createFile, createFolder, setActiveExplorerPath } = useEditor()
+  const { state, dispatch, createFile, createFolder, setActiveExplorerPath, renameItem } = useEditor()
   const [isOpen, setIsOpen] = useState(depth < 1)
   const [isTocOpen, setIsTocOpen] = useState(true)
   const isActiveFile = !entry.isDirectory && entry.path === activeFilePath
@@ -185,26 +253,38 @@ function FileTreeItem({ entry, depth, onFileClick, activeFilePath, activeToc }: 
     if (state.creating?.targetPath === entry.path) setIsOpen(true)
   }, [state.creating?.targetPath, entry.path])
 
+  const isRenaming = state.renaming?.path === entry.path
+
   if (entry.isDirectory) {
     return (
       <div>
-        <button
-          onClick={() => {
-            setActiveExplorerPath(entry.path)
-            setIsOpen(!isOpen)
-          }}
-          className={`w-full flex items-center gap-1.5 text-[13px] rounded transition-colors ${isFolderActive ? 'bg-[var(--bg-hover)] text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
-            }`}
-          style={{ paddingTop: '5px', paddingBottom: '5px', paddingLeft: `${depth * 12 + 8}px`, paddingRight: '8px' }}
-        >
-          <svg width="12" height="12" viewBox="0 0 12 12" className={`transition-transform flex-shrink-0 ${isOpen ? 'rotate-90' : ''}`} fill="currentColor">
-            <path d="M4 2l4 4-4 4z" />
-          </svg>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-[var(--text-dim)]">
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-          </svg>
-          <span className="truncate">{entry.name}</span>
-        </button>
+        {isRenaming ? (
+          <InlineRenameInput
+            initialValue={entry.name}
+            depth={depth}
+            onSubmit={(name) => renameItem(entry.path, name, 'folder')}
+            onCancel={() => dispatch({ type: 'STOP_RENAMING' })}
+          />
+        ) : (
+          <button
+            onContextMenu={(e) => onContextMenu(e, entry.path, 'folder', entry.name)}
+            onClick={() => {
+              setActiveExplorerPath(entry.path)
+              setIsOpen(!isOpen)
+            }}
+            className={`w-full flex items-center gap-1.5 text-[13px] rounded transition-colors ${isFolderActive ? 'bg-[var(--bg-hover)] text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
+              }`}
+            style={{ paddingTop: '5px', paddingBottom: '5px', paddingLeft: `${depth * 12 + 8}px`, paddingRight: '8px' }}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" className={`transition-transform flex-shrink-0 ${isOpen ? 'rotate-90' : ''}`} fill="currentColor">
+              <path d="M4 2l4 4-4 4z" />
+            </svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-[var(--text-dim)]">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+            </svg>
+            <span className="truncate">{entry.name}</span>
+          </button>
+        )}
         {isOpen && (
           <div>
             {state.creating?.targetPath === entry.path && (
@@ -219,7 +299,7 @@ function FileTreeItem({ entry, depth, onFileClick, activeFilePath, activeToc }: 
               />
             )}
             {entry.children?.map((child) => (
-              <FileTreeItem key={child.path} entry={child} depth={depth + 1} onFileClick={onFileClick} activeFilePath={activeFilePath} activeToc={activeToc} />
+              <FileTreeItem key={child.path} entry={child} depth={depth + 1} onFileClick={onFileClick} onContextMenu={onContextMenu} activeFilePath={activeFilePath} activeToc={activeToc} />
             ))}
           </div>
         )}
@@ -229,20 +309,29 @@ function FileTreeItem({ entry, depth, onFileClick, activeFilePath, activeToc }: 
 
   return (
     <div>
-      <div className={`w-full flex items-center gap-1.5 text-[13px] rounded transition-colors group ${isActiveFile ? 'bg-[var(--bg-hover)] text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
-        }`} style={{ paddingLeft: `${depth * 12 + (isActiveFile && activeToc.length > 0 ? 8 : 26)}px`, paddingRight: '1px' }}>
-        {isActiveFile && activeToc.length > 0 && (
-          <button onClick={() => setIsTocOpen(!isTocOpen)} className="p-1 rounded hover:bg-[var(--border-default)]">
-            <svg width="10" height="10" viewBox="0 0 12 12" className={`transition-transform flex-shrink-0 text-[var(--text-dim)] ${isTocOpen ? 'rotate-90' : ''}`} fill="currentColor">
-              <path d="M4 2l4 4-4 4z" />
-            </svg>
-          </button>
-        )}
-        <button
-          onClick={() => onFileClick(entry.path, entry.name)}
-          className="flex-1 flex items-center gap-1.5 overflow-hidden"
-          style={{ paddingTop: '5px', paddingBottom: '5px' }}
-        >
+      {isRenaming ? (
+        <InlineRenameInput
+          initialValue={entry.name.replace(/\.md$/i, '')}
+          depth={depth}
+          onSubmit={(name) => renameItem(entry.path, name, 'file')}
+          onCancel={() => dispatch({ type: 'STOP_RENAMING' })}
+        />
+      ) : (
+        <div className={`w-full flex items-center gap-1.5 text-[13px] rounded transition-colors group ${isActiveFile ? 'bg-[var(--bg-hover)] text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
+          }`} style={{ paddingLeft: `${depth * 12 + (isActiveFile && activeToc.length > 0 ? 8 : 26)}px`, paddingRight: '1px' }}>
+          {isActiveFile && activeToc.length > 0 && (
+            <button onClick={() => setIsTocOpen(!isTocOpen)} className="p-1 rounded hover:bg-[var(--border-default)]">
+              <svg width="10" height="10" viewBox="0 0 12 12" className={`transition-transform flex-shrink-0 text-[var(--text-dim)] ${isTocOpen ? 'rotate-90' : ''}`} fill="currentColor">
+                <path d="M4 2l4 4-4 4z" />
+              </svg>
+            </button>
+          )}
+          <button
+            onContextMenu={(e) => onContextMenu(e, entry.path, 'file', entry.name)}
+            onClick={() => onFileClick(entry.path, entry.name)}
+            className="flex-1 flex items-center gap-1.5 overflow-hidden"
+            style={{ paddingTop: '5px', paddingBottom: '5px' }}
+          >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-[var(--accent)]">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
             <polyline points="14 2 14 8 20 8" />
@@ -250,6 +339,7 @@ function FileTreeItem({ entry, depth, onFileClick, activeFilePath, activeToc }: 
           <span className="truncate">{entry.name}</span>
         </button>
       </div>
+      )}
       {isActiveFile && isTocOpen && activeToc.length > 0 && (
         <div className="mt-0.5">
           {activeToc.map((toc) => (

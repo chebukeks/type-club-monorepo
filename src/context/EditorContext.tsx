@@ -22,6 +22,7 @@ const initialState: AppState = {
   focusMode: 'none',
   activeExplorerPath: null,
   showEmptyFolders: true,
+  renaming: null,
 }
 
 // ============================================================
@@ -99,6 +100,26 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, creating: { type: action.payload.itemType, targetPath: action.payload.targetPath } }
     case 'STOP_CREATING':
       return { ...state, creating: null }
+    case 'START_RENAMING':
+      return { ...state, renaming: { path: action.payload.path, type: action.payload.itemType } }
+    case 'STOP_RENAMING':
+      return { ...state, renaming: null }
+    case 'RENAME_TAB_PATHS': {
+      const { oldPath, newPath } = action.payload
+      const sep = oldPath.includes('/') ? '/' : '\\'
+      const newTabs = state.tabs.map(tab => {
+        if (tab.filePath === oldPath) {
+          const newName = newPath.substring(newPath.lastIndexOf(sep) + 1)
+          return { ...tab, filePath: newPath, fileName: newName }
+        }
+        if (tab.filePath.startsWith(oldPath + sep)) {
+          const updatedPath = tab.filePath.replace(oldPath, newPath)
+          return { ...tab, filePath: updatedPath }
+        }
+        return tab
+      })
+      return { ...state, tabs: newTabs }
+    }
     case 'SET_ACTIVE_EXPLORER_PATH':
       return { ...state, activeExplorerPath: action.payload.path }
     case 'SET_THEME':
@@ -146,6 +167,10 @@ interface EditorContextValue {
   refreshFileTree: () => Promise<void>
   startCreating: (type: 'file' | 'folder') => void
   setActiveExplorerPath: (path: string | null) => void
+  renameItem: (oldPath: string, newName: string, type: 'file' | 'folder') => Promise<void>
+  deleteItem: (path: string, type: 'file' | 'folder', name: string) => Promise<void>
+  showInExplorer: (path: string) => void
+  startRenaming: (path: string, type: 'file' | 'folder') => void
   setTheme: (theme: ThemeMode) => Promise<void>
   setTabMode: (tabId: string, mode: EditorMode) => void
   refreshTab: (tabId: string) => void
@@ -406,6 +431,56 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     try { await window.api.storeSet('showEmptyFolders', enabled) } catch (e) { /* ignore */ }
   }, [])
 
+  // --- Начать переименование ---
+  const startRenaming = useCallback((path: string, type: 'file' | 'folder') => {
+    dispatch({ type: 'START_RENAMING', payload: { path, itemType: type } })
+  }, [])
+
+  // --- Переименовать ---
+  const renameItem = useCallback(async (oldPath: string, newName: string, type: 'file' | 'folder') => {
+    try {
+      const sep = oldPath.includes('/') ? '/' : '\\'
+      const dirPath = oldPath.substring(0, oldPath.lastIndexOf(sep))
+      const finalName = (type === 'file' && !newName.endsWith('.md')) ? newName + '.md' : newName
+      const newPath = dirPath + sep + finalName
+      
+      if (oldPath === newPath) {
+        dispatch({ type: 'STOP_RENAMING' })
+        return
+      }
+
+      await window.api.renameItem(oldPath, newPath)
+      dispatch({ type: 'RENAME_TAB_PATHS', payload: { oldPath, newPath } })
+      refreshFileTree()
+      dispatch({ type: 'STOP_RENAMING' })
+    } catch (err) {
+      console.error(err)
+    }
+  }, [refreshFileTree])
+
+  // --- Удалить ---
+  const deleteItem = useCallback(async (delPath: string, _type: 'file' | 'folder', name: string) => {
+    const confirm = await window.api.confirmDelete(name)
+    if (!confirm) return
+    try {
+      await window.api.deleteItem(delPath)
+      const sep = delPath.includes('/') ? '/' : '\\'
+      state.tabs.forEach(t => {
+        if (t.filePath === delPath || t.filePath.startsWith(delPath + sep)) {
+          dispatch({ type: 'CLOSE_TAB', payload: { tabId: t.id } })
+        }
+      })
+      refreshFileTree()
+    } catch (err) {
+      console.error(err)
+    }
+  }, [state.tabs, refreshFileTree])
+
+  // --- Показать в проводнике ---
+  const showInExplorer = useCallback((path: string) => {
+    window.api.showItemInFolder(path)
+  }, [])
+
   // ============================================================
   // Автосохранение: debounce 5 сек после последнего изменения
   // ============================================================
@@ -448,6 +523,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       openFileViaDialog, saveActiveFileAs,
       createFile, createFolder, refreshFileTree,
       startCreating, setActiveExplorerPath,
+      renameItem, deleteItem, showInExplorer, startRenaming,
       setTheme, setTabMode, refreshTab,
       setAutosave, setShowStats, setWordLimit,
       setTypewriterMode, setFocusMode, setShowEmptyFolders

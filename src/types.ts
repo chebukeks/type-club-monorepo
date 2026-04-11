@@ -68,6 +68,8 @@ export interface AppState {
   creating: { type: 'file' | 'folder', targetPath: string } | null;
   /** Активная папка для создания файлов/папок (выбранная в сайдбаре) */
   activeExplorerPath: string | null;
+  /** Режим переименования файла/папки в Sidebar */
+  renaming: { path: string, type: 'file' | 'folder' } | null;
   /** Текущая цветовая тема */
   theme: ThemeMode;
   /** Автосохранение включено */
@@ -96,6 +98,9 @@ export type AppAction =
   | { type: 'MARK_SAVED'; payload: { tabId: string } }
   | { type: 'START_CREATING'; payload: { itemType: 'file' | 'folder', targetPath: string } }
   | { type: 'STOP_CREATING' }
+  | { type: 'START_RENAMING'; payload: { path: string; itemType: 'file' | 'folder' } }
+  | { type: 'STOP_RENAMING' }
+  | { type: 'RENAME_TAB_PATHS'; payload: { oldPath: string; newPath: string } }
   | { type: 'SET_ACTIVE_EXPLORER_PATH'; payload: { path: string | null } }
   | { type: 'SET_THEME'; payload: { theme: ThemeMode } }
   | { type: 'SET_TAB_MODE'; payload: { tabId: string; mode: EditorMode } }
@@ -114,6 +119,10 @@ export interface IElectronAPI {
   writeFile: (filePath: string, content: string) => Promise<void>;
   readDir: (dirPath: string) => Promise<FileEntry[]>;
   createDir: (dirPath: string) => Promise<void>;
+  renameItem: (oldPath: string, newPath: string) => Promise<void>;
+  deleteItem: (filePath: string) => Promise<void>;
+  showItemInFolder: (filePath: string) => void;
+  confirmDelete: (itemName: string) => Promise<boolean>;
   openFolder: () => Promise<string | null>;
   openFile: () => Promise<{ filePath: string; content: string } | null>;
   saveFileAs: (content: string, defaultName: string) => Promise<{ filePath: string } | null>;

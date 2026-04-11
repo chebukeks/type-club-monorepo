@@ -30,6 +30,21 @@ contextBridge.exposeInMainWorld('api', {
     return ipcRenderer.invoke('fs:createDir', dirPath)
   },
 
+  /** Переименование файла/папки */
+  renameItem: (oldPath: string, newPath: string) => {
+    return ipcRenderer.invoke('fs:rename', oldPath, newPath)
+  },
+
+  /** Удаление файла/папки (в корзину) */
+  deleteItem: (filePath: string) => {
+    return ipcRenderer.invoke('fs:delete', filePath)
+  },
+
+  /** Показать файл/папку в системном проводнике */
+  showItemInFolder: (filePath: string) => {
+    ipcRenderer.send('shell:showItemInFolder', filePath)
+  },
+
   // ==========================================
   // Диалоговые окна
   // ==========================================
@@ -47,6 +62,11 @@ contextBridge.exposeInMainWorld('api', {
   /** Сохранить как... (диалог + запись) */
   saveFileAs: (content: string, defaultName: string) => {
     return ipcRenderer.invoke('dialog:saveFileAs', content, defaultName)
+  },
+
+  /** Диалог подтверждения удаления */
+  confirmDelete: (itemName: string) => {
+    return ipcRenderer.invoke('dialog:confirmDelete', itemName)
   },
 
   /** Экспорт в HTML (откроет диалог сохранения) */
