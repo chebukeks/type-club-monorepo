@@ -38,6 +38,7 @@ function getFilesFromArgs(argv: string[]): string[] {
 
 // Первичный сбор файлов при запуске
 initialFiles.push(...getFilesFromArgs(process.argv))
+console.log('[MAIN] initialFiles from argv:', initialFiles)
 
 // ============================================================
 // Проверка на единственность экземпляра приложения
@@ -47,18 +48,48 @@ const gotTheLock = app.requestSingleInstanceLock()
 if (!gotTheLock) {
   app.quit()
 } else {
+  // Дебаунс-очередь: при открытии N файлов из проводника Windows запускает
+  // N экземпляров приложения, каждый из которых шлёт second-instance.
+  // Собираем все файлы в очередь и отправляем одним IPC-сообщением.
+  let pendingFiles: string[] = []
+  let flushTimer: ReturnType<typeof setTimeout> | null = null
+
+  function flushPendingFiles() {
+    flushTimer = null
+    if (pendingFiles.length === 0 || !win) return
+    const batch = pendingFiles.splice(0)
+    console.log('[MAIN] flushing batch:', batch.length, 'files')
+
+    if (win.webContents.isLoading()) {
+      win.webContents.once('did-finish-load', () => {
+        win!.webContents.send('app:open-files', batch)
+      })
+    } else {
+      win.webContents.send('app:open-files', batch)
+    }
+  }
+
   app.on('second-instance', (_event, commandLine) => {
-    // При попытке запуска второго экземпляра — фокусируем текущее окно
+    const additionalFiles = getFilesFromArgs(commandLine)
+    console.log('[MAIN] second-instance, win:', !!win, 'files:', additionalFiles)
+
     if (win) {
       if (win.isMinimized()) win.restore()
       win.focus()
-      
-      // Передаем новые файлы в Renderer процесс
-      const additionalFiles = getFilesFromArgs(commandLine)
-      if (additionalFiles.length > 0) {
-        win.webContents.send('app:open-files', additionalFiles)
-      }
     }
+
+    if (additionalFiles.length === 0) return
+
+    if (!win) {
+      // Окно ещё не создано — renderer заберёт через app:get-files-to-open
+      initialFiles.push(...additionalFiles)
+      return
+    }
+
+    // Копим файлы и сбрасываем таймер дебаунса
+    pendingFiles.push(...additionalFiles)
+    if (flushTimer) clearTimeout(flushTimer)
+    flushTimer = setTimeout(flushPendingFiles, 150)
   })
 }
 
@@ -93,7 +124,10 @@ function createWindow() {
     minHeight: 500,
     frame: false,                     // Убираем системную рамку
     titleBarStyle: 'hidden',          // Скрываем заголовок
-    icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
+    icon: path.join(process.env.APP_ROOT, 'build',
+      process.platform === 'win32' ? 'icon.ico'
+        : process.platform === 'darwin' ? 'icon.icns'
+          : path.join('icons', 'icon.png')),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
       contextIsolation: true,         // Изоляция контекста (безопасность)

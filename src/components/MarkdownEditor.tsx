@@ -119,8 +119,9 @@ export function MarkdownEditor() {
 
     // При включении режима печатной машинки — сразу прокрутить к каретке,
     // иначе padding-top: 70vh сдвигает контент вниз и виден огромный пробел.
-    if (state.typewriterMode && editorView) {
+    if (state.typewriterMode && editorView && !editorView.isDestroyed) {
       requestAnimationFrame(() => {
+        if (editorView.isDestroyed) return
         const { head } = editorView.state.selection
         const scrollContainer = editorView.dom.closest('.overflow-auto') as HTMLElement
         if (!scrollContainer) return
@@ -146,7 +147,7 @@ export function MarkdownEditor() {
   const isFocusModeRef = useRef(state.focusMode)
   useEffect(() => {
     isFocusModeRef.current = state.focusMode
-    if (editorView) {
+    if (editorView && !editorView.isDestroyed) {
       editorView.dispatch(editorView.state.tr.setMeta('focusModeUpdate', true))
     }
   }, [state.focusMode, editorView])
@@ -160,6 +161,7 @@ export function MarkdownEditor() {
 
     injectStyles()
     if (viewRef.current) { viewRef.current.destroy(); viewRef.current = null }
+    console.log('[EDITOR] Creating ProseMirror for tab:', activeTab.id, 'mode:', activeTab.mode)
 
     const tabId = activeTab.id
     const initialContent = activeTab.content || ''

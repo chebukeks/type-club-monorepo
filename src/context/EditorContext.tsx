@@ -177,6 +177,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
 
         // --- Обработка файлов, переданных при старте (Open with...) ---
         const startupFiles = await window.api.getFilesToOpen()
+        console.log('[RENDERER] getFilesToOpen:', startupFiles.length, startupFiles)
         for (const p of startupFiles) {
           const name = p.replace(/^.*[\\/]/, '') || 'untitled.md'
           // Используем dispatch напрямую, так как openFile определен позже
@@ -203,13 +204,16 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
   // --- Подписка на открытие новых файлов (когда приложение уже запущено) ---
   useEffect(() => {
     const unsubscribe = window.api.onOpenFiles((paths) => {
-      paths.forEach(async (p) => {
-        const name = p.replace(/^.*[\\/]/, '') || 'untitled.md'
-        try {
-          const content = await window.api.readFile(p)
-          dispatch({ type: 'OPEN_FILE', payload: { filePath: p, fileName: name, content } })
-        } catch (err) { /* ignore */ }
-      })
+      console.log('[RENDERER] onOpenFiles received:', paths.length, paths)
+      ;(async () => {
+        for (const p of paths) {
+          const name = p.replace(/^.*[\\/]/, '') || 'untitled.md'
+          try {
+            const content = await window.api.readFile(p)
+            dispatch({ type: 'OPEN_FILE', payload: { filePath: p, fileName: name, content } })
+          } catch (err) { /* ignore */ }
+        }
+      })()
     })
     return unsubscribe
   }, [])
