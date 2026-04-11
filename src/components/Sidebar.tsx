@@ -6,7 +6,7 @@ import { useEditor } from '../context/EditorContext'
 import type { FileEntry, TocItem } from '../types'
 
 export function Sidebar() {
-  const { state, dispatch, openFolder, openFile, createFile, createFolder, setActiveExplorerPath, refreshFileTree, setShowEmptyFolders, startRenaming, deleteItem, showInExplorer } = useEditor()
+  const { state, dispatch, openFolder, openFile, createFile, createFolder, setActiveExplorerPath, refreshFileTree, setShowEmptyFolders, startRenaming, deleteItem, showInExplorer, moveItem } = useEditor()
 
   const filterTree = (nodes: FileEntry[]): FileEntry[] => {
     return nodes.reduce<FileEntry[]>((acc, node) => {
@@ -92,9 +92,15 @@ export function Sidebar() {
           </button>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto py-2" onClick={(e) => {
-        if (e.target === e.currentTarget) setActiveExplorerPath(null)
-      }}>
+      <div className="flex-1 overflow-y-auto py-2" 
+        onClick={(e) => { if (e.target === e.currentTarget) setActiveExplorerPath(null) }}
+        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+        onDrop={(e) => {
+          e.preventDefault()
+          const sourcePath = e.dataTransfer.getData('text/plain')
+          if (sourcePath && state.folderPath) moveItem(sourcePath, state.folderPath)
+        }}
+      >
         {visibleTree.length === 0 && !state.creating ? (
           <EmptyState onOpenFolder={openFolder} />
         ) : (
@@ -243,11 +249,50 @@ function FileTreeItem({ entry, depth, onFileClick, onContextMenu, activeFilePath
   activeFilePath: string | null;
   activeToc: TocItem[];
 }) {
-  const { state, dispatch, createFile, createFolder, setActiveExplorerPath, renameItem } = useEditor()
+  const { state, dispatch, createFile, createFolder, setActiveExplorerPath, renameItem, moveItem } = useEditor()
   const [isOpen, setIsOpen] = useState(depth < 1)
   const [isTocOpen, setIsTocOpen] = useState(true)
+  const [isDragOver, setIsDragOver] = useState(false)
+
   const isActiveFile = !entry.isDirectory && entry.path === activeFilePath
   const isFolderActive = entry.isDirectory && entry.path === state.activeExplorerPath
+
+  const handleDragStart = (e: React.DragEvent) => {
+    e.stopPropagation()
+    e.dataTransfer.setData('text/plain', entry.path)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+  }
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+    const sourcePath = e.dataTransfer.getData('text/plain')
+    if (sourcePath && sourcePath !== entry.path) {
+      if (entry.isDirectory) {
+        moveItem(sourcePath, entry.path)
+      } else {
+        const sep = entry.path.includes('/') ? '/' : '\\'
+        const dirPath = entry.path.substring(0, entry.path.lastIndexOf(sep))
+        moveItem(sourcePath, dirPath)
+      }
+    }
+  }
 
   useEffect(() => {
     if (state.creating?.targetPath === entry.path) setIsOpen(true)
@@ -267,12 +312,19 @@ function FileTreeItem({ entry, depth, onFileClick, onContextMenu, activeFilePath
           />
         ) : (
           <button
+            draggable
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
             onContextMenu={(e) => onContextMenu(e, entry.path, 'folder', entry.name)}
             onClick={() => {
               setActiveExplorerPath(entry.path)
               setIsOpen(!isOpen)
             }}
-            className={`w-full flex items-center gap-1.5 text-[13px] rounded transition-colors ${isFolderActive ? 'bg-[var(--bg-hover)] text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
+            className={`w-full flex items-center gap-1.5 text-[13px] rounded transition-colors ${
+               isDragOver ? 'bg-[var(--accent)] text-white' : isFolderActive ? 'bg-[var(--bg-hover)] text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
               }`}
             style={{ paddingTop: '5px', paddingBottom: '5px', paddingLeft: `${depth * 12 + 8}px`, paddingRight: '8px' }}
           >
@@ -317,11 +369,19 @@ function FileTreeItem({ entry, depth, onFileClick, onContextMenu, activeFilePath
           onCancel={() => dispatch({ type: 'STOP_RENAMING' })}
         />
       ) : (
-        <div className={`w-full flex items-center gap-1.5 text-[13px] rounded transition-colors group ${isActiveFile ? 'bg-[var(--bg-hover)] text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
+        <div 
+          draggable
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className={`w-full flex items-center gap-1.5 text-[13px] rounded transition-colors group ${
+            isDragOver ? 'bg-[var(--accent)] text-white' : isActiveFile ? 'bg-[var(--bg-hover)] text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
           }`} style={{ paddingLeft: `${depth * 12 + (isActiveFile && activeToc.length > 0 ? 8 : 26)}px`, paddingRight: '1px' }}>
           {isActiveFile && activeToc.length > 0 && (
-            <button onClick={() => setIsTocOpen(!isTocOpen)} className="p-1 rounded hover:bg-[var(--border-default)]">
-              <svg width="10" height="10" viewBox="0 0 12 12" className={`transition-transform flex-shrink-0 text-[var(--text-dim)] ${isTocOpen ? 'rotate-90' : ''}`} fill="currentColor">
+            <button onClick={() => setIsTocOpen(!isTocOpen)} className={`p-1 rounded ${isDragOver ? 'hover:bg-white/20' : 'hover:bg-[var(--border-default)]'}`}>
+              <svg width="10" height="10" viewBox="0 0 12 12" className={`transition-transform flex-shrink-0 ${isDragOver ? 'text-white' : 'text-[var(--text-dim)]'} ${isTocOpen ? 'rotate-90' : ''}`} fill="currentColor">
                 <path d="M4 2l4 4-4 4z" />
               </svg>
             </button>
@@ -332,7 +392,7 @@ function FileTreeItem({ entry, depth, onFileClick, onContextMenu, activeFilePath
             className="flex-1 flex items-center gap-1.5 overflow-hidden"
             style={{ paddingTop: '5px', paddingBottom: '5px' }}
           >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-[var(--accent)]">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`flex-shrink-0 ${isDragOver ? 'text-white' : 'text-[var(--accent)]'}`}>
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
             <polyline points="14 2 14 8 20 8" />
           </svg>

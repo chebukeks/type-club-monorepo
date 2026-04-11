@@ -171,6 +171,7 @@ interface EditorContextValue {
   deleteItem: (path: string, type: 'file' | 'folder', name: string) => Promise<void>
   showInExplorer: (path: string) => void
   startRenaming: (path: string, type: 'file' | 'folder') => void
+  moveItem: (sourcePath: string, targetDirPath: string) => Promise<void>
   setTheme: (theme: ThemeMode) => Promise<void>
   setTabMode: (tabId: string, mode: EditorMode) => void
   refreshTab: (tabId: string) => void
@@ -458,6 +459,25 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     }
   }, [refreshFileTree])
 
+  // --- Перемещение (Drag & Drop) ---
+  const moveItem = useCallback(async (sourcePath: string, targetDirPath: string) => {
+    try {
+      const sep = sourcePath.includes('/') ? '/' : '\\'
+      const fileName = sourcePath.substring(sourcePath.lastIndexOf(sep) + 1)
+      const newPath = targetDirPath + sep + fileName
+
+      if (sourcePath === newPath) return // Уже там
+      // Проверяем, не пытаются ли переместить папку внутрь самой себя
+      if (targetDirPath.startsWith(sourcePath + sep) || targetDirPath === sourcePath) return
+
+      await window.api.renameItem(sourcePath, newPath)
+      dispatch({ type: 'RENAME_TAB_PATHS', payload: { oldPath: sourcePath, newPath } })
+      refreshFileTree()
+    } catch (err) {
+      console.error(err)
+    }
+  }, [refreshFileTree])
+
   // --- Удалить ---
   const deleteItem = useCallback(async (delPath: string, _type: 'file' | 'folder', name: string) => {
     const confirm = await window.api.confirmDelete(name)
@@ -523,7 +543,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       openFileViaDialog, saveActiveFileAs,
       createFile, createFolder, refreshFileTree,
       startCreating, setActiveExplorerPath,
-      renameItem, deleteItem, showInExplorer, startRenaming,
+      renameItem, deleteItem, showInExplorer, startRenaming, moveItem,
       setTheme, setTabMode, refreshTab,
       setAutosave, setShowStats, setWordLimit,
       setTypewriterMode, setFocusMode, setShowEmptyFolders
