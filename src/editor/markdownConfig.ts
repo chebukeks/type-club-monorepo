@@ -389,7 +389,7 @@ export const markdownSerializer = new MarkdownSerializer(
       state.write('$' + node.textContent + '$')
     },
     math_block(state, node) {
-      state.write('$$\n' + node.textContent + '\n$$')
+      state.write('$$\n' + node.textContent.trim() + '\n$$')
       state.closeBlock(node)
     },
     image(state, node) {

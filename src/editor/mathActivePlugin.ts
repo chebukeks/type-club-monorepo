@@ -14,7 +14,7 @@ export const mathActivePlugin = new Plugin({
       return buildDecorations(state)
     },
     apply(tr, oldDecos, oldState, newState) {
-      if (!tr.selectionSet && !tr.docChanged && oldState.doc === newState.doc) return oldDecos
+      if (!tr.selectionSet && !tr.docChanged && oldState.doc === newState.doc && !tr.getMeta('forceUpdate')) return oldDecos
       return buildDecorations(newState)
     }
   },
