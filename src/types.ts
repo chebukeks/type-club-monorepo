@@ -65,7 +65,9 @@ export interface AppState {
   /** Дерево файлов текущей папки */
   fileTree: FileEntry[];
   /** Режим создания файла/папки (inline-ввод в Sidebar) */
-  creating: { type: 'file' | 'folder' } | null;
+  creating: { type: 'file' | 'folder', targetPath: string } | null;
+  /** Активная папка для создания файлов/папок (выбранная в сайдбаре) */
+  activeExplorerPath: string | null;
   /** Текущая цветовая тема */
   theme: ThemeMode;
   /** Автосохранение включено */
@@ -80,6 +82,8 @@ export interface AppState {
   typewriterMode: boolean;
   /** Режим акцентирования */
   focusMode: FocusMode;
+  /** Показывать пустые папки */
+  showEmptyFolders: boolean;
 }
 
 /** Действия для редьюсера состояния */
@@ -90,8 +94,9 @@ export type AppAction =
   | { type: 'UPDATE_CONTENT'; payload: { tabId: string; content: string } }
   | { type: 'SET_FILE_TREE'; payload: { folderPath: string; fileTree: FileEntry[] } }
   | { type: 'MARK_SAVED'; payload: { tabId: string } }
-  | { type: 'START_CREATING'; payload: { itemType: 'file' | 'folder' } }
+  | { type: 'START_CREATING'; payload: { itemType: 'file' | 'folder', targetPath: string } }
   | { type: 'STOP_CREATING' }
+  | { type: 'SET_ACTIVE_EXPLORER_PATH'; payload: { path: string | null } }
   | { type: 'SET_THEME'; payload: { theme: ThemeMode } }
   | { type: 'SET_TAB_MODE'; payload: { tabId: string; mode: EditorMode } }
   | { type: 'REFRESH_TAB'; payload: { tabId: string } }
@@ -100,7 +105,8 @@ export type AppAction =
   | { type: 'SET_WORD_LIMIT'; payload: WordLimit }
   | { type: 'SET_ACTIVE_TOC'; payload: TocItem[] }
   | { type: 'SET_TYPEWRITER_MODE'; payload: { enabled: boolean } }
-  | { type: 'SET_FOCUS_MODE'; payload: { mode: FocusMode } };
+  | { type: 'SET_FOCUS_MODE'; payload: { mode: FocusMode } }
+  | { type: 'SET_SHOW_EMPTY_FOLDERS'; payload: { enabled: boolean } };
 
 /** API, доступный из Renderer-процесса через contextBridge */
 export interface IElectronAPI {

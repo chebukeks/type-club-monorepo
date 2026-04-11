@@ -192,15 +192,12 @@ function readDirRecursive(dirPath: string): FileEntry[] {
 
       if (entry.isDirectory()) {
         const children = readDirRecursive(fullPath)
-        // Показываем папку, только если в ней есть .md файлы
-        if (children.length > 0) {
-          result.push({
-            name: entry.name,
-            path: fullPath,
-            isDirectory: true,
-            children,
-          })
-        }
+        result.push({
+          name: entry.name,
+          path: fullPath,
+          isDirectory: true,
+          children,
+        })
       } else if (entry.name.endsWith('.md')) {
         result.push({
           name: entry.name,

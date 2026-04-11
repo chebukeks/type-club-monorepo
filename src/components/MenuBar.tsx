@@ -8,6 +8,7 @@ export function MenuBar() {
     state, dispatch,
     saveActiveFile, openFolder,
     openFileViaDialog, saveActiveFileAs,
+    startCreating,
     setTheme, setTabMode, refreshTab, setFocusMode,
   } = useEditor()
   const { activeTabId, tabs, folderPath, theme, focusMode } = state
@@ -42,11 +43,11 @@ export function MenuBar() {
       else if (ctrl && shift && code === 'KeyO') { e.preventDefault(); openFolder() }
       else if (ctrl && !shift && code === 'KeyN') {
         e.preventDefault()
-        if (folderPath) dispatch({ type: 'START_CREATING', payload: { itemType: 'file' } })
+        if (folderPath) startCreating('file')
       }
       else if (ctrl && shift && code === 'KeyN') {
         e.preventDefault()
-        if (folderPath) dispatch({ type: 'START_CREATING', payload: { itemType: 'folder' } })
+        if (folderPath) startCreating('folder')
       }
       else if (e.code === 'F5') {
         e.preventDefault()
@@ -76,8 +77,8 @@ export function MenuBar() {
     const html = generateExportHtml(activeTab.content)
     await window.api.exportPdf(html, activeTab.fileName.replace(/\.md$/i, '.pdf'))
   }
-  const handleCreateFile = () => { closeMenu(); if (folderPath) dispatch({ type: 'START_CREATING', payload: { itemType: 'file' } }) }
-  const handleCreateFolder = () => { closeMenu(); if (folderPath) dispatch({ type: 'START_CREATING', payload: { itemType: 'folder' } }) }
+  const handleCreateFile = () => { closeMenu(); if (folderPath) startCreating('file') }
+  const handleCreateFolder = () => { closeMenu(); if (folderPath) startCreating('folder') }
   const handleOpenFile = () => { closeMenu(); openFileViaDialog() }
   const handleOpenFolder = () => { closeMenu(); openFolder() }
   const handleSave = () => { closeMenu(); saveActiveFile() }

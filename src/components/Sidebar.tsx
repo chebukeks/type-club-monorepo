@@ -6,7 +6,24 @@ import { useEditor } from '../context/EditorContext'
 import type { FileEntry, TocItem } from '../types'
 
 export function Sidebar() {
-  const { state, dispatch, openFolder, openFile, createFile, createFolder } = useEditor()
+  const { state, dispatch, openFolder, openFile, createFile, createFolder, setActiveExplorerPath, refreshFileTree, setShowEmptyFolders } = useEditor()
+
+  const filterTree = (nodes: FileEntry[]): FileEntry[] => {
+    return nodes.reduce<FileEntry[]>((acc, node) => {
+      if (!node.isDirectory) {
+        acc.push(node)
+      } else {
+        const filteredChildren = filterTree(node.children || [])
+        // Оставляем папку, если она непустая, ИЛИ если мы явно просим показывать пустые
+        if (filteredChildren.length > 0 || state.showEmptyFolders) {
+          acc.push({ ...node, children: filteredChildren })
+        }
+      }
+      return acc
+    }, [])
+  }
+
+  const visibleTree = filterTree(state.fileTree)
 
   return (
     <div className="w-60 min-w-[200px] max-w-[400px] bg-[var(--bg-surface)] border-r border-[var(--border-default)] flex flex-col h-full">
@@ -17,32 +34,65 @@ export function Sidebar() {
         <span className="text-[11px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">
           Проводник
         </span>
-        <button
-          onClick={openFolder}
-          className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors"
-          title="Открыть папку"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-folder-open-icon lucide-folder-open">
-            <path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2" />
-          </svg>
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setShowEmptyFolders(!state.showEmptyFolders)}
+            className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors"
+            title={state.showEmptyFolders ? "Скрыть пустые папки" : "Показывать пустые папки"}
+          >
+            {state.showEmptyFolders ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-eye">
+                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-eye-off">
+                <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><line x1="2" x2="22" y1="2" y2="22" />
+              </svg>
+            )}
+          </button>
+
+          <button
+            onClick={refreshFileTree}
+            className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors"
+            title="Обновить"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-rotate-cw">
+              <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" />
+            </svg>
+          </button>
+
+          <button
+            onClick={openFolder}
+            className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors"
+            title="Открыть папку"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-folder-open-icon lucide-folder-open">
+              <path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2" />
+            </svg>
+          </button>
+        </div>
       </div>
-      <div className="flex-1 overflow-y-auto py-2">
-        {state.fileTree.length === 0 && !state.creating ? (
+      <div className="flex-1 overflow-y-auto py-2" onClick={(e) => {
+        if (e.target === e.currentTarget) setActiveExplorerPath(null)
+      }}>
+        {visibleTree.length === 0 && !state.creating ? (
           <EmptyState onOpenFolder={openFolder} />
         ) : (
-          <div className="px-1">
-            {state.creating && (
+          <div className="px-1" onClick={(e) => {
+            if (e.target === e.currentTarget) setActiveExplorerPath(null)
+          }}>
+            {state.creating && state.creating.targetPath === state.folderPath && (
               <InlineCreateInput
                 type={state.creating.type}
+                depth={0}
                 onSubmit={(name) => {
-                  if (state.creating?.type === 'file') createFile(name)
-                  else createFolder(name)
+                  if (state.creating?.type === 'file') createFile(name, state.folderPath!)
+                  else createFolder(name, state.folderPath!)
                 }}
                 onCancel={() => dispatch({ type: 'STOP_CREATING' })}
               />
             )}
-            {state.fileTree.map((entry) => (
+            {visibleTree.map((entry) => (
               <FileTreeItem
                 key={entry.path}
                 entry={entry}
@@ -59,8 +109,8 @@ export function Sidebar() {
   )
 }
 
-function InlineCreateInput({ type, onSubmit, onCancel }: {
-  type: 'file' | 'folder'; onSubmit: (name: string) => void; onCancel: () => void
+function InlineCreateInput({ type, depth, onSubmit, onCancel }: {
+  type: 'file' | 'folder'; depth: number; onSubmit: (name: string) => void; onCancel: () => void
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   useEffect(() => { inputRef.current?.focus() }, [])
@@ -69,7 +119,7 @@ function InlineCreateInput({ type, onSubmit, onCancel }: {
     else if (e.key === 'Escape') onCancel()
   }
   return (
-    <div className="flex items-center gap-1.5 rounded" style={{ padding: '4px 8px' }}>
+    <div className="flex items-center gap-1.5 rounded" style={{ paddingTop: '2px', paddingBottom: '2px', paddingLeft: `${depth * 12 + 26}px`, paddingRight: '8px' }}>
       {type === 'folder' ? (
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-[var(--text-dim)]">
           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
@@ -125,16 +175,26 @@ function FileTreeItem({ entry, depth, onFileClick, activeFilePath, activeToc }: 
   activeFilePath: string | null;
   activeToc: TocItem[];
 }) {
+  const { state, dispatch, createFile, createFolder, setActiveExplorerPath } = useEditor()
   const [isOpen, setIsOpen] = useState(depth < 1)
   const [isTocOpen, setIsTocOpen] = useState(true)
-  const isActive = entry.path === activeFilePath
+  const isActiveFile = !entry.isDirectory && entry.path === activeFilePath
+  const isFolderActive = entry.isDirectory && entry.path === state.activeExplorerPath
+
+  useEffect(() => {
+    if (state.creating?.targetPath === entry.path) setIsOpen(true)
+  }, [state.creating?.targetPath, entry.path])
 
   if (entry.isDirectory) {
     return (
       <div>
         <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="w-full flex items-center gap-1.5 text-[13px] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] rounded transition-colors"
+          onClick={() => {
+            setActiveExplorerPath(entry.path)
+            setIsOpen(!isOpen)
+          }}
+          className={`w-full flex items-center gap-1.5 text-[13px] rounded transition-colors ${isFolderActive ? 'bg-[var(--bg-hover)] text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
+            }`}
           style={{ paddingTop: '5px', paddingBottom: '5px', paddingLeft: `${depth * 12 + 8}px`, paddingRight: '8px' }}
         >
           <svg width="12" height="12" viewBox="0 0 12 12" className={`transition-transform flex-shrink-0 ${isOpen ? 'rotate-90' : ''}`} fill="currentColor">
@@ -145,9 +205,20 @@ function FileTreeItem({ entry, depth, onFileClick, activeFilePath, activeToc }: 
           </svg>
           <span className="truncate">{entry.name}</span>
         </button>
-        {isOpen && entry.children && (
+        {isOpen && (
           <div>
-            {entry.children.map((child) => (
+            {state.creating?.targetPath === entry.path && (
+              <InlineCreateInput
+                type={state.creating.type}
+                depth={depth}
+                onSubmit={(name) => {
+                  if (state.creating?.type === 'file') createFile(name, entry.path)
+                  else createFolder(name, entry.path)
+                }}
+                onCancel={() => dispatch({ type: 'STOP_CREATING' })}
+              />
+            )}
+            {entry.children?.map((child) => (
               <FileTreeItem key={child.path} entry={child} depth={depth + 1} onFileClick={onFileClick} activeFilePath={activeFilePath} activeToc={activeToc} />
             ))}
           </div>
@@ -158,9 +229,9 @@ function FileTreeItem({ entry, depth, onFileClick, activeFilePath, activeToc }: 
 
   return (
     <div>
-      <div className={`w-full flex items-center gap-1.5 text-[13px] rounded transition-colors group ${isActive ? 'bg-[var(--bg-hover)] text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
-        }`} style={{ paddingLeft: `${depth * 12 + (isActive && activeToc.length > 0 ? 8 : 26)}px`, paddingRight: '1px' }}>
-        {isActive && activeToc.length > 0 && (
+      <div className={`w-full flex items-center gap-1.5 text-[13px] rounded transition-colors group ${isActiveFile ? 'bg-[var(--bg-hover)] text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
+        }`} style={{ paddingLeft: `${depth * 12 + (isActiveFile && activeToc.length > 0 ? 8 : 26)}px`, paddingRight: '1px' }}>
+        {isActiveFile && activeToc.length > 0 && (
           <button onClick={() => setIsTocOpen(!isTocOpen)} className="p-1 rounded hover:bg-[var(--border-default)]">
             <svg width="10" height="10" viewBox="0 0 12 12" className={`transition-transform flex-shrink-0 text-[var(--text-dim)] ${isTocOpen ? 'rotate-90' : ''}`} fill="currentColor">
               <path d="M4 2l4 4-4 4z" />
@@ -179,7 +250,7 @@ function FileTreeItem({ entry, depth, onFileClick, activeFilePath, activeToc }: 
           <span className="truncate">{entry.name}</span>
         </button>
       </div>
-      {isActive && isTocOpen && activeToc.length > 0 && (
+      {isActiveFile && isTocOpen && activeToc.length > 0 && (
         <div className="mt-0.5">
           {activeToc.map((toc) => (
             <button

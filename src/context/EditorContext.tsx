@@ -20,6 +20,8 @@ const initialState: AppState = {
   activeToc: [],
   typewriterMode: false,
   focusMode: 'none',
+  activeExplorerPath: null,
+  showEmptyFolders: true,
 }
 
 // ============================================================
@@ -42,9 +44,12 @@ function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'OPEN_FILE': {
       const { filePath, fileName, content } = action.payload
+      const sep = filePath.includes('/') ? '/' : '\\'
+      const dirPath = filePath.substring(0, filePath.lastIndexOf(sep))
+      
       const existingTab = state.tabs.find((t) => t.filePath === filePath)
       if (existingTab) {
-        return { ...state, activeTabId: existingTab.id }
+        return { ...state, activeTabId: existingTab.id, activeExplorerPath: dirPath }
       }
       const newTab = {
         id: crypto.randomUUID(),
@@ -53,7 +58,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         mode: 'seamless' as EditorMode,
         refreshCounter: 0,
       }
-      return { ...state, tabs: [...state.tabs, newTab], activeTabId: newTab.id }
+      return { ...state, tabs: [...state.tabs, newTab], activeTabId: newTab.id, activeExplorerPath: dirPath }
     }
     case 'CLOSE_TAB': {
       const { tabId } = action.payload
@@ -66,8 +71,15 @@ function appReducer(state: AppState, action: AppAction): AppState {
       }
       return { ...state, tabs: newTabs, activeTabId: newActiveId }
     }
-    case 'SET_ACTIVE_TAB':
-      return { ...state, activeTabId: action.payload.tabId }
+    case 'SET_ACTIVE_TAB': {
+      const targetTab = state.tabs.find(t => t.id === action.payload.tabId)
+      let dirPath = state.activeExplorerPath
+      if (targetTab) {
+        const sep = targetTab.filePath.includes('/') ? '/' : '\\'
+        dirPath = targetTab.filePath.substring(0, targetTab.filePath.lastIndexOf(sep))
+      }
+      return { ...state, activeTabId: action.payload.tabId, activeExplorerPath: dirPath }
+    }
     case 'UPDATE_CONTENT': {
       const { tabId, content } = action.payload
       return {
@@ -84,9 +96,11 @@ function appReducer(state: AppState, action: AppAction): AppState {
         t.id === action.payload.tabId ? { ...t, isModified: false } : t
       )}
     case 'START_CREATING':
-      return { ...state, creating: { type: action.payload.itemType } }
+      return { ...state, creating: { type: action.payload.itemType, targetPath: action.payload.targetPath } }
     case 'STOP_CREATING':
       return { ...state, creating: null }
+    case 'SET_ACTIVE_EXPLORER_PATH':
+      return { ...state, activeExplorerPath: action.payload.path }
     case 'SET_THEME':
       return { ...state, theme: action.payload.theme }
     case 'SET_TAB_MODE':
@@ -109,6 +123,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, typewriterMode: action.payload.enabled }
     case 'SET_FOCUS_MODE':
       return { ...state, focusMode: action.payload.mode }
+    case 'SET_SHOW_EMPTY_FOLDERS':
+      return { ...state, showEmptyFolders: action.payload.enabled }
     default:
       return state
   }
@@ -125,9 +141,11 @@ interface EditorContextValue {
   openFolder: () => Promise<void>
   openFileViaDialog: () => Promise<void>
   saveActiveFileAs: () => Promise<void>
-  createFile: (fileName: string) => Promise<void>
-  createFolder: (folderName: string) => Promise<void>
+  createFile: (fileName: string, targetPath: string) => Promise<void>
+  createFolder: (folderName: string, targetPath: string) => Promise<void>
   refreshFileTree: () => Promise<void>
+  startCreating: (type: 'file' | 'folder') => void
+  setActiveExplorerPath: (path: string | null) => void
   setTheme: (theme: ThemeMode) => Promise<void>
   setTabMode: (tabId: string, mode: EditorMode) => void
   refreshTab: (tabId: string) => void
@@ -136,6 +154,7 @@ interface EditorContextValue {
   setWordLimit: (limit: WordLimit) => void
   setTypewriterMode: (enabled: boolean) => Promise<void>
   setFocusMode: (mode: FocusMode) => Promise<void>
+  setShowEmptyFolders: (enabled: boolean) => Promise<void>
 }
 
 const EditorContext = createContext<EditorContextValue | null>(null)
@@ -163,6 +182,9 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
 
         const savedFocusMode = await window.api.storeGet('focusMode') as FocusMode | undefined
         dispatch({ type: 'SET_FOCUS_MODE', payload: { mode: savedFocusMode || 'none' } })
+
+        const savedEmptyFolders = await window.api.storeGet('showEmptyFolders') as boolean | undefined
+        dispatch({ type: 'SET_SHOW_EMPTY_FOLDERS', payload: { enabled: savedEmptyFolders !== false } })
 
         const lastFolder = await window.api.storeGet('lastFolderPath') as string | undefined
         if (lastFolder) {
@@ -274,16 +296,18 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
   }, [state.tabs, state.activeTabId, state.folderPath])
 
   // --- Создать .md файл ---
-  const createFile = useCallback(async (fileName: string) => {
-    if (!state.folderPath) return
+  const createFile = useCallback(async (fileName: string, targetPath: string) => {
     try {
       const fullName = fileName.endsWith('.md') ? fileName : fileName + '.md'
-      const sep = state.folderPath.includes('/') ? '/' : '\\'
-      const filePath = state.folderPath + sep + fullName
+      const sep = targetPath.includes('/') ? '/' : '\\'
+      const filePath = targetPath + sep + fullName
       await window.api.writeFile(filePath, '')
       dispatch({ type: 'OPEN_FILE', payload: { filePath, fileName: fullName, content: '' } })
-      const fileTree: FileEntry[] = await window.api.readDir(state.folderPath)
-      dispatch({ type: 'SET_FILE_TREE', payload: { folderPath: state.folderPath, fileTree } })
+      
+      if (state.folderPath) {
+        const fileTree: FileEntry[] = await window.api.readDir(state.folderPath)
+        dispatch({ type: 'SET_FILE_TREE', payload: { folderPath: state.folderPath, fileTree } })
+      }
       dispatch({ type: 'STOP_CREATING' })
     } catch (err) {
       console.error('Ошибка создания файла:', err)
@@ -292,14 +316,16 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
   }, [state.folderPath])
 
   // --- Создать подпапку ---
-  const createFolder = useCallback(async (folderName: string) => {
-    if (!state.folderPath) return
+  const createFolder = useCallback(async (folderName: string, targetPath: string) => {
     try {
-      const sep = state.folderPath.includes('/') ? '/' : '\\'
-      const dirPath = state.folderPath + sep + folderName
+      const sep = targetPath.includes('/') ? '/' : '\\'
+      const dirPath = targetPath + sep + folderName
       await window.api.createDir(dirPath)
-      const fileTree: FileEntry[] = await window.api.readDir(state.folderPath)
-      dispatch({ type: 'SET_FILE_TREE', payload: { folderPath: state.folderPath, fileTree } })
+      
+      if (state.folderPath) {
+        const fileTree: FileEntry[] = await window.api.readDir(state.folderPath)
+        dispatch({ type: 'SET_FILE_TREE', payload: { folderPath: state.folderPath, fileTree } })
+      }
       dispatch({ type: 'STOP_CREATING' })
     } catch (err) {
       console.error('Ошибка создания папки:', err)
@@ -362,6 +388,24 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: 'SET_WORD_LIMIT', payload: limit })
   }, [])
 
+  // --- Начать создание элемента ---
+  const startCreating = useCallback((type: 'file' | 'folder') => {
+    if (!state.folderPath) return
+    const targetPath = state.activeExplorerPath || state.folderPath
+    dispatch({ type: 'START_CREATING', payload: { itemType: type, targetPath } })
+  }, [state.activeExplorerPath, state.folderPath])
+
+  // --- Установить активную директорию ---
+  const setActiveExplorerPath = useCallback((path: string | null) => {
+    dispatch({ type: 'SET_ACTIVE_EXPLORER_PATH', payload: { path } })
+  }, [])
+
+  // --- Установить видимость пустых папок ---
+  const setShowEmptyFolders = useCallback(async (enabled: boolean) => {
+    dispatch({ type: 'SET_SHOW_EMPTY_FOLDERS', payload: { enabled } })
+    try { await window.api.storeSet('showEmptyFolders', enabled) } catch (e) { /* ignore */ }
+  }, [])
+
   // ============================================================
   // Автосохранение: debounce 5 сек после последнего изменения
   // ============================================================
@@ -403,9 +447,10 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       openFile, saveActiveFile, openFolder,
       openFileViaDialog, saveActiveFileAs,
       createFile, createFolder, refreshFileTree,
+      startCreating, setActiveExplorerPath,
       setTheme, setTabMode, refreshTab,
       setAutosave, setShowStats, setWordLimit,
-      setTypewriterMode, setFocusMode,
+      setTypewriterMode, setFocusMode, setShowEmptyFolders
     }}>
       {children}
     </EditorContext.Provider>
