@@ -30,6 +30,8 @@ import { foldingPlugin } from '../editor/foldingPlugin'
 import { HeadingView } from '../editor/headingView'
 import { interactivePlugin } from '../editor/interactivePlugin'
 import { focusModePlugin } from '../editor/focusModePlugin'
+import { toggleMark } from 'prosemirror-commands'
+import { schema } from '../editor/schema'
 
 // Inject CSS один раз
 let styleInjected = false
@@ -85,11 +87,12 @@ class MathInlinePreviewView implements NodeView {
 }
 
 export function MarkdownEditor() {
-  const { state, dispatch } = useEditor()
+  const { state, dispatch, setTextZoom } = useEditor()
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const [editorView, setEditorView] = useState<EditorView | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
 
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
   const content = activeTab?.content || ''
@@ -157,16 +160,16 @@ export function MarkdownEditor() {
   // ============================================================
   useEffect(() => {
     if (!editorRef.current || !activeTab) return
-    if (activeTab.mode === 'raw') return // Raw = textarea, не ProseMirror
+    if (state.editorMode === 'raw') return // Raw = textarea, не ProseMirror
 
     injectStyles()
     if (viewRef.current) { viewRef.current.destroy(); viewRef.current = null }
-    console.log('[EDITOR] Creating ProseMirror for tab:', activeTab.id, 'mode:', activeTab.mode)
+    console.log('[EDITOR] Creating ProseMirror for tab:', activeTab.id, 'mode:', state.editorMode)
 
     const tabId = activeTab.id
     const initialContent = activeTab.content || ''
     const doc = parseMarkdown(initialContent)
-    const isPreview = activeTab.mode === 'preview'
+    const isPreview = state.editorMode === 'preview'
 
     // Плагин Tab для таблиц
     const tabPlugin = keymap({
@@ -351,8 +354,23 @@ export function MarkdownEditor() {
     setEditorView(view)
     if (!isPreview) view.focus()
 
-    return () => { view.destroy(); viewRef.current = null; setEditorView(null) }
-  }, [activeTab?.id, activeTab?.mode, activeTab?.refreshCounter])
+    // Восстановить позицию прокрутки (#6)
+    requestAnimationFrame(() => {
+      const scrollContainer = view.dom.closest('.overflow-auto') as HTMLElement
+      if (scrollContainer && activeTab.scrollTop > 0) {
+        scrollContainer.scrollTop = activeTab.scrollTop
+      }
+    })
+
+    return () => {
+      // Сохранить позицию прокрутки при размонтировании
+      const scrollContainer = view.dom.closest('.overflow-auto') as HTMLElement
+      if (scrollContainer) {
+        dispatchRef.current({ type: 'SAVE_SCROLL_POSITION', payload: { tabId, scrollTop: scrollContainer.scrollTop } })
+      }
+      view.destroy(); viewRef.current = null; setEditorView(null)
+    }
+  }, [activeTab?.id, state.editorMode, activeTab?.refreshCounter])
 
   // --- Обновление класса is-over-limit ---
   useEffect(() => {
@@ -418,7 +436,7 @@ export function MarkdownEditor() {
   // ============================================================
   // Raw-режим — textarea
   // ============================================================
-  if (activeTab.mode === 'raw') {
+  if (state.editorMode === 'raw') {
     return (
       <div className="flex-1 overflow-auto bg-[var(--bg-base)]">
         <textarea
@@ -426,7 +444,7 @@ export function MarkdownEditor() {
           className="w-full h-full resize-none outline-none bg-transparent text-[var(--editor-text)] p-6"
           style={{
             fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
-            fontSize: '14px',
+            fontSize: `${14 * state.textZoom / 100}px`,
             lineHeight: '1.6',
             maxWidth: '860px',
             margin: '0 auto',
@@ -451,19 +469,73 @@ export function MarkdownEditor() {
     : state.focusMode === 'sentence' ? 'focus-mode-sentence'
       : state.focusMode === 'lines' ? 'focus-mode-lines' : ''
 
+  // --- Контекстное меню форматирования ---
+  const formatItems = [
+    { label: 'Жирный', hotkey: 'Ctrl+B', command: 'strong' },
+    { label: 'Курсив', hotkey: 'Ctrl+I', command: 'em' },
+    { label: 'Код', hotkey: 'Ctrl+E', command: 'code' },
+    { label: 'Зачёркнутый', hotkey: 'Ctrl+Shift+X', command: 's' },
+    { label: 'Выделение', hotkey: 'Ctrl+Shift+H', command: 'highlight' },
+  ]
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    if (state.editorMode !== 'seamless' || !editorView) return
+    e.preventDefault()
+    setCtxMenu({ x: e.clientX, y: e.clientY })
+  }
+
+  const applyFormat = (markName: string) => {
+    if (!editorView) return
+    const mark = (schema.marks as Record<string, unknown>)[markName]
+    if (mark) {
+      toggleMark(mark as import('prosemirror-model').MarkType)(editorView.state, editorView.dispatch)
+      editorView.focus()
+    }
+    setCtxMenu(null)
+  }
+
   return (
     <div
       className={`flex-1 overflow-auto bg-[var(--bg-base)] ${state.typewriterMode ? 'typewriter-mode' : ''} ${focusClass}`}
       style={{
+        ['--editor-font-size' as string]: `${15 * state.textZoom / 100}px`,
         maskImage: state.focusMode === 'lines' ? 'linear-gradient(to bottom, rgba(0, 0, 0, 0.3) calc(var(--focus-mask-y, 50%) - 50px), black calc(var(--focus-mask-y, 50%) - 30px), black calc(var(--focus-mask-y, 50%) + 30px), rgba(0, 0, 0, 0.3) calc(var(--focus-mask-y, 50%) + 50px))' : 'none',
         WebkitMaskImage: state.focusMode === 'lines' ? 'linear-gradient(to bottom, rgba(0, 0, 0, 0.3) calc(var(--focus-mask-y, 50%) - 50px), black calc(var(--focus-mask-y, 50%) - 30px), black calc(var(--focus-mask-y, 50%) + 30px), rgba(0, 0, 0, 0.3) calc(var(--focus-mask-y, 50%) + 50px))' : 'none',
         transition: 'mask-image 0.3s'
       }}
+      onWheel={(e) => {
+        if (e.ctrlKey) {
+          e.preventDefault()
+          setTextZoom(state.textZoom + (e.deltaY < 0 ? 10 : -10))
+        }
+      }}
+      onContextMenu={handleContextMenu}
+      onClick={() => setCtxMenu(null)}
     >
       <div
         ref={editorRef}
         className="h-full w-full"
       />
+
+      {/* Контекстное меню форматирования (#4) */}
+      {ctxMenu && (
+        <div
+          className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
+          style={{ top: ctxMenu.y, left: ctxMenu.x, minWidth: '180px' }}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          {formatItems.map((item) => (
+            <div
+              key={item.command}
+              className="menu-item enabled"
+              onClick={() => applyFormat(item.command)}
+            >
+              <span>{item.label}</span>
+              <span className="text-[11px] text-[var(--text-dim)]">{item.hotkey}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

@@ -4,7 +4,7 @@
 import { useEditor } from '../context/EditorContext'
 
 export function TabBar() {
-  const { state, dispatch } = useEditor()
+  const { state, dispatch, closeTab } = useEditor()
 
   if (state.tabs.length === 0) return null
 
@@ -35,9 +35,16 @@ export function TabBar() {
             <button
               onClick={(e) => {
                 e.stopPropagation()
-                dispatch({ type: 'CLOSE_TAB', payload: { tabId: tab.id } })
+                if (e.altKey) {
+                  // Alt+Click — закрыть все вкладки кроме текущей
+                  dispatch({ type: 'CLOSE_OTHER_TABS', payload: { tabId: tab.id } })
+                } else {
+                  // Обычный клик — закрыть эту вкладку (с проверкой несохранённых)
+                  closeTab(tab.id)
+                }
               }}
               className="ml-auto p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-active)] transition-all flex-shrink-0"
+              title="Alt+Click — закрыть другие"
             >
               <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <line x1="2" y1="2" x2="8" y2="8" />
@@ -50,3 +57,4 @@ export function TabBar() {
     </div>
   )
 }
+

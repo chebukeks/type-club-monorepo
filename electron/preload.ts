@@ -138,4 +138,25 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('app:open-files', subscription)
     return () => ipcRenderer.off('app:open-files', subscription)
   },
+
+  // ==========================================
+  // Диалог при выходе / закрытии вкладки
+  // ==========================================
+
+  /** Диалог подтверждения выхода с несохранёнными файлами */
+  confirmExit: (fileNames: string[]): Promise<'save' | 'discard' | 'cancel'> => {
+    return ipcRenderer.invoke('dialog:confirmExit', fileNames)
+  },
+
+  /** Подписка на событие попытки закрытия окна */
+  onBeforeClose: (callback: () => void) => {
+    const subscription = () => callback()
+    ipcRenderer.on('window:before-close', subscription)
+    return () => ipcRenderer.off('window:before-close', subscription)
+  },
+
+  /** Подтвердить закрытие окна (разрешить) */
+  confirmClose: () => {
+    ipcRenderer.send('window:confirm-close')
+  },
 })

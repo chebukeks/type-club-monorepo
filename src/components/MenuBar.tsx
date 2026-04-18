@@ -1,19 +1,22 @@
 import { useState, useRef, useEffect } from 'react'
 import { useEditor } from '../context/EditorContext'
 import { generateExportHtml } from '../editor/markdownConfig'
-import type { Tab, ThemeMode, EditorMode, FocusMode } from '../types'
+import type { Tab, ThemeMode, FocusMode } from '../types'
 
 export function MenuBar() {
   const {
     state, dispatch,
-    saveActiveFile, openFolder,
+    saveActiveFile, openFolder, openFile,
     openFileViaDialog, saveActiveFileAs,
     startCreating, startRenaming,
-    setTheme, setTabMode, refreshTab, setFocusMode,
+    setTheme, refreshTab, setFocusMode,
+    getRecentFiles, getRecentFolders, clearRecentFiles, clearRecentFolders,
   } = useEditor()
   const { activeTabId, tabs, folderPath, theme, focusMode } = state
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const [submenu, setSubmenu] = useState<string | null>(null)
+  const [recentFiles, setRecentFiles] = useState<string[]>([])
+  const [recentFolders, setRecentFolders] = useState<string[]>([])
   const menuRef = useRef<HTMLDivElement>(null)
 
   const activeTab = activeTabId ? tabs.find((t: Tab) => t.id === activeTabId) : null
@@ -59,10 +62,22 @@ export function MenuBar() {
           startRenaming(activeTab.filePath, 'file')
         }
       }
+      // Ctrl+Tab / Ctrl+Shift+Tab — переключение между вкладками
+      else if (ctrl && e.key === 'Tab') {
+        e.preventDefault()
+        const { tabs } = state
+        if (tabs.length < 2) return
+        const currentIndex = tabs.findIndex(t => t.id === activeTabId)
+        if (currentIndex === -1) return
+        const nextIndex = shift
+          ? (currentIndex - 1 + tabs.length) % tabs.length
+          : (currentIndex + 1) % tabs.length
+        dispatch({ type: 'SET_ACTIVE_TAB', payload: { tabId: tabs[nextIndex].id } })
+      }
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [saveActiveFile, saveActiveFileAs, openFileViaDialog, openFolder, folderPath, dispatch, activeTabId, activeTab, refreshTab, startRenaming, startCreating])
+  }, [saveActiveFile, saveActiveFileAs, openFileViaDialog, openFolder, folderPath, dispatch, activeTabId, activeTab, refreshTab, startRenaming, startCreating, state])
 
   const closeMenu = () => { setOpenMenu(null); setSubmenu(null) }
   const toggleMenu = (name: string) => {
@@ -93,8 +108,26 @@ export function MenuBar() {
   // Обработчики View
   const handleRefresh = () => { closeMenu(); if (activeTabId) refreshTab(activeTabId) }
   const handleSetTheme = (t: ThemeMode) => { closeMenu(); setTheme(t) }
-  const handleSetMode = (m: EditorMode) => { closeMenu(); if (activeTabId) setTabMode(activeTabId, m) }
   const handleSetFocusMode = (m: FocusMode) => { closeMenu(); setFocusMode(m) }
+
+  // Недавние файлы/папки — ленивая загрузка
+  const loadRecent = () => {
+    getRecentFiles().then(setRecentFiles)
+    getRecentFolders().then(setRecentFolders)
+  }
+  const handleOpenRecent = (filePath: string) => {
+    closeMenu()
+    const name = filePath.replace(/^.*[\\/]/, '') || 'untitled.md'
+    openFile(filePath, name)
+  }
+  const handleOpenRecentFolder = async (folderPath: string) => {
+    closeMenu()
+    try {
+      const fileTree = await window.api.readDir(folderPath)
+      dispatch({ type: 'SET_FILE_TREE', payload: { folderPath, fileTree } })
+      await window.api.storeSet('lastFolderPath', folderPath)
+    } catch (err) { /* ignore */ }
+  }
 
   const itemCls = (enabled: boolean) => `menu-item ${enabled ? 'enabled' : 'disabled'}`
 
@@ -126,6 +159,69 @@ export function MenuBar() {
             </div>
             <div className={itemCls(true)} onClick={handleOpenFolder}>
               <span>Открыть папку</span><span className="text-[11px] text-[var(--text-dim)]">Ctrl+Shift+O</span>
+            </div>
+            {sep}
+            {/* Недавние файлы */}
+            <div
+              className="menu-item enabled relative"
+              onMouseEnter={() => { setSubmenu('recentFiles'); loadRecent() }}
+              onMouseLeave={() => setSubmenu(null)}
+            >
+              <span>Недавние файлы</span>
+              <span className="text-[11px]">▸</span>
+              {submenu === 'recentFiles' && (
+                <div className="absolute left-full top-0 ml-0.5 w-72 py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50"
+                  onMouseEnter={() => setSubmenu('recentFiles')} onMouseLeave={() => setSubmenu(null)}
+                >
+                  {recentFiles.length === 0 ? (
+                    <div className="px-4 py-2 text-[12px] text-[var(--text-dim)] italic">Пусто</div>
+                  ) : (
+                    <>
+                      {recentFiles.map((fp) => (
+                        <div key={fp} className={`${itemCls(true)}`} onClick={() => handleOpenRecent(fp)}>
+                          <span className="truncate text-[12px]">{fp.replace(/^.*[\\/]/, '')}</span>
+                          <span className="text-[10px] text-[var(--text-dim)] truncate ml-auto" style={{ maxWidth: '140px' }}>{fp}</span>
+                        </div>
+                      ))}
+                      {sep}
+                      <div className={itemCls(true)} onClick={() => { clearRecentFiles(); setRecentFiles([]) }}>
+                        <span className="text-[var(--text-dim)]">Очистить</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+            {/* Недавние папки */}
+            <div
+              className="menu-item enabled relative"
+              onMouseEnter={() => { setSubmenu('recentFolders'); loadRecent() }}
+              onMouseLeave={() => setSubmenu(null)}
+            >
+              <span>Недавние папки</span>
+              <span className="text-[11px]">▸</span>
+              {submenu === 'recentFolders' && (
+                <div className="absolute left-full top-0 ml-0.5 w-72 py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50"
+                  onMouseEnter={() => setSubmenu('recentFolders')} onMouseLeave={() => setSubmenu(null)}
+                >
+                  {recentFolders.length === 0 ? (
+                    <div className="px-4 py-2 text-[12px] text-[var(--text-dim)] italic">Пусто</div>
+                  ) : (
+                    <>
+                      {recentFolders.map((fp) => (
+                        <div key={fp} className={`${itemCls(true)}`} onClick={() => handleOpenRecentFolder(fp)}>
+                          <span className="truncate text-[12px]">{fp.replace(/^.*[\\/]/, '')}</span>
+                          <span className="text-[10px] text-[var(--text-dim)] truncate ml-auto" style={{ maxWidth: '140px' }}>{fp}</span>
+                        </div>
+                      ))}
+                      {sep}
+                      <div className={itemCls(true)} onClick={() => { clearRecentFolders(); setRecentFolders([]) }}>
+                        <span className="text-[var(--text-dim)]">Очистить</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
             {sep}
             <div className={itemCls(!!activeTabId)} onClick={activeTabId ? handleSave : undefined}>
@@ -186,31 +282,6 @@ export function MenuBar() {
                   </div>
                   <div className={`${itemCls(true)} gap-2`} onClick={() => handleSetTheme('system')}>
                     <span>{theme === 'system' ? '●' : '○'} Системная</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Режим — подменю */}
-            <div
-              className="menu-item enabled relative"
-              onMouseEnter={() => setSubmenu('mode')}
-              onMouseLeave={() => setSubmenu(null)}
-            >
-              <span>Режим</span>
-              <span className="text-[11px]">▸</span>
-              {submenu === 'mode' && (
-                <div className="absolute left-full top-0 ml-0.5 w-44 py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50"
-                  onMouseEnter={() => setSubmenu('mode')} onMouseLeave={() => setSubmenu(null)}
-                >
-                  <div className={`${itemCls(!!activeTabId)} gap-2`} onClick={activeTabId ? () => handleSetMode('raw') : undefined}>
-                    <span>{activeTab?.mode === 'raw' ? '●' : '○'} Raw</span>
-                  </div>
-                  <div className={`${itemCls(!!activeTabId)} gap-2`} onClick={activeTabId ? () => handleSetMode('seamless') : undefined}>
-                    <span>{activeTab?.mode === 'seamless' ? '●' : '○'} Seamless</span>
-                  </div>
-                  <div className={`${itemCls(!!activeTabId)} gap-2`} onClick={activeTabId ? () => handleSetMode('preview') : undefined}>
-                    <span>{activeTab?.mode === 'preview' ? '●' : '○'} Preview</span>
                   </div>
                 </div>
               )}

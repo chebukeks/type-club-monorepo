@@ -184,6 +184,18 @@ function mathBlockRule(): InputRule {
 }
 
 // ============================================================
+// Типографика
+// ============================================================
+
+/** Автозамена `--` → `—` (длинное тире).
+ *  Ctrl+Z отменяет замену (встроенная поддержка InputRules). */
+function emDashRule(): InputRule {
+  return new InputRule(/--$/, (state, _match, start, end) => {
+    return state.tr.replaceWith(start, end, schema.text('—'))
+  })
+}
+
+// ============================================================
 // Экспорт
 // ============================================================
 
@@ -237,6 +249,9 @@ export function getInputRulesPlugin(): Plugin {
         /\|\|([^|]+)\|\|$/,
         schema.marks.spoiler
       ),
+
+      // Типографика: -- → —
+      emDashRule(),
 
       // Формулы
       singleMathInlineRule(),

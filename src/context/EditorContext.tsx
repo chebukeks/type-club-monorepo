@@ -23,6 +23,8 @@ const initialState: AppState = {
   activeExplorerPath: null,
   showEmptyFolders: true,
   renaming: null,
+  editorMode: 'seamless',
+  textZoom: 100,
 }
 
 // ============================================================
@@ -56,8 +58,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
         id: crypto.randomUUID(),
         filePath, fileName, content,
         isModified: false,
-        mode: 'seamless' as EditorMode,
         refreshCounter: 0,
+        scrollTop: 0,
       }
       return { ...state, tabs: [...state.tabs, newTab], activeTabId: newTab.id, activeExplorerPath: dirPath }
     }
@@ -124,10 +126,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, activeExplorerPath: action.payload.path }
     case 'SET_THEME':
       return { ...state, theme: action.payload.theme }
-    case 'SET_TAB_MODE':
-      return { ...state, tabs: state.tabs.map((t) =>
-        t.id === action.payload.tabId ? { ...t, mode: action.payload.mode } : t
-      )}
+    case 'SET_EDITOR_MODE':
+      return { ...state, editorMode: action.payload.mode }
     case 'REFRESH_TAB':
       return { ...state, tabs: state.tabs.map((t) =>
         t.id === action.payload.tabId ? { ...t, refreshCounter: t.refreshCounter + 1 } : t
@@ -146,6 +146,17 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, focusMode: action.payload.mode }
     case 'SET_SHOW_EMPTY_FOLDERS':
       return { ...state, showEmptyFolders: action.payload.enabled }
+    case 'CLOSE_OTHER_TABS': {
+      const keepTab = state.tabs.find(t => t.id === action.payload.tabId)
+      if (!keepTab) return state
+      return { ...state, tabs: [keepTab], activeTabId: keepTab.id }
+    }
+    case 'SAVE_SCROLL_POSITION':
+      return { ...state, tabs: state.tabs.map(t =>
+        t.id === action.payload.tabId ? { ...t, scrollTop: action.payload.scrollTop } : t
+      )}
+    case 'SET_TEXT_ZOOM':
+      return { ...state, textZoom: action.payload.zoom }
     default:
       return state
   }
@@ -172,8 +183,9 @@ interface EditorContextValue {
   showInExplorer: (path: string) => void
   startRenaming: (path: string, type: 'file' | 'folder') => void
   moveItem: (sourcePath: string, targetDirPath: string) => Promise<void>
+  closeTab: (tabId: string) => Promise<void>
   setTheme: (theme: ThemeMode) => Promise<void>
-  setTabMode: (tabId: string, mode: EditorMode) => void
+  setEditorMode: (mode: EditorMode) => Promise<void>
   refreshTab: (tabId: string) => void
   setAutosave: (enabled: boolean) => Promise<void>
   setShowStats: (enabled: boolean) => Promise<void>
@@ -181,6 +193,11 @@ interface EditorContextValue {
   setTypewriterMode: (enabled: boolean) => Promise<void>
   setFocusMode: (mode: FocusMode) => Promise<void>
   setShowEmptyFolders: (enabled: boolean) => Promise<void>
+  setTextZoom: (zoom: number) => Promise<void>
+  getRecentFiles: () => Promise<string[]>
+  getRecentFolders: () => Promise<string[]>
+  clearRecentFiles: () => Promise<void>
+  clearRecentFolders: () => Promise<void>
 }
 
 const EditorContext = createContext<EditorContextValue | null>(null)
@@ -211,6 +228,12 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
 
         const savedEmptyFolders = await window.api.storeGet('showEmptyFolders') as boolean | undefined
         dispatch({ type: 'SET_SHOW_EMPTY_FOLDERS', payload: { enabled: savedEmptyFolders !== false } })
+
+        const savedEditorMode = await window.api.storeGet('editorMode') as EditorMode | undefined
+        if (savedEditorMode) dispatch({ type: 'SET_EDITOR_MODE', payload: { mode: savedEditorMode } })
+
+        const savedTextZoom = await window.api.storeGet('textZoom') as number | undefined
+        if (savedTextZoom) dispatch({ type: 'SET_TEXT_ZOOM', payload: { zoom: savedTextZoom } })
 
         const lastFolder = await window.api.storeGet('lastFolderPath') as string | undefined
         if (lastFolder) {
@@ -266,13 +289,48 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     return unsubscribe
   }, [])
 
+  // --- Недавние файлы ---
+  const addRecentFile = useCallback(async (filePath: string) => {
+    try {
+      const recent = (await window.api.storeGet('recentFiles') as string[] | undefined) || []
+      const updated = [filePath, ...recent.filter(f => f !== filePath)].slice(0, 10)
+      await window.api.storeSet('recentFiles', updated)
+    } catch (e) { /* ignore */ }
+  }, [])
+  const getRecentFiles = useCallback(async () => {
+    try {
+      return (await window.api.storeGet('recentFiles') as string[] | undefined) || []
+    } catch { return [] }
+  }, [])
+  const clearRecentFiles = useCallback(async () => {
+    try { await window.api.storeSet('recentFiles', []) } catch { /* ignore */ }
+  }, [])
+
+  // --- Недавние папки ---
+  const addRecentFolder = useCallback(async (folderPath: string) => {
+    try {
+      const recent = (await window.api.storeGet('recentFolders') as string[] | undefined) || []
+      const updated = [folderPath, ...recent.filter(f => f !== folderPath)].slice(0, 10)
+      await window.api.storeSet('recentFolders', updated)
+    } catch (e) { /* ignore */ }
+  }, [])
+  const getRecentFolders = useCallback(async () => {
+    try {
+      return (await window.api.storeGet('recentFolders') as string[] | undefined) || []
+    } catch { return [] }
+  }, [])
+  const clearRecentFolders = useCallback(async () => {
+    try { await window.api.storeSet('recentFolders', []) } catch { /* ignore */ }
+  }, [])
+
   // --- Открыть файл ---
   const openFile = useCallback(async (filePath: string, fileName: string) => {
     try {
       const content = await window.api.readFile(filePath)
       dispatch({ type: 'OPEN_FILE', payload: { filePath, fileName, content } })
+      addRecentFile(filePath)
     } catch (err) { /* ignore */ }
-  }, [])
+  }, [addRecentFile])
 
   // --- Сохранить ---
   const saveActiveFile = useCallback(async () => {
@@ -292,8 +350,9 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       const fileTree: FileEntry[] = await window.api.readDir(folderPath)
       dispatch({ type: 'SET_FILE_TREE', payload: { folderPath, fileTree } })
       await window.api.storeSet('lastFolderPath', folderPath)
+      addRecentFolder(folderPath)
     } catch (err) { /* ignore */ }
-  }, [])
+  }, [addRecentFolder])
 
   // --- Открыть файл через диалог ---
   const openFileViaDialog = useCallback(async () => {
@@ -375,9 +434,17 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     try { await window.api.storeSet('theme', theme) } catch (e) { /* ignore */ }
   }, [])
 
-  // --- Установить режим вкладки ---
-  const setTabMode = useCallback((tabId: string, mode: EditorMode) => {
-    dispatch({ type: 'SET_TAB_MODE', payload: { tabId, mode } })
+  // --- Установить режим редактирования (глобальный) ---
+  const setEditorMode = useCallback(async (mode: EditorMode) => {
+    dispatch({ type: 'SET_EDITOR_MODE', payload: { mode } })
+    try { await window.api.storeSet('editorMode', mode) } catch (e) { /* ignore */ }
+  }, [])
+
+  // --- Масштаб текста ---
+  const setTextZoom = useCallback(async (zoom: number) => {
+    const clamped = Math.max(50, Math.min(200, zoom))
+    dispatch({ type: 'SET_TEXT_ZOOM', payload: { zoom: clamped } })
+    try { await window.api.storeSet('textZoom', clamped) } catch (e) { /* ignore */ }
   }, [])
 
   // --- Обновить вкладку ---
@@ -502,7 +569,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   // ============================================================
-  // Автосохранение: debounce 5 сек после последнего изменения
+  // Автосохранение: debounce 1 сек после последнего изменения
   // ============================================================
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveActiveFileRef = useRef(saveActiveFile)
@@ -516,7 +583,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
 
     autosaveTimerRef.current = setTimeout(() => {
       saveActiveFileRef.current()
-    }, 5000)
+    }, 1000)
 
     return () => {
       if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
@@ -536,6 +603,73 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('blur', handleBlur)
   }, [state.autosave, state.tabs, state.activeTabId])
 
+  // --- Автосохранение при переключении вкладки ---
+  const prevActiveTabIdRef = useRef<string | null>(state.activeTabId)
+  useEffect(() => {
+    if (prevActiveTabIdRef.current && prevActiveTabIdRef.current !== state.activeTabId && state.autosave) {
+      const prevTab = state.tabs.find(t => t.id === prevActiveTabIdRef.current)
+      if (prevTab?.isModified) {
+        // Сохраняем предыдущую вкладку
+        void (async () => {
+          try {
+            await window.api.writeFile(prevTab.filePath, prevTab.content)
+            dispatch({ type: 'MARK_SAVED', payload: { tabId: prevTab.id } })
+          } catch (err) { console.error('Ошибка автосохранения при переключении:', err) }
+        })()
+      }
+    }
+    prevActiveTabIdRef.current = state.activeTabId
+  }, [state.activeTabId, state.autosave])
+
+  // --- Диалог при закрытии окна (#16) ---
+  const stateRef = useRef(state)
+  stateRef.current = state
+  useEffect(() => {
+    const unsubscribe = window.api.onBeforeClose(async () => {
+      const currentState = stateRef.current
+      const modifiedTabs = currentState.tabs.filter(t => t.isModified)
+      if (modifiedTabs.length === 0) {
+        window.api.confirmClose()
+        return
+      }
+      const fileNames = modifiedTabs.map(t => t.fileName)
+      const result = await window.api.confirmExit(fileNames)
+      if (result === 'save') {
+        // Сохраняем все несохранённые файлы
+        for (const tab of modifiedTabs) {
+          try {
+            await window.api.writeFile(tab.filePath, tab.content)
+          } catch (err) { console.error('Ошибка сохранения:', err) }
+        }
+        window.api.confirmClose()
+      } else if (result === 'discard') {
+        window.api.confirmClose()
+      }
+      // 'cancel' — ничего не делаем, окно не закроется
+    })
+    return unsubscribe
+  }, [])
+
+  // --- Закрытие вкладки с проверкой несохранённых изменений ---
+  const closeTab = useCallback(async (tabId: string) => {
+    const tab = state.tabs.find(t => t.id === tabId)
+    if (tab?.isModified) {
+      const result = await window.api.confirmExit([tab.fileName])
+      if (result === 'save') {
+        try {
+          await window.api.writeFile(tab.filePath, tab.content)
+          dispatch({ type: 'MARK_SAVED', payload: { tabId: tab.id } })
+        } catch (err) { console.error('Ошибка сохранения:', err) }
+        dispatch({ type: 'CLOSE_TAB', payload: { tabId } })
+      } else if (result === 'discard') {
+        dispatch({ type: 'CLOSE_TAB', payload: { tabId } })
+      }
+      // 'cancel' — ничего не делаем
+    } else {
+      dispatch({ type: 'CLOSE_TAB', payload: { tabId } })
+    }
+  }, [state.tabs])
+
   return (
     <EditorContext.Provider value={{
       state, dispatch,
@@ -544,9 +678,12 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       createFile, createFolder, refreshFileTree,
       startCreating, setActiveExplorerPath,
       renameItem, deleteItem, showInExplorer, startRenaming, moveItem,
-      setTheme, setTabMode, refreshTab,
+      closeTab,
+      setTheme, setEditorMode, refreshTab,
       setAutosave, setShowStats, setWordLimit,
-      setTypewriterMode, setFocusMode, setShowEmptyFolders
+      setTypewriterMode, setFocusMode, setShowEmptyFolders,
+      setTextZoom,
+      getRecentFiles, getRecentFolders, clearRecentFiles, clearRecentFolders
     }}>
       {children}
     </EditorContext.Provider>

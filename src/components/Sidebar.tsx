@@ -6,7 +6,8 @@ import { useEditor } from '../context/EditorContext'
 import type { FileEntry, TocItem } from '../types'
 
 export function Sidebar() {
-  const { state, dispatch, openFolder, openFile, createFile, createFolder, setActiveExplorerPath, refreshFileTree, setShowEmptyFolders, startRenaming, deleteItem, showInExplorer, moveItem } = useEditor()
+  const { state, dispatch, openFolder, openFile, createFile, createFolder, startCreating, setActiveExplorerPath, refreshFileTree, setShowEmptyFolders, startRenaming, deleteItem, showInExplorer, moveItem } = useEditor()
+  const [copied, setCopied] = useState(false)
 
   const filterTree = (nodes: FileEntry[]): FileEntry[] => {
     return nodes.reduce<FileEntry[]>((acc, node) => {
@@ -51,8 +52,18 @@ export function Sidebar() {
         className="flex items-center justify-between border-b border-[var(--border-default)]"
         style={{ height: '36px', paddingLeft: '16px', paddingRight: '12px' }}
       >
-        <span className="text-[11px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">
-          Проводник
+        <span
+          className="text-[11px] font-semibold uppercase tracking-widest text-[var(--text-dim)] truncate cursor-pointer select-none"
+          title={state.folderPath || 'Проводник'}
+          onClick={() => {
+            if (state.folderPath) {
+              navigator.clipboard.writeText(state.folderPath)
+              setCopied(true)
+              setTimeout(() => setCopied(false), 1500)
+            }
+          }}
+        >
+          {copied ? 'Скопировано!' : (state.folderPath ? state.folderPath.replace(/^.*[\\/]/, '') : 'Проводник')}
         </span>
         <div className="flex items-center gap-1.5">
           <button
@@ -94,6 +105,13 @@ export function Sidebar() {
       </div>
       <div className="flex-1 overflow-y-auto py-2" 
         onClick={(e) => { if (e.target === e.currentTarget) setActiveExplorerPath(null) }}
+        onContextMenu={(e) => {
+          // ПКМ по пустому месту в Sidebar (#17)
+          if (e.target === e.currentTarget && state.folderPath) {
+            e.preventDefault()
+            setContextMenu({ x: e.clientX, y: e.clientY, path: '__empty__', type: 'folder', name: '' })
+          }
+        }}
         onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
         onDrop={(e) => {
           e.preventDefault()
@@ -139,17 +157,30 @@ export function Sidebar() {
           style={{ top: contextMenu.y, left: contextMenu.x, minWidth: '160px' }}
           onContextMenu={(e) => e.preventDefault()}
         >
-          <button className="menu-item enabled" onClick={() => { startRenaming(contextMenu.path, contextMenu.type); setContextMenu(null) }}>
-            Переименовать
-          </button>
-          <div className="border-t border-[var(--border-strong)] my-1" />
-          <button className="menu-item enabled" style={{ color: 'var(--text-danger)' }} onClick={() => { deleteItem(contextMenu.path, contextMenu.type, contextMenu.name); setContextMenu(null) }}>
-            Удалить
-          </button>
-           <div className="border-t border-[var(--border-strong)] my-1" />
-          <button className="menu-item enabled" onClick={() => { showInExplorer(contextMenu.path); setContextMenu(null) }}>
-            Открыть в проводнике
-          </button>
+          {contextMenu.path === '__empty__' ? (
+            <>
+              <button className="menu-item enabled" onClick={() => { startCreating('file'); setContextMenu(null) }}>
+                Создать файл
+              </button>
+              <button className="menu-item enabled" onClick={() => { startCreating('folder'); setContextMenu(null) }}>
+                Создать папку
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="menu-item enabled" onClick={() => { startRenaming(contextMenu.path, contextMenu.type); setContextMenu(null) }}>
+                Переименовать
+              </button>
+              <div className="border-t border-[var(--border-strong)] my-1" />
+              <button className="menu-item enabled" style={{ color: 'var(--text-danger)' }} onClick={() => { deleteItem(contextMenu.path, contextMenu.type, contextMenu.name); setContextMenu(null) }}>
+                Удалить
+              </button>
+              <div className="border-t border-[var(--border-strong)] my-1" />
+              <button className="menu-item enabled" onClick={() => { showInExplorer(contextMenu.path); setContextMenu(null) }}>
+                Открыть в проводнике
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>

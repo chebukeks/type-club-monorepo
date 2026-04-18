@@ -35,10 +35,10 @@ export interface Tab {
   fileName: string;
   content: string;
   isModified: boolean;
-  /** Режим редактирования вкладки */
-  mode: EditorMode;
   /** Счётчик для принудительного обновления */
   refreshCounter: number;
+  /** Позиция прокрутки (для восстановления при переключении вкладок) */
+  scrollTop: number;
 }
 
 /** Тип ограничения (символы или слова) */
@@ -86,6 +86,10 @@ export interface AppState {
   focusMode: FocusMode;
   /** Показывать пустые папки */
   showEmptyFolders: boolean;
+  /** Глобальный режим редактирования */
+  editorMode: EditorMode;
+  /** Масштаб текста в процентах (50–200) */
+  textZoom: number;
 }
 
 /** Действия для редьюсера состояния */
@@ -103,7 +107,7 @@ export type AppAction =
   | { type: 'RENAME_TAB_PATHS'; payload: { oldPath: string; newPath: string } }
   | { type: 'SET_ACTIVE_EXPLORER_PATH'; payload: { path: string | null } }
   | { type: 'SET_THEME'; payload: { theme: ThemeMode } }
-  | { type: 'SET_TAB_MODE'; payload: { tabId: string; mode: EditorMode } }
+  | { type: 'SET_EDITOR_MODE'; payload: { mode: EditorMode } }
   | { type: 'REFRESH_TAB'; payload: { tabId: string } }
   | { type: 'SET_AUTOSAVE'; payload: { enabled: boolean } }
   | { type: 'SET_SHOW_STATS'; payload: { enabled: boolean } }
@@ -111,7 +115,10 @@ export type AppAction =
   | { type: 'SET_ACTIVE_TOC'; payload: TocItem[] }
   | { type: 'SET_TYPEWRITER_MODE'; payload: { enabled: boolean } }
   | { type: 'SET_FOCUS_MODE'; payload: { mode: FocusMode } }
-  | { type: 'SET_SHOW_EMPTY_FOLDERS'; payload: { enabled: boolean } };
+  | { type: 'SET_SHOW_EMPTY_FOLDERS'; payload: { enabled: boolean } }
+  | { type: 'CLOSE_OTHER_TABS'; payload: { tabId: string } }
+  | { type: 'SAVE_SCROLL_POSITION'; payload: { tabId: string; scrollTop: number } }
+  | { type: 'SET_TEXT_ZOOM'; payload: { zoom: number } };
 
 /** API, доступный из Renderer-процесса через contextBridge */
 export interface IElectronAPI {
@@ -144,6 +151,12 @@ export interface IElectronAPI {
   getFilesToOpen: () => Promise<string[]>;
   /** Подписаться на открытие новых файлов (когда приложение уже запущен) */
   onOpenFiles: (callback: (paths: string[]) => void) => () => void;
+  /** Диалог подтверждения выхода с несохранёнными файлами */
+  confirmExit: (fileNames: string[]) => Promise<'save' | 'discard' | 'cancel'>;
+  /** Подписка на событие закрытия окна */
+  onBeforeClose: (callback: () => void) => () => void;
+  /** Подтвердить закрытие окна (разрешить) */
+  confirmClose: () => void;
 }
 
 declare global {

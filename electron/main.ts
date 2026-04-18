@@ -112,14 +112,20 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
   : RENDERER_DIST
 
 let win: BrowserWindow | null
+/** Флаг: разрешено ли закрытие окна (после подтверждения renderer) */
+let allowClose = false
 
 // ============================================================
 // Создание главного окна приложения
 // ============================================================
 function createWindow() {
+  // Восстановление размеров и положения окна из хранилища
+  const savedBounds = store.get('windowBounds') as { x?: number; y?: number; width?: number; height?: number; isMaximized?: boolean } | undefined
+
   win = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: savedBounds?.width || 1200,
+    height: savedBounds?.height || 800,
+    ...(savedBounds?.x !== undefined && savedBounds?.y !== undefined ? { x: savedBounds.x, y: savedBounds.y } : {}),
     minWidth: 800,
     minHeight: 500,
     frame: false,                     // Убираем системную рамку
@@ -134,6 +140,42 @@ function createWindow() {
       nodeIntegration: false,         // Запрет прямого доступа к Node.js
       spellcheck: store.get('spellcheck', true) as boolean,
     },
+  })
+
+  // Восстанавливаем полноэкранный режим
+  if (savedBounds?.isMaximized) {
+    win.maximize()
+  }
+
+  // --- Сохранение размеров окна с debounce ---
+  let boundsTimer: ReturnType<typeof setTimeout> | null = null
+  function saveBounds() {
+    if (!win) return
+    if (boundsTimer) clearTimeout(boundsTimer)
+    boundsTimer = setTimeout(() => {
+      if (!win) return
+      const isMaximized = win.isMaximized()
+      if (!isMaximized) {
+        const bounds = win.getBounds()
+        store.set('windowBounds', { ...bounds, isMaximized: false })
+      } else {
+        // Сохраняем только флаг максимизации, остальное оставляем как есть
+        const prev = store.get('windowBounds') as Record<string, unknown> | undefined
+        store.set('windowBounds', { ...(prev || {}), isMaximized: true })
+      }
+    }, 500)
+  }
+  win.on('resize', saveBounds)
+  win.on('move', saveBounds)
+  win.on('maximize', saveBounds)
+  win.on('unmaximize', saveBounds)
+
+  // --- Перехват закрытия окна (диалог при несохранённых файлах) ---
+  win.on('close', (e) => {
+    if (!allowClose && win) {
+      e.preventDefault()
+      win.webContents.send('window:before-close')
+    }
   })
 
   if (VITE_DEV_SERVER_URL) {
@@ -420,11 +462,36 @@ ipcMain.on('window:maximize', () => {
 ipcMain.on('window:close', () => win?.close())
 ipcMain.on('window:openExternal', (_event, url: string) => shell.openExternal(url))
 
+// Подтверждение закрытия окна от renderer
+ipcMain.on('window:confirm-close', () => {
+  allowClose = true
+  win?.close()
+})
+
 // ============================================================
 // IPC-хэндлеры для открытия файлов при старте
 // ============================================================
 ipcMain.handle('app:get-files-to-open', () => {
   return initialFiles
+})
+
+// ============================================================
+// Диалог подтверждения выхода с несохранёнными файлами
+// ============================================================
+ipcMain.handle('dialog:confirmExit', async (_event, fileNames: string[]): Promise<'save' | 'discard' | 'cancel'> => {
+  const fileList = fileNames.join('\n')
+  const result = await dialog.showMessageBox(win!, {
+    type: 'warning',
+    buttons: ['Сохранить', 'Без сохранения', 'Отмена'],
+    defaultId: 0,
+    cancelId: 2,
+    title: 'Несохранённые изменения',
+    message: 'У вас есть несохранённые изменения:',
+    detail: fileList,
+  })
+  if (result.response === 0) return 'save'
+  if (result.response === 1) return 'discard'
+  return 'cancel'
 })
 
 // ============================================================

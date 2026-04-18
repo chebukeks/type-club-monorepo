@@ -11,15 +11,17 @@ export function getEditorStyles(): string {
 
 .ProseMirror {
   font-family: 'Inter', 'SF Pro Text', -apple-system, sans-serif;
-  font-size: 15px;
+  font-size: var(--editor-font-size, 15px);
   line-height: 1.75;
   color: var(--editor-text);
   padding: 24px 48px;
+  padding-bottom: 70vh;
   max-width: 860px;
   margin: 0 auto;
   outline: none;
   min-height: 100%;
   caret-color: var(--editor-caret);
+  box-shadow: inset 1px 0 0 0 var(--border-subtle, rgba(128,128,128,0.12)), inset -1px 0 0 0 var(--border-subtle, rgba(128,128,128,0.12));
 
 }
 

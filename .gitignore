@@ -35,6 +35,7 @@ release/
 # Agent / AI
 .agent
 .gemini
+.qwen
 
 # Windows specific
 Thumbs.db

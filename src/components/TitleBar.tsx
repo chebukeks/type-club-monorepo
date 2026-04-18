@@ -1,22 +1,31 @@
 /**
  * TitleBar.tsx — Кастомная шапка окна (frameless window).
- * Содержит логотип, MenuBar, кнопки настроек/пользователя и кнопки управления окном.
+ * Содержит логотип, MenuBar, переключатель режимов и кнопки управления окном.
  */
 import { useState } from 'react'
 import { MenuBar } from './MenuBar'
 import { SettingsPopup } from './SettingsPopup'
+import { useEditor } from '../context/EditorContext'
+import type { EditorMode } from '../types'
+
+const modes: { key: EditorMode; label: string }[] = [
+  { key: 'raw', label: 'Raw' },
+  { key: 'seamless', label: 'Seamless' },
+  { key: 'preview', label: 'Preview' },
+]
 
 export function TitleBar() {
   const [showSettings, setShowSettings] = useState(false)
+  const { state, setEditorMode } = useEditor()
 
   return (
     <div
       className="flex items-center h-9 bg-[var(--bg-surface)] border-b border-[var(--border-default)] select-none"
       style={{ paddingLeft: '8px', paddingRight: '0' }}
     >
-      {/* Область перетаскивания окна */}
+      {/* Область перетаскивания окна — левая часть */}
       <div
-        className="flex-1 flex items-center h-full"
+        className="flex items-center h-full"
         style={{
           WebkitAppRegion: 'drag',
           paddingLeft: '12px',
@@ -34,7 +43,36 @@ export function TitleBar() {
         </div>
 
         {/* Интерактивное Меню */}
-        <MenuBar />
+        <div style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+          <MenuBar />
+        </div>
+      </div>
+
+      {/* Центральная часть — переключатель режимов */}
+      <div
+        className="flex-1 flex items-center justify-center h-full"
+        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+      >
+        <div
+          className="flex items-center rounded-md overflow-hidden border border-[var(--border-default)]"
+          style={{ WebkitAppRegion: 'no-drag', height: '22px' } as React.CSSProperties}
+        >
+          {modes.map((m) => (
+            <button
+              key={m.key}
+              onClick={() => setEditorMode(m.key)}
+              className="transition-colors text-[11px] font-medium tracking-wide"
+              style={{
+                padding: '0 10px',
+                height: '100%',
+                backgroundColor: state.editorMode === m.key ? 'var(--accent)' : 'transparent',
+                color: state.editorMode === m.key ? 'white' : 'var(--text-dim)',
+              }}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Кнопки: пользователь + настройки + управление окном */}
@@ -105,4 +143,3 @@ export function TitleBar() {
     </div>
   )
 }
-

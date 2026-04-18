@@ -28,8 +28,9 @@ export function StatsToast() {
     const chars = text.length
     const words = text ? text.split(/\s+/).filter(Boolean).length : 0
     const sentences = text ? (text.match(/[.!?]+(?:\s|$)/g) || []).length : 0
+    const paragraphs = text ? text.split(/\n\s*\n/).filter(p => p.trim().length > 0).length : 0
     const readingMinutes = Math.max(1, Math.ceil(words / 250))
-    return { chars, words, sentences, readingMinutes }
+    return { chars, words, sentences, paragraphs, readingMinutes }
   }, [activeTab?.content])
 
   const currentValue = wordLimit.type === 'chars' ? stats.chars : stats.words
@@ -125,6 +126,10 @@ export function StatsToast() {
             <div className="menu-item" style={{ cursor: 'default' }}>
               <span className="text-[var(--text-dim)]">Предложения</span>
               <span className="text-[var(--text-secondary)] tabular-nums">{stats.sentences.toLocaleString('ru-RU')}</span>
+            </div>
+            <div className="menu-item" style={{ cursor: 'default' }}>
+              <span className="text-[var(--text-dim)]">Абзацы</span>
+              <span className="text-[var(--text-secondary)] tabular-nums">{stats.paragraphs.toLocaleString('ru-RU')}</span>
             </div>
             <div className="menu-item" style={{ cursor: 'default' }}>
               <span className="text-[var(--text-dim)]">Чтение</span>
