@@ -157,6 +157,13 @@ function appReducer(state: AppState, action: AppAction): AppState {
       )}
     case 'SET_TEXT_ZOOM':
       return { ...state, textZoom: action.payload.zoom }
+    case 'REORDER_TABS': {
+      const { fromIndex, toIndex } = action.payload
+      const newTabs = [...state.tabs]
+      const [moved] = newTabs.splice(fromIndex, 1)
+      newTabs.splice(toIndex, 0, moved)
+      return { ...state, tabs: newTabs }
+    }
     default:
       return state
   }

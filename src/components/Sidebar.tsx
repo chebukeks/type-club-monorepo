@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useEditor } from '../context/EditorContext'
 import type { FileEntry, TocItem } from '../types'
 
-export function Sidebar() {
+export function Sidebar({ width }: { width: number }) {
   const { state, dispatch, openFolder, openFile, createFile, createFolder, startCreating, setActiveExplorerPath, refreshFileTree, setShowEmptyFolders, startRenaming, deleteItem, showInExplorer, moveItem } = useEditor()
   const [copied, setCopied] = useState(false)
 
@@ -47,7 +47,7 @@ export function Sidebar() {
   }
 
   return (
-    <div className="w-60 min-w-[200px] max-w-[400px] bg-[var(--bg-surface)] border-r border-[var(--border-default)] flex flex-col h-full">
+    <div style={{ width: `${width}px`, minWidth: '140px', maxWidth: '500px' }} className="bg-[var(--bg-surface)] border-r border-[var(--border-default)] flex flex-col h-full flex-shrink-0">
       <div
         className="flex items-center justify-between border-b border-[var(--border-default)]"
         style={{ height: '36px', paddingLeft: '16px', paddingRight: '12px' }}
@@ -171,6 +171,29 @@ export function Sidebar() {
               <button className="menu-item enabled" onClick={() => { startRenaming(contextMenu.path, contextMenu.type); setContextMenu(null) }}>
                 Переименовать
               </button>
+              <button className="menu-item enabled" onClick={() => {
+                navigator.clipboard.writeText(contextMenu.path)
+                setContextMenu(null)
+              }}>
+                Копировать путь
+              </button>
+              {contextMenu.type === 'file' && (
+                <button className="menu-item enabled" onClick={async () => {
+                  try {
+                    const content = await window.api.readFile(contextMenu.path)
+                    const sep = contextMenu.path.includes('/') ? '/' : '\\'
+                    const ext = contextMenu.name.includes('.') ? contextMenu.name.substring(contextMenu.name.lastIndexOf('.')) : ''
+                    const baseName = ext ? contextMenu.name.substring(0, contextMenu.name.lastIndexOf('.')) : contextMenu.name
+                    const dir = contextMenu.path.substring(0, contextMenu.path.lastIndexOf(sep))
+                    const copyPath = dir + sep + baseName + ' копия' + ext
+                    await window.api.writeFile(copyPath, content)
+                    refreshFileTree()
+                  } catch (err) { console.error('Ошибка копированиея файла:', err) }
+                  setContextMenu(null)
+                }}>
+                  Создать копию
+                </button>
+              )}
               <div className="border-t border-[var(--border-strong)] my-1" />
               <button className="menu-item enabled" style={{ color: 'var(--text-danger)' }} onClick={() => { deleteItem(contextMenu.path, contextMenu.type, contextMenu.name); setContextMenu(null) }}>
                 Удалить

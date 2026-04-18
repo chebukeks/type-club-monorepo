@@ -368,10 +368,36 @@ const customKeymap = keymap({
   'Mod-y': redo,
 })
 
+// Команда: оборачивание выделенного текста в пару скобок/кавычек (#38)
+function wrapSelection(open: string, close: string): Command {
+  return (state, dispatch) => {
+    const { from, to } = state.selection
+    if (from === to) return false // нет выделения — пропустить
+
+    if (dispatch) {
+      const selectedText = state.doc.textBetween(from, to)
+      const tr = state.tr.replaceWith(from, to, schema.text(open + selectedText + close))
+      // Ставим курсор после закрывающей скобки
+      tr.setSelection(TextSelection.create(tr.doc, from + 1, from + 1 + selectedText.length))
+      dispatch(tr)
+    }
+    return true
+  }
+}
+
+/** Клавиши для оборачивания выделения (#38) */
+const bracketKeymap = keymap({
+  '(': wrapSelection('(', ')'),
+  '[': wrapSelection('[', ']'),
+  '{': wrapSelection('{', '}'),
+  '"': wrapSelection('"', '"'),
+  "'": wrapSelection("'", "'"),
+})
+
 /** Базовые клавиши (Enter, Backspace, Delete, etc.) */
 const baseKeys = keymap(baseKeymap)
 
 /** Все клавиатурные плагины в правильном порядке */
 export function getKeymapPlugins(): Plugin[] {
-  return [customKeymap, baseKeys]
+  return [customKeymap, bracketKeymap, baseKeys]
 }

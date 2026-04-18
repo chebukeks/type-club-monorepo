@@ -118,7 +118,8 @@ export type AppAction =
   | { type: 'SET_SHOW_EMPTY_FOLDERS'; payload: { enabled: boolean } }
   | { type: 'CLOSE_OTHER_TABS'; payload: { tabId: string } }
   | { type: 'SAVE_SCROLL_POSITION'; payload: { tabId: string; scrollTop: number } }
-  | { type: 'SET_TEXT_ZOOM'; payload: { zoom: number } };
+  | { type: 'SET_TEXT_ZOOM'; payload: { zoom: number } }
+  | { type: 'REORDER_TABS'; payload: { fromIndex: number; toIndex: number } };
 
 /** API, доступный из Renderer-процесса через contextBridge */
 export interface IElectronAPI {
