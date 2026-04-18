@@ -53,6 +53,52 @@ export function getEditorStyles(): string {
   margin: 0 0 0.5em 0;
 }
 
+/* Блочное изображение с подписью */
+.image-block {
+  margin: 1.2em 0;
+  text-align: center;
+  cursor: default;
+}
+
+.image-block img {
+  max-width: 100%;
+  border-radius: 6px;
+  display: block;
+  margin: 0 auto;
+}
+
+.image-caption {
+  margin-top: 8px;
+  font-size: 0.85em;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s;
+  line-height: 1.4;
+}
+.image-caption:hover {
+  color: var(--text-primary);
+}
+.image-caption.placeholder {
+  font-style: italic;
+  color: var(--text-disabled, rgba(128,128,128,0.35));
+}
+
+.image-caption-input {
+  display: block;
+  margin: 8px auto 0;
+  padding: 4px 10px;
+  font-size: 0.85em;
+  text-align: center;
+  color: var(--text-primary);
+  background: var(--bg-hover);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  outline: none;
+  width: 70%;
+  max-width: 400px;
+  font-family: inherit;
+}
+
 /* Заголовки */
 .ProseMirror h1 { font-size: 2em; font-weight: 700; color: var(--editor-heading); line-height: 1.3; margin: 1em 0 0.4em 0; }
 .ProseMirror h2 { font-size: 1.5em; font-weight: 650; color: var(--editor-heading); line-height: 1.35; margin: 0.8em 0 0.3em 0; }

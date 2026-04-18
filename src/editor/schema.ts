@@ -140,15 +140,24 @@ export const schema = new Schema({
       },
     },
     image: {
-      inline: true,
       attrs: {
         src: {},
         alt: { default: null },
         title: { default: null }
       },
-      group: 'inline',
+      group: 'block',
       draggable: true,
       parseDOM: [{
+        tag: 'figure.image-block',
+        getAttrs(dom) {
+          const img = (dom as HTMLElement).querySelector('img')
+          return {
+            src: img?.getAttribute('src') || '',
+            alt: img?.getAttribute('alt') || null,
+            title: img?.getAttribute('title') || null,
+          }
+        }
+      }, {
         tag: 'img[src]',
         getAttrs(dom) {
           return {
@@ -159,7 +168,19 @@ export const schema = new Schema({
         }
       }],
       toDOM(node) {
-        return ['img', { ...node.attrs }]
+        const figure = document.createElement('figure')
+        figure.className = 'image-block'
+        const img = document.createElement('img')
+        img.src = node.attrs.src
+        if (node.attrs.alt) img.alt = node.attrs.alt
+        if (node.attrs.title) img.title = node.attrs.title
+        figure.appendChild(img)
+        if (node.attrs.alt) {
+          const caption = document.createElement('figcaption')
+          caption.textContent = node.attrs.alt
+          figure.appendChild(caption)
+        }
+        return figure
       }
     },
 

@@ -28,6 +28,7 @@ import { useEditor } from '../context/EditorContext'
 import { tocPlugin } from '../editor/tocPlugin'
 import { foldingPlugin } from '../editor/foldingPlugin'
 import { HeadingView } from '../editor/headingView'
+import { ImageView } from '../editor/imageView'
 import { interactivePlugin } from '../editor/interactivePlugin'
 import { focusModePlugin } from '../editor/focusModePlugin'
 import { toggleMark } from 'prosemirror-commands'
@@ -338,6 +339,7 @@ export function MarkdownEditor() {
         heading: (node, view, getPos) => new HeadingView(node, view, getPos),
         code_block: (node, view, getPos) => new CodeBlockView(node, view, getPos),
         math_block: (node, view, getPos) => new MathBlockView(node, view, getPos),
+        image: (node, view, getPos) => new ImageView(node, view, getPos),
         ...(isPreview ? {
           // В Preview режиме math_inline рендерим только KaTeX (без UI редактирования)
           math_inline: (node: PMNode) => new MathInlinePreviewView(node),

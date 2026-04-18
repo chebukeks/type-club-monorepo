@@ -251,6 +251,22 @@ if (handlers) {
     state.closeNode() // close paragraph
     state.closeNode() // close table_cell
   }
+
+  // Кастомный обработчик для image (теперь блочная нода).
+  // Markdown-it помещает image как inline-токен внутри paragraph.
+  // Мы закрываем текущий paragraph, вставляем image как блок, и открываем новый paragraph.
+  handlers.image = (state: any, tok: any) => {
+    const src = tok.attrGet('src') || ''
+    const alt = tok.children?.[0]?.content || tok.attrGet('alt') || null
+    const title = tok.attrGet('title') || null
+
+    // Закрываем открытый paragraph
+    state.closeNode()
+    // Добавляем image как блок
+    state.addNode(schema.nodes.image, { src, alt, title })
+    // Открываем новый paragraph для оставшихся inline-токенов
+    state.openNode(schema.nodes.paragraph)
+  }
 }
 
 // ============================================================

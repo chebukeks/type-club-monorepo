@@ -147,12 +147,15 @@ function linkRule(): InputRule {
 
 function imageRule(): InputRule {
   return new InputRule(
-    /(?:^|\s)!\[([^\[]*)\]\(([^)]+)\)$/,
-    (state, match, start, end) => {
-      const [all, alt, src] = match
-      const trStart = start + (all.match(/^\s/) ? 1 : 0)
-      const node = schema.nodes.image.create({ src, alt })
-      return state.tr.replaceWith(trStart, end, node)
+    /^!\[([^\[]*)\]\(([^)]+)\)\s?$/,
+    (state, match, start, _end) => {
+      const [, alt, src] = match
+      const node = schema.nodes.image.create({ src, alt: alt || null })
+      // Заменяем весь paragraph блочной нодой image
+      const $start = state.doc.resolve(start)
+      const parentStart = $start.before($start.depth)
+      const parentEnd = $start.after($start.depth)
+      return state.tr.replaceWith(parentStart, parentEnd, node)
     }
   )
 }
