@@ -209,16 +209,16 @@ export function getEditorStyles(): string {
 .ProseMirror li.task-list-item {
   list-style: none;
   position: relative;
-  margin-left: -24px;
-  padding-left: 28px;
+  margin-left: -1.5em;
+  padding-left: 1.75em;
 }
 .ProseMirror li.task-list-item::before {
   content: '';
   position: absolute;
-  left: 4px; top: 4px;
-  width: 16px; height: 16px;
-  border: 1px solid var(--accent);
-  border-radius: 4px;
+  left: 0.25em; top: 0.25em;
+  width: 1em; height: 1em;
+  border: 0.08em solid var(--accent);
+  border-radius: 0.25em;
   background: transparent;
   display: inline-block;
   pointer-events: none;
@@ -230,10 +230,10 @@ export function getEditorStyles(): string {
 .ProseMirror li.task-list-item[data-checked="true"]::after {
   content: '';
   position: absolute;
-  left: 9px; top: 6px;
-  width: 4px; height: 8px;
+  left: 0.5625em; top: 0.375em;
+  width: 0.25em; height: 0.5em;
   border: solid white;
-  border-width: 0 2px 2px 0;
+  border-width: 0 0.125em 0.125em 0;
   transform: rotate(45deg);
   pointer-events: none;
 }
