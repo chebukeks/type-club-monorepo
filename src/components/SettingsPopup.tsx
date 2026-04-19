@@ -55,7 +55,7 @@ export function SettingsPopup({ onClose }: SettingsPopupProps) {
   return (
     <div
       ref={popupRef}
-      className="absolute right-0 top-full mt-1 w-60 py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50"
+      className="absolute right-0 top-full mt-1 w-max min-w-[240px] py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50 text-[13px] text-[var(--text-secondary)] select-none"
     >
       {/* Заголовок */}
       <div className="menu-item enabled" style={{ cursor: 'default' }}>

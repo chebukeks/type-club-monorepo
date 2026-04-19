@@ -580,6 +580,7 @@ export function MarkdownEditor() {
       }}
       onContextMenu={handleContextMenu}
       onClick={() => setCtxMenu(null)}
+      onScroll={() => { if (ctxMenu) setCtxMenu(null) }}
     >
       <div
         ref={editorRef}
@@ -590,7 +591,7 @@ export function MarkdownEditor() {
       {ctxMenu && (
         <div
           className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
-          style={{ top: ctxMenu.y, left: ctxMenu.x, minWidth: '180px' }}
+          style={{ top: ctxMenu.y, left: ctxMenu.x, minWidth: '220px' }}
           onContextMenu={(e) => e.preventDefault()}
         >
           {formatItems.map((item) => (
