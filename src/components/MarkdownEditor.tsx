@@ -31,6 +31,7 @@ import { HeadingView } from '../editor/headingView'
 import { ImageView } from '../editor/imageView'
 import { interactivePlugin } from '../editor/interactivePlugin'
 import { focusModePlugin } from '../editor/focusModePlugin'
+import { typographyPlugin } from '../editor/typographyPlugin'
 import { toggleMark } from 'prosemirror-commands'
 import { schema } from '../editor/schema'
 
@@ -322,7 +323,7 @@ export function MarkdownEditor() {
 
     // Набор плагинов зависит от режима
     const plugins: Plugin[] = isPreview
-      ? [history(), dropCursor(), gapCursor(), syncPlugin, foldingPlugin, interactivePlugin, typewriterPlugin, focusPlugin, syntaxHighlightPlugin]
+      ? [history(), dropCursor(), gapCursor(), syncPlugin, foldingPlugin, interactivePlugin, typewriterPlugin, focusPlugin, syntaxHighlightPlugin, typographyPlugin()]
       : [
         ...getKeymapPlugins(),
         getInputRulesPlugin(),
@@ -340,6 +341,7 @@ export function MarkdownEditor() {
         interactivePlugin,
         typewriterPlugin,
         focusPlugin,
+        typographyPlugin(),
         tocPlugin((toc) => dispatchRef.current({ type: 'SET_ACTIVE_TOC', payload: toc })),
       ]
 
