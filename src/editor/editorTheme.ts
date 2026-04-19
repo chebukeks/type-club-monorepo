@@ -60,6 +60,17 @@ export function getEditorStyles(): string {
   cursor: default;
 }
 
+/* Скрытие ровно одной пустой строки до и после изображения в Preview режиме */
+.preview-mode p:has(br:only-child):has(+ .image-block),
+.preview-mode p:empty:has(+ .image-block) {
+  display: none;
+}
+
+.preview-mode .image-block + p:has(br:only-child),
+.preview-mode .image-block + p:empty {
+  display: none;
+}
+
 .image-block img {
   max-width: 100%;
   border-radius: 6px;

@@ -36,8 +36,14 @@ export class ImageView implements NodeView {
     // Подпись
     this.caption = document.createElement('figcaption')
     this.caption.className = 'image-caption'
-    this.caption.textContent = node.attrs.alt || 'Добавить подпись...'
-    if (!node.attrs.alt) this.caption.classList.add('placeholder')
+    const hasAlt = !!node.attrs.alt
+    this.caption.textContent = hasAlt ? node.attrs.alt : 'Добавить подпись...'
+    if (!hasAlt) {
+      this.caption.classList.add('placeholder')
+      if (!this.view.editable) {
+        this.caption.style.display = 'none'
+      }
+    }
     this.dom.appendChild(this.caption)
 
     // Клик по подписи → редактирование
@@ -49,7 +55,7 @@ export class ImageView implements NodeView {
   }
 
   private startEditing() {
-    if (this.captionInput) return // уже редактируем
+    if (!this.view.editable || this.captionInput) return // уже редактируем или превью
 
     this.caption.style.display = 'none'
 
@@ -104,11 +110,14 @@ export class ImageView implements NodeView {
 
     // Обновляем подпись (если не в режиме редактирования)
     if (!this.captionInput) {
-      this.caption.textContent = node.attrs.alt || 'Добавить подпись...'
-      if (!node.attrs.alt) {
+      const hasAlt = !!node.attrs.alt
+      this.caption.textContent = hasAlt ? node.attrs.alt : 'Добавить подпись...'
+      if (!hasAlt) {
         this.caption.classList.add('placeholder')
+        this.caption.style.display = this.view.editable ? '' : 'none'
       } else {
         this.caption.classList.remove('placeholder')
+        this.caption.style.display = ''
       }
     }
 
