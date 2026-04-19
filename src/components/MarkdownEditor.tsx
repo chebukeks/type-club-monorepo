@@ -230,18 +230,29 @@ export function MarkdownEditor() {
 
     /** Сохранить document-позицию каретки и обновить маску */
     function updateCaretDocY(view: EditorView) {
-      const { head } = view.state.selection
-      let coords: { top: number, bottom: number }
-      try {
-        coords = view.coordsAtPos(head)
-      } catch (e) {
-        return
-      }
       const scrollContainer = view.dom.closest('.overflow-auto') as HTMLElement
       if (!scrollContainer) return
 
+      let caretCenterY: number
+
+      // Сначала проверяем, не находимся ли мы внутри кастомного инпута (например, подписи к картинке)
+      const activeEl = document.activeElement as HTMLElement
+      // Проверяем, что активный элемент находится внутри scrollContainer,
+      // но не является самим view.dom (потому что view.dom — это сам редактор)
+      if (activeEl && activeEl !== view.dom && scrollContainer.contains(activeEl)) {
+        const rect = activeEl.getBoundingClientRect()
+        caretCenterY = (rect.top + rect.bottom) / 2
+      } else {
+        const { head } = view.state.selection
+        try {
+          const coords = view.coordsAtPos(head)
+          caretCenterY = (coords.top + coords.bottom) / 2
+        } catch (e) {
+          return
+        }
+      }
+
       const containerRect = scrollContainer.getBoundingClientRect()
-      const caretCenterY = (coords.top + coords.bottom) / 2
       // Сохраняем позицию каретки в координатах документа (не viewport)
       caretDocY.current = (caretCenterY - containerRect.top) + scrollContainer.scrollTop
       updateFocusMaskFromDocY(scrollContainer)
