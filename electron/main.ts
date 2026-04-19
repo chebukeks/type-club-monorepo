@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell, screen } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
@@ -122,12 +122,25 @@ function createWindow() {
   // Восстановление размеров и положения окна из хранилища
   const savedBounds = store.get('windowBounds') as { x?: number; y?: number; width?: number; height?: number; isMaximized?: boolean } | undefined
 
-  win = new BrowserWindow({
-    width: savedBounds?.width || 1200,
-    height: savedBounds?.height || 800,
-    ...(savedBounds?.x !== undefined && savedBounds?.y !== undefined ? { x: savedBounds.x, y: savedBounds.y } : {}),
+  // Получаем область всех дисплеев для проверки координат
+  const displays = screen.getAllDisplays()
+  const boundsInDisplay = savedBounds?.x !== undefined ? displays.some((display: any) => {
+    return (
+      savedBounds.x! >= display.bounds.x &&
+      savedBounds.y! >= display.bounds.y &&
+      savedBounds.x! < display.bounds.x + display.bounds.width &&
+      savedBounds.y! < display.bounds.y + display.bounds.height
+    )
+  }) : false
+
+  // Ключевой фикс для мульти-мониторного DPI в Electron на Windows:
+  // 1. Мы передаем в конструктор ТОЛЬКО x и y (при условии, что они валидны). 
+  // Это гарантирует, что нативный HWND изначально будет создан на целевом мониторе, в его родном DPI контексте.
+  // 2. Мы НЕ передаем width и height, иначе Windows применит масшаб главного монитора (на котором был запущен процесс).
+  const opts: any = {
     minWidth: 800,
     minHeight: 500,
+    show: false,                      // Скрываем окно до применения координат
     frame: false,                     // Убираем системную рамку
     titleBarStyle: 'hidden',          // Скрываем заголовок
     icon: path.join(process.env.APP_ROOT, 'build',
@@ -140,12 +153,36 @@ function createWindow() {
       nodeIntegration: false,         // Запрет прямого доступа к Node.js
       spellcheck: store.get('spellcheck', true) as boolean,
     },
-  })
-
-  // Восстанавливаем полноэкранный режим
-  if (savedBounds?.isMaximized) {
-    win.maximize()
   }
+
+  if (boundsInDisplay) {
+    opts.x = savedBounds!.x
+    opts.y = savedBounds!.y
+  } else {
+    // Дефолтные размеры при создании по центру главного экрана, если сохраненных нет или они битые
+    opts.width = savedBounds?.width || 1200
+    opts.height = savedBounds?.height || 800
+  }
+
+  win = new BrowserWindow(opts)
+
+  // 3. Теперь, когда окно ИЗНАЧАЛЬНО привязано к правильному монитору (если координаты были валидны),
+  // мы применяем к нему width и height. Так как DPI контекст уже верен,
+  // Windows не будет пытаться "скэйлить" эти логические пиксели при переброске окна.
+  if (boundsInDisplay && savedBounds?.width && savedBounds?.height) {
+    win.setSize(savedBounds.width, savedBounds.height)
+  } else if (!boundsInDisplay) {
+    win.center()
+  }
+
+  win.once('ready-to-show', () => {
+
+    // Восстанавливаем полноэкранный режим
+    if (savedBounds?.isMaximized) {
+      win!.maximize()
+    }
+    win!.show()
+  })
 
   // --- Сохранение размеров окна с debounce ---
   let boundsTimer: ReturnType<typeof setTimeout> | null = null
