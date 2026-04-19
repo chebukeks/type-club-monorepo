@@ -297,12 +297,12 @@ export function getEditorStyles(): string {
 /* Math */
 .math-inline { position: relative; display: inline-block; cursor: text; }
 .math-inline.is-inactive { display: none; }
-.math-inline.is-active { color: var(--math-text); font-family: inherit; font-size: 1rem; }
+.math-inline.is-active { color: var(--math-text); font-family: inherit; font-size: 1em; }
 .math-inline.is-active::before { content: "$"; color: var(--math-dollar); }
 .math-inline.is-active::after { content: "$"; color: var(--math-dollar); }
 .math-inline-render-anchor { position: relative; display: inline; }
-.math-inline-render { font-size: 1rem; color: var(--math-render); cursor: text; user-select: none; }
-.math-inline-preview { display: inline-block; font-size: 1rem; color: var(--math-render); user-select: none; }
+.math-inline-render { font-size: 1em; color: var(--math-render); cursor: text; user-select: none; }
+.math-inline-preview { display: inline-block; font-size: 1em; color: var(--math-render); user-select: none; }
 .math-inline-tooltip-anchor { position: relative; display: inline; width: 0; height: 0; }
 .math-inline-tooltip {
   position: absolute; top: 100%; left: 50%; transform: translateX(-50%);

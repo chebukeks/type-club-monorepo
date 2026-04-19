@@ -423,9 +423,9 @@ export function MarkdownEditor() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!e.ctrlKey) return
 
-      const isPlus = e.key === '=' || e.key === '+'
-      const isMinus = e.key === '-' || e.key === '_'
-      const isZero = e.key === '0' || e.key === ')' || e.key === '('
+      const isPlus = e.code === 'Equal' || e.code === 'NumpadAdd'
+      const isMinus = e.code === 'Minus' || e.code === 'NumpadSubtract'
+      const isZero = e.code === 'Digit0' || e.code === 'Numpad0'
 
       if (!isPlus && !isMinus && !isZero) return
 

@@ -141,8 +141,8 @@
   --editor-strike: #999999;
   --editor-code-bg: rgba(68, 114, 196, 0.08);
   --editor-code-text: #4472c4;
-  --editor-mark-bg: rgba(255, 215, 0, 0.3);
-  --editor-mark-text: #b8860b;
+  --editor-mark-bg: rgba(255, 217, 0, 0.521);
+  --editor-mark-text: #704e00;
   --editor-link: #4472c4;
   --editor-syntax: #bbbbbb;
   --editor-hr: #e0e0e0;
@@ -204,13 +204,17 @@
    Глобальные стили Type Club
    ============================================================ */
 
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
   width: 100%;
   overflow: hidden;
@@ -225,14 +229,33 @@ body {
 }
 
 /* Скроллбар */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
 
-.select-none { user-select: none; -webkit-user-select: none; }
+::-webkit-scrollbar-track {
+  background: transparent;
+}
 
-.cm-editor { height: 100% !important; }
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+.select-none {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.cm-editor {
+  height: 100% !important;
+}
+
 .cm-gutters {
   background-color: var(--bg-base) !important;
   border-right: 1px solid var(--border-default) !important;
@@ -240,6 +263,7 @@ body {
   font-size: 11px !important;
   min-width: 40px !important;
 }
+
 .cm-activeLineGutter {
   background-color: rgba(108, 140, 255, 0.05) !important;
   color: var(--text-dim) !important;
@@ -252,13 +276,16 @@ body {
   justify-content: space-between;
   align-items: center;
 }
+
 .menu-item.enabled {
   cursor: pointer;
 }
+
 .menu-item.enabled:hover {
   background: var(--menu-hover-bg);
   color: var(--text-primary);
 }
+
 .menu-item.disabled {
   color: var(--text-dim);
   cursor: default;
