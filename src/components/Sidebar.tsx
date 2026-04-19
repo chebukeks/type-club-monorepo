@@ -120,7 +120,7 @@ export function Sidebar({ width }: { width: number }) {
         }}
       >
         {visibleTree.length === 0 && !state.creating ? (
-          <EmptyState onOpenFolder={openFolder} />
+          <EmptyState onOpenFolder={openFolder} isFolderOpen={!!state.folderPath} onCreateFile={() => startCreating('file')} />
         ) : (
           <div className="px-1" onClick={(e) => {
             if (e.target === e.currentTarget) setActiveExplorerPath(null)
@@ -266,7 +266,7 @@ function InlineCreateInput({ type, depth, onSubmit, onCancel }: {
   )
 }
 
-function EmptyState({ onOpenFolder }: { onOpenFolder: () => void }) {
+function EmptyState({ onOpenFolder, onCreateFile, isFolderOpen }: { onOpenFolder: () => void, onCreateFile: () => void, isFolderOpen: boolean }) {
   return (
     <div
       className="flex flex-col items-center justify-center h-full text-center"
@@ -275,9 +275,11 @@ function EmptyState({ onOpenFolder }: { onOpenFolder: () => void }) {
       <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-disabled)' }}>
         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
       </svg>
-      <p style={{ fontSize: '13px', color: 'var(--text-dim)', margin: 0 }}>Нет открытой папки</p>
+      <p style={{ fontSize: '13px', color: 'var(--text-dim)', margin: 0 }}>
+        {isFolderOpen ? 'Эта папка пуста' : 'Нет открытой папки'}
+      </p>
       <button
-        onClick={onOpenFolder}
+        onClick={isFolderOpen ? onCreateFile : onOpenFolder}
         style={{
           padding: '8px 20px',
           fontSize: '13px',
@@ -291,7 +293,9 @@ function EmptyState({ onOpenFolder }: { onOpenFolder: () => void }) {
         }}
         onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-hover)')}
         onMouseLeave={e => (e.currentTarget.style.background = 'var(--accent)')}
-      >Открыть папку</button>
+      >
+        {isFolderOpen ? 'Создать файл' : 'Открыть папку'}
+      </button>
     </div>
   )
 }
