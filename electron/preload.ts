@@ -1,4 +1,4 @@
-import { ipcRenderer, contextBridge } from 'electron'
+import { ipcRenderer, contextBridge, webFrame } from 'electron'
 
 /**
  * Preload-скрипт: создаёт безопасный мост между Main и Renderer процессами.
@@ -158,5 +158,24 @@ contextBridge.exposeInMainWorld('api', {
   /** Подтвердить закрытие окна (разрешить) */
   confirmClose: () => {
     ipcRenderer.send('window:confirm-close')
+  },
+
+  // ==========================================
+  // Масштаб интерфейса (Ctrl+=/Ctrl+-)
+  // ==========================================
+
+  /** Увеличить масштаб интерфейса */
+  zoomIn: () => {
+    webFrame.setZoomLevel(webFrame.getZoomLevel() + 0.5)
+  },
+
+  /** Уменьшить масштаб интерфейса */
+  zoomOut: () => {
+    webFrame.setZoomLevel(webFrame.getZoomLevel() - 0.5)
+  },
+
+  /** Сбросить масштаб интерфейса */
+  zoomReset: () => {
+    webFrame.setZoomLevel(0)
   },
 })

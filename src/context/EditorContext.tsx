@@ -25,6 +25,7 @@ const initialState: AppState = {
   renaming: null,
   editorMode: 'seamless',
   textZoom: 100,
+  documentZoom: 100,
 }
 
 // ============================================================
@@ -157,6 +158,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
       )}
     case 'SET_TEXT_ZOOM':
       return { ...state, textZoom: action.payload.zoom }
+    case 'SET_DOCUMENT_ZOOM':
+      return { ...state, documentZoom: action.payload.zoom }
     case 'REORDER_TABS': {
       const { fromIndex, toIndex } = action.payload
       const newTabs = [...state.tabs]
@@ -200,7 +203,8 @@ interface EditorContextValue {
   setTypewriterMode: (enabled: boolean) => Promise<void>
   setFocusMode: (mode: FocusMode) => Promise<void>
   setShowEmptyFolders: (enabled: boolean) => Promise<void>
-  setTextZoom: (zoom: number) => Promise<void>
+  setTextZoom: (zoom: number) => void
+  setDocumentZoom: (zoom: number) => void
   getRecentFiles: () => Promise<string[]>
   getRecentFolders: () => Promise<string[]>
   clearRecentFiles: () => Promise<void>
@@ -241,6 +245,9 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
 
         const savedTextZoom = await window.api.storeGet('textZoom') as number | undefined
         if (savedTextZoom) dispatch({ type: 'SET_TEXT_ZOOM', payload: { zoom: savedTextZoom } })
+
+        const savedDocZoom = await window.api.storeGet('documentZoom') as number | undefined
+        if (savedDocZoom) dispatch({ type: 'SET_DOCUMENT_ZOOM', payload: { zoom: savedDocZoom } })
 
         const lastFolder = await window.api.storeGet('lastFolderPath') as string | undefined
         if (lastFolder) {
@@ -447,11 +454,28 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     try { await window.api.storeSet('editorMode', mode) } catch (e) { /* ignore */ }
   }, [])
 
-  // --- Масштаб текста ---
-  const setTextZoom = useCallback(async (zoom: number) => {
+  // --- Масштаб текста (Ctrl+Shift++/-) ---
+  const textZoomTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const setTextZoom = useCallback((zoom: number) => {
     const clamped = Math.max(50, Math.min(200, zoom))
     dispatch({ type: 'SET_TEXT_ZOOM', payload: { zoom: clamped } })
-    try { await window.api.storeSet('textZoom', clamped) } catch (e) { /* ignore */ }
+    
+    if (textZoomTimeoutRef.current) clearTimeout(textZoomTimeoutRef.current)
+    textZoomTimeoutRef.current = setTimeout(() => {
+      window.api.storeSet('textZoom', clamped).catch(() => {})
+    }, 500)
+  }, [])
+
+  // --- Масштаб документа (Ctrl+Scroll, Ctrl+Alt++/-) ---
+  const docZoomTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const setDocumentZoom = useCallback((zoom: number) => {
+    const clamped = Math.max(50, Math.min(300, zoom))
+    dispatch({ type: 'SET_DOCUMENT_ZOOM', payload: { zoom: clamped } })
+    
+    if (docZoomTimeoutRef.current) clearTimeout(docZoomTimeoutRef.current)
+    docZoomTimeoutRef.current = setTimeout(() => {
+      window.api.storeSet('documentZoom', clamped).catch(() => {})
+    }, 500)
   }, [])
 
   // --- Обновить вкладку ---
@@ -689,7 +713,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       setTheme, setEditorMode, refreshTab,
       setAutosave, setShowStats, setWordLimit,
       setTypewriterMode, setFocusMode, setShowEmptyFolders,
-      setTextZoom,
+      setTextZoom, setDocumentZoom,
       getRecentFiles, getRecentFolders, clearRecentFiles, clearRecentFolders
     }}>
       {children}

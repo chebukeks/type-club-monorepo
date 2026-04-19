@@ -88,8 +88,10 @@ export interface AppState {
   showEmptyFolders: boolean;
   /** Глобальный режим редактирования */
   editorMode: EditorMode;
-  /** Масштаб текста в процентах (50–200) */
+  /** Масштаб текста в процентах (50–200) — Ctrl+Shift++/- */
   textZoom: number;
+  /** Масштаб документа в процентах (50–300) — Ctrl+Scroll, Ctrl+Alt++/- */
+  documentZoom: number;
 }
 
 /** Действия для редьюсера состояния */
@@ -119,6 +121,7 @@ export type AppAction =
   | { type: 'CLOSE_OTHER_TABS'; payload: { tabId: string } }
   | { type: 'SAVE_SCROLL_POSITION'; payload: { tabId: string; scrollTop: number } }
   | { type: 'SET_TEXT_ZOOM'; payload: { zoom: number } }
+  | { type: 'SET_DOCUMENT_ZOOM'; payload: { zoom: number } }
   | { type: 'REORDER_TABS'; payload: { fromIndex: number; toIndex: number } };
 
 /** API, доступный из Renderer-процесса через contextBridge */
@@ -158,6 +161,12 @@ export interface IElectronAPI {
   onBeforeClose: (callback: () => void) => () => void;
   /** Подтвердить закрытие окна (разрешить) */
   confirmClose: () => void;
+  /** Увеличить масштаб интерфейса */
+  zoomIn: () => void;
+  /** Уменьшить масштаб интерфейса */
+  zoomOut: () => void;
+  /** Сбросить масштаб интерфейса */
+  zoomReset: () => void;
 }
 
 declare global {

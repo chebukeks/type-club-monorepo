@@ -14,9 +14,9 @@ export function getEditorStyles(): string {
   font-size: var(--editor-font-size, 15px);
   line-height: 1.75;
   color: var(--editor-text);
-  padding: 24px 48px;
+  padding: 24px calc(48px * var(--doc-scale, 1));
   padding-bottom: 70vh;
-  max-width: 860px;
+  max-width: calc(860px * var(--doc-scale, 1));
   margin: 0 auto;
   outline: none;
   min-height: 100%;

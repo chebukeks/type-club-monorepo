@@ -88,12 +88,18 @@ class MathInlinePreviewView implements NodeView {
 }
 
 export function MarkdownEditor() {
-  const { state, dispatch, setTextZoom } = useEditor()
+  const { state, dispatch, setTextZoom, setDocumentZoom } = useEditor()
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const [editorView, setEditorView] = useState<EditorView | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
+  const lastWheelTimeRef = useRef(0)
+
+  // -- Масштаб (для расчётов координат маски и фокуса) --
+  const docScale = state.documentZoom / 100
+  const docScaleRef = useRef(docScale)
+  useEffect(() => { docScaleRef.current = docScale }, [docScale])
 
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
   const content = activeTab?.content || ''
@@ -155,6 +161,13 @@ export function MarkdownEditor() {
       editorView.dispatch(editorView.state.tr.setMeta('focusModeUpdate', true))
     }
   }, [state.focusMode, editorView])
+
+  useEffect(() => {
+    if (editorView && !editorView.isDestroyed) {
+      // При изменении масштаба принудительно обновляем позицию каретки
+      editorView.dispatch(editorView.state.tr.setMeta('zoomUpdate', true))
+    }
+  }, [docScale, editorView])
 
   // ============================================================
   // ProseMirror (Seamless / Preview режимы)
@@ -284,9 +297,10 @@ export function MarkdownEditor() {
               }
             }
 
-            const selectionOrDocChanged = !view.state.selection.eq(prevState.selection) || !view.state.doc.eq(prevState.doc)
+            // Если поменялась позиция, сам документ или мы искусственно инициализировали рендер
+            const needsUpdate = !view.state.selection.eq(prevState.selection) || !view.state.doc.eq(prevState.doc) || view.state !== prevState
 
-            if (selectionOrDocChanged && !isMouseSelectingRef.current) {
+            if (needsUpdate && !isMouseSelectingRef.current) {
               if (isTypewriterModeRef.current) {
                 typewriterScrollToHead(view)
               } else {
@@ -404,6 +418,40 @@ export function MarkdownEditor() {
     return () => window.removeEventListener('editor-scroll-to', handleScrollTo)
   }, [editorView])
 
+  // --- Клавишные зумы ---
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!e.ctrlKey) return
+
+      const isPlus = e.key === '=' || e.key === '+'
+      const isMinus = e.key === '-' || e.key === '_'
+      const isZero = e.key === '0' || e.key === ')' || e.key === '('
+
+      if (!isPlus && !isMinus && !isZero) return
+
+      if (e.altKey && !e.shiftKey) {
+        // Ctrl+Alt +/- — масштаб документа (Word-like)
+        e.preventDefault()
+        if (isZero) setDocumentZoom(100)
+        else setDocumentZoom(state.documentZoom + (isPlus ? 10 : -10))
+      } else if (e.shiftKey && !e.altKey) {
+        // Ctrl+Shift +/- — масштаб текста
+        e.preventDefault()
+        if (isZero) setTextZoom(100)
+        else setTextZoom(state.textZoom + (isPlus ? 10 : -10))
+      } else if (!e.shiftKey && !e.altKey) {
+        // Ctrl +/- — масштаб интерфейса
+        e.preventDefault()
+        if (isZero) window.api.zoomReset()
+        else if (isPlus) window.api.zoomIn()
+        else window.api.zoomOut()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [state.textZoom, state.documentZoom, setTextZoom, setDocumentZoom])
+
   // ============================================================
   // Заглушка при отсутствии открытых вкладок
   // ============================================================
@@ -471,6 +519,8 @@ export function MarkdownEditor() {
     : state.focusMode === 'sentence' ? 'focus-mode-sentence'
       : state.focusMode === 'lines' ? 'focus-mode-lines' : ''
 
+
+
   // --- Контекстное меню форматирования ---
   const formatItems = [
     { label: 'Жирный', hotkey: 'Ctrl+B', command: 'strong' },
@@ -500,15 +550,19 @@ export function MarkdownEditor() {
     <div
       className={`flex-1 overflow-auto bg-[var(--bg-base)] ${state.typewriterMode ? 'typewriter-mode' : ''} ${focusClass}`}
       style={{
-        ['--editor-font-size' as string]: `${15 * state.textZoom / 100}px`,
-        maskImage: state.focusMode === 'lines' ? 'linear-gradient(to bottom, rgba(0, 0, 0, 0.3) calc(var(--focus-mask-y, 50%) - 50px), black calc(var(--focus-mask-y, 50%) - 30px), black calc(var(--focus-mask-y, 50%) + 30px), rgba(0, 0, 0, 0.3) calc(var(--focus-mask-y, 50%) + 50px))' : 'none',
-        WebkitMaskImage: state.focusMode === 'lines' ? 'linear-gradient(to bottom, rgba(0, 0, 0, 0.3) calc(var(--focus-mask-y, 50%) - 50px), black calc(var(--focus-mask-y, 50%) - 30px), black calc(var(--focus-mask-y, 50%) + 30px), rgba(0, 0, 0, 0.3) calc(var(--focus-mask-y, 50%) + 50px))' : 'none',
+        ['--editor-font-size' as string]: `${15 * (state.textZoom / 100) * docScale}px`,
+        ['--doc-scale' as string]: docScale,
+        maskImage: state.focusMode === 'lines' ? 'linear-gradient(to bottom, rgba(0, 0, 0, 0.3) calc(var(--focus-mask-y, 50%) - calc(50px * var(--doc-scale, 1))), black calc(var(--focus-mask-y, 50%) - calc(30px * var(--doc-scale, 1))), black calc(var(--focus-mask-y, 50%) + calc(30px * var(--doc-scale, 1))), rgba(0, 0, 0, 0.3) calc(var(--focus-mask-y, 50%) + calc(50px * var(--doc-scale, 1))))' : 'none',
+        WebkitMaskImage: state.focusMode === 'lines' ? 'linear-gradient(to bottom, rgba(0, 0, 0, 0.3) calc(var(--focus-mask-y, 50%) - calc(50px * var(--doc-scale, 1))), black calc(var(--focus-mask-y, 50%) - calc(30px * var(--doc-scale, 1))), black calc(var(--focus-mask-y, 50%) + calc(30px * var(--doc-scale, 1))), rgba(0, 0, 0, 0.3) calc(var(--focus-mask-y, 50%) + calc(50px * var(--doc-scale, 1))))' : 'none',
         transition: 'mask-image 0.3s'
       }}
       onWheel={(e) => {
         if (e.ctrlKey) {
           e.preventDefault()
-          setTextZoom(state.textZoom + (e.deltaY < 0 ? 10 : -10))
+          const now = Date.now()
+          if (now - lastWheelTimeRef.current < 30) return // Throttle ~30fps
+          lastWheelTimeRef.current = now
+          setDocumentZoom(state.documentZoom + (e.deltaY < 0 ? 10 : -10))
         }
       }}
       onContextMenu={handleContextMenu}
