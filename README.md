@@ -1,33 +1,52 @@
-# React + TypeScript + Vite
+# Release v0.3.0 — Initial Beta 🚀
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**Type Club** — 'то современный, быстрый и минималистичный настольный Markdown-редактор, созданный для тех, кто ценит удобство и простой интерфейс.
 
-Currently, two official plugins are available:
+## ✨ Ключевые особенности
 
-* *@vitejs/plugin-react* uses *Babel* for Fast Refresh
+### 📝 Режимы редактирования
+*   **Seamless (WYSIWYG)** — «бесшовный» режим: разметка исчезает сразу после ввода, оставляя только чистый текст.
+*   **Raw Mode** — прямой доступ к исходному коду Markdown для полного контроля.
+*   **Preview** — режим чтения с финальным рендерингом документа.
 
-* *@vitejs/plugin-react-swc* uses *SWC* for Fast Refresh
+### 🔬 Работа с контентом
+*   **Математика (LaTeX)** — полноценная поддержка формул через KaTeX с интерактивным редактированием (инлайн и блочные формулы).
+*   **Умные таблицы** — удобная навигация и быстрое форматирование таблиц.
+*   **Task Lists** — интерактивные списки задач с поддержкой чекбоксов.
+*   **Folding** — сворачивание секций по заголовкам для работы с длинными документами.
+*   **Syntax Highlighting** — подсветка синтаксиса в блоках кода через highlight.js.
 
-## Expanding the ESLint configuration
+### ✍️ Инструменты для писателей
+*   **Focus Mode** — акцентирование внимания на текущем абзаце, предложении или трех строках вокруг курсора.
+*   **Typewriter Mode** — режим «печатной машинки», удерживающий строку ввода всегда по центру экрана.
+*   **Stats Toast** — расширенная статистика: подсчет слов, символов, времени чтения и возможность задать лимит.
+*   **Спеллчекер** — встроенная проверка орфографии (использует системные словари).
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
+### 🖥️ Интерфейс и система
+*   **Файловый менеджер** — полноценный сайдбар с деревом файлов, созданием папок и поддержкой рабочих пространств.
+*   **Табы** — работа с несколькими документами одновременно.
+*   **Экспорт** — сохранение ваших заметок в форматы HTML и PDF.
+*   **Темы** — шикарная тёмная тема (dark mode), светлая и автоматическая системная.
+*   **Автосохранение** — безопасное сохранение ваших данных с настраиваемой задержкой.
 
-* Configure the top-level `parserOptions` property like this:
+---
 
-```js
-export default {
-  // other rules...
-  parserOptions: {
-    ecmaVersion: 'latest',
-    sourceType: 'module',
-    project: ['./tsconfig.json', './tsconfig.node.json'],
-    tsconfigRootDir: __dirname,
-  },
-}
-```
+## 🛠 Технологический стек
+Проект построен на базе следующих инструментов:
+- **Electron 30** — стабильная десктопная оболочка.
+- **React 18 + Vite** — быстрый и отзывчивый интерфейс.
+- **ProseMirror** — мощное ядро редактора, обеспечивающее надежность работы с текстом.
+- **Tailwind CSS v4** — современная и гибкая стилизация.
+- **TypeScript** — строгая типизация для стабильности кода.
 
-* Replace `plugin:@typescript-eslint/recommended` to `plugin:@typescript-eslint/recommended-type-checked` or `plugin:@typescript-eslint/strict-type-checked`
+---
 
-* Optionally add `plugin:@typescript-eslint/stylistic-type-checked`
+## 📥 Установка и запуск
 
-* Install *eslint-plugin-react* and add `plugin:react/recommended` & `plugin:react/jsx-runtime` to the `extends` list
+Установите бинарный файл установщика или соберите проект самостоятельно:
+
+1. Клонируйте репозиторий: `git clone https://github.com/chebukeks/type-club.git`
+2. Установите зависимости: `npm install`
+3. Запустите приложение: `npm run dev`
+
+Для сборки установщика (Windows/Mac/Linux): `npm run build`
