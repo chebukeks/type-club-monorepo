@@ -113,7 +113,8 @@ function buildDecorations(state: import('prosemirror-state').EditorState): Decor
         )
       }
     } else if (state.selection.empty) {
-      // Марка активна (storedMarks), но текста ещё нет — тут нужны widget-декорации
+      // Марка активна (storedMarks), но текста ещё нет — widget-декорации.
+      // Phantom line fix: CSS скрывает trailing <br> после этих виджетов (см. editorTheme.ts).
       decorations.push(
         Decoration.widget(cursorPos, () => {
           const span = document.createElement('span')

@@ -472,30 +472,35 @@ export const markdownSerializer = new MarkdownSerializer(
 function cellText(_state: unknown, cell: PMNode): string {
   // Создаём временный сериализатор для рендера содержимого ячейки
   let result = ''
-  cell.forEach(child => {
-    if (child.isText) {
-      let text = child.text || ''
-      // Применяем марки
-      if (child.marks.length > 0) {
-        for (const mark of child.marks) {
-          if (mark.type.name === 'strong') text = `**${text}**`
-          else if (mark.type.name === 'em') text = `*${text}*`
-          else if (mark.type.name === 'code') text = `\`${text}\``
+
+  /** Обернуть текст марками */
+  function applyMarks(text: string, marks: readonly import('prosemirror-model').Mark[]): string {
+    for (const mark of marks) {
+      switch (mark.type.name) {
+        case 'strong': text = `**${text}**`; break
+        case 'em': text = `*${text}*`; break
+        case 'code': text = `\`${text}\``; break
+        case 's': text = `~~${text}~~`; break
+        case 'highlight': text = `==${text}==`; break
+        case 'spoiler': text = `||${text}||`; break
+        case 'link': {
+          const href = mark.attrs.href || ''
+          const title = mark.attrs.title ? ` "${mark.attrs.title.replace(/"/g, '\\"')}"` : ''
+          text = `[${text}](${href}${title})`
+          break
         }
       }
-      result += text
+    }
+    return text
+  }
+
+  cell.forEach(child => {
+    if (child.isText) {
+      result += applyMarks(child.text || '', child.marks)
     } else if (child.type.name === 'paragraph') {
       child.forEach(inline => {
         if (inline.isText) {
-          let text = inline.text || ''
-          if (inline.marks.length > 0) {
-            for (const mark of inline.marks) {
-              if (mark.type.name === 'strong') text = `**${text}**`
-              else if (mark.type.name === 'em') text = `*${text}*`
-              else if (mark.type.name === 'code') text = `\`${text}\``
-            }
-          }
-          result += text
+          result += applyMarks(inline.text || '', inline.marks)
         }
       })
     }

@@ -423,6 +423,10 @@ export function getEditorStyles(): string {
   font-family: 'Inter', sans-serif; font-size: 0.85em; user-select: none; pointer-events: none;
   line-height: 0; vertical-align: baseline;
 }
+/* Скрыть trailing <br> после виджетов пустых марок — иначе появляется фантомная строка */
+.pm-mark-syntax ~ br:last-child {
+  display: none;
+}
 
 /* Горизонтальная линия */
 .ProseMirror hr { border: none; border-top: 1px solid var(--editor-hr); margin: 16px 0; }
