@@ -442,7 +442,8 @@ ipcMain.handle('export:pdf', async (_event, htmlContent: string, defaultName: st
     const pdfBuffer = await printWin.webContents.printToPDF({
       printBackground: true,
       pageSize: 'A4',
-      margins: { marginType: 'default' }
+      margins: { marginType: 'none' },
+      generateDocumentOutline: true
     })
     
     // Сохраняем финальный PDF в выбранное пользователем место и чистим временный файл

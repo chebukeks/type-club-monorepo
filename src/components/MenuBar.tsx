@@ -86,16 +86,22 @@ export function MenuBar() {
   }
 
   // Обработчики File
+  const resolveTheme = (): 'dark' | 'light' => {
+    if (state.theme === 'system') {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    }
+    return state.theme as 'dark' | 'light'
+  }
   const handleExportHtml = async () => {
     closeMenu()
     if (!activeTab) return
-    const html = generateExportHtml(activeTab.content)
+    const html = generateExportHtml(activeTab.content, resolveTheme())
     await window.api.exportHtml(html, activeTab.fileName.replace(/\.md$/i, '.html'))
   }
   const handleExportPdf = async () => {
     closeMenu()
     if (!activeTab) return
-    const html = generateExportHtml(activeTab.content)
+    const html = generateExportHtml(activeTab.content, resolveTheme())
     await window.api.exportPdf(html, activeTab.fileName.replace(/\.md$/i, '.pdf'))
   }
   const handleCreateFile = () => { closeMenu(); if (folderPath) startCreating('file') }

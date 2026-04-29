@@ -364,7 +364,14 @@ export function getEditorStyles(): string {
 .pm-tooltip-input:focus { border-color: var(--editor-link); }
 
 /* Изображения и Ссылки */
-.ProseMirror img { max-width: 100%; border-radius: 6px; margin: 12px 0; cursor: pointer; border: 1px solid transparent; }
+.ProseMirror img {
+  max-width: 100%;
+  border-radius: 6px;
+  margin: 12px auto;
+  display: block;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
 .ProseMirror img.ProseMirror-selectednode { border-color: var(--editor-link); }
 .ProseMirror a { color: var(--editor-link); text-decoration: none; cursor: text; }
 .ProseMirror a:hover { text-decoration: underline; }

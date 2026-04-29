@@ -36,6 +36,10 @@ release/
 .agent
 .gemini
 .qwen
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+QWEN.md
 
 # Windows specific
 Thumbs.db

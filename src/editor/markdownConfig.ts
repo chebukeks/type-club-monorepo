@@ -541,7 +541,7 @@ export function serializeMarkdown(doc: PMNode): string {
 }
 
 /** Markdown string → HTML string (for Export) */
-export function generateExportHtml(markdown: string): string {
+export function generateExportHtml(markdown: string, theme: 'dark' | 'light' = 'dark'): string {
   // --- Инициализируем чистый парсер специально для экспорта ---
   // Нам не нужны костыли для ProseMirror (texmathFixPlugin, кастомные чекбоксы),
   // нам нужен родной, стандартный рендер HTML.
@@ -559,122 +559,262 @@ export function generateExportHtml(markdown: string): string {
   // Конвертируем Markdown в HTML тело
   const bodyHtml = exportMd.render(markdown)
   
-  // Добавляем стили KaTeX через CDN, НО и локальный фолбэк для отключения 
-  // дублирующихся .katex-mathml элементов, если CDN не подгрузится (например при экспорте PDF через Electron).
+  // Стили повторяют CSS-переменные из index.css и стили из editorTheme.ts,
+  // чтобы экспорт выглядел идентично Preview режиму в редакторе.
   return `
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="${theme}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Export</title>
   
-  <!-- Подключение CSS для математики -->
+  <!-- Шрифты, идентичные редактору -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;650;700&display=swap">
+  
+  <!-- KaTeX CSS для математики -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
   
   <style>
-    /* Дефолтная светлая тема (чистая/печатная) */
+    /* === Тёмная тема (по умолчанию) === */
+    :root,
+    [data-theme="dark"] {
+      --bg-base: #1a1b1e;
+      --bg-hover: #2a2d33;
+      --bg-active: #313238;
+      --text-primary: #e1e1e3;
+      --text-muted: #a0a4ab;
+      --editor-text: #e1e1e3;
+      --editor-heading: #e8eaed;
+      --editor-heading-h3: #d2d4d7;
+      --editor-heading-h4: #c0c3c8;
+      --editor-heading-h5: #b0b3b8;
+      --editor-heading-h6: #9ca0a8;
+      --editor-strong: #f0f0f2;
+      --editor-em: #c8cad0;
+      --editor-strike: #7b7d85;
+      --editor-code-bg: rgba(108, 140, 255, 0.1);
+      --editor-code-text: #8ca8ff;
+      --editor-mark-bg: rgba(255, 215, 0, 0.2);
+      --editor-mark-text: #ffd700;
+      --editor-link: #5865f2;
+      --editor-hr: #3a3d44;
+      --editor-blockquote-border: #6c8cff;
+      --editor-blockquote-text: #a0a4ab;
+      --editor-blockquote-bg: rgba(108, 140, 255, 0.05);
+      --codeblock-bg: #1e1e1e;
+      --codeblock-border: #2d2e32;
+      --codeblock-text: #e4e6eb;
+      --table-border: #232428;
+      --table-header-bg: #1e2025;
+      --table-header-text: #e8eaed;
+      --table-cell-bg: rgba(30, 32, 37, 0.3);
+      --table-cell-text: #c8cad0;
+      --table-even-bg: rgba(30, 32, 37, 0.5);
+      --math-render: #abb2bf;
+    }
+
+    /* === Светлая тема === */
+    [data-theme="light"] {
+      --bg-base: #ffffff;
+      --bg-hover: #e8e8e8;
+      --bg-active: #d4d4d4;
+      --text-primary: #1e1e1e;
+      --text-muted: #6e6e6e;
+      --editor-text: #1e1e1e;
+      --editor-heading: #1e1e1e;
+      --editor-heading-h3: #333333;
+      --editor-heading-h4: #444444;
+      --editor-heading-h5: #555555;
+      --editor-heading-h6: #666666;
+      --editor-strong: #1e1e1e;
+      --editor-em: #333333;
+      --editor-strike: #999999;
+      --editor-code-bg: rgba(68, 114, 196, 0.08);
+      --editor-code-text: #4472c4;
+      --editor-mark-bg: rgba(255, 217, 0, 0.521);
+      --editor-mark-text: #704e00;
+      --editor-link: #4472c4;
+      --editor-hr: #e0e0e0;
+      --editor-blockquote-border: #4472c4;
+      --editor-blockquote-text: #6e6e6e;
+      --editor-blockquote-bg: rgba(68, 114, 196, 0.05);
+      --codeblock-bg: #f5f5f5;
+      --codeblock-border: #e0e0e0;
+      --codeblock-text: #1e1e1e;
+      --table-border: #e0e0e0;
+      --table-header-bg: #f0f0f0;
+      --table-header-text: #1e1e1e;
+      --table-cell-bg: transparent;
+      --table-cell-text: #333333;
+      --table-even-bg: rgba(0, 0, 0, 0.02);
+      --math-render: #333333;
+    }
+
+    /* === Базовые стили (идентичны ProseMirror в Preview) === */
+    html {
+      background-color: var(--bg-base);
+    }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      line-height: 1.6;
-      color: #333;
-      background-color: #fff;
-      max-width: 800px;
+      font-family: 'Inter', 'SF Pro Text', -apple-system, sans-serif;
+      font-size: 15px;
+      line-height: 1.75;
+      color: var(--editor-text);
+      background-color: var(--bg-base);
+      max-width: 860px;
       margin: 0 auto;
-      padding: 2rem;
+      padding: 24px 48px;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
-    
-    h1, h2, h3, h4, h5, h6 {
-      margin-top: 1.5em;
-      margin-bottom: 0.5em;
-      font-weight: 600;
-      line-height: 1.25;
+
+    /* Печать / PDF: убираем белые рамки, фон заливает всю страницу */
+    @page {
+      margin: 0;
+      size: A4;
     }
-    
-    h1 { font-size: 2em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
-    h2 { font-size: 1.5em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
-    
-    p { margin-top: 0; margin-bottom: 16px; }
-    
-    a { color: #0366d6; text-decoration: none; }
+    @media print {
+      body {
+        max-width: none;
+        padding: 1.5cm 2cm;
+      }
+    }
+
+    /* Заголовки */
+    h1 { font-size: 2em; font-weight: 700; color: var(--editor-heading); line-height: 1.3; margin: 1em 0 0.4em 0; }
+    h2 { font-size: 1.5em; font-weight: 650; color: var(--editor-heading); line-height: 1.35; margin: 0.8em 0 0.3em 0; }
+    h3 { font-size: 1.25em; font-weight: 600; color: var(--editor-heading-h3); line-height: 1.4; margin: 0.7em 0 0.3em 0; }
+    h4 { font-size: 1.1em; font-weight: 600; color: var(--editor-heading-h4); line-height: 1.45; margin: 0.6em 0 0.3em 0; }
+    h5 { font-size: 1.05em; font-weight: 600; color: var(--editor-heading-h5); line-height: 1.5; margin: 0.5em 0 0.2em 0; }
+    h6 { font-size: 1em; font-weight: 600; color: var(--editor-heading-h6); line-height: 1.5; margin: 0.5em 0 0.2em 0; }
+
+    p { margin: 0 0 0.5em 0; }
+
+    /* Ссылки */
+    a { color: var(--editor-link); text-decoration: none; }
     a:hover { text-decoration: underline; }
-    
+
+    /* Inline стили */
+    strong { font-weight: 700; color: var(--editor-strong); }
+    em { color: var(--editor-em); }
+    s { text-decoration: line-through; color: var(--editor-strike); }
+    mark { background: var(--editor-mark-bg); color: var(--editor-mark-text); border-radius: 3px; padding: 0 2px; }
+
+    /* Inline code */
     code {
-      font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
-      font-size: 85%;
-      background-color: rgba(27,31,35,0.05);
-      border-radius: 3px;
-      padding: 0.2em 0.4em;
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      background: var(--editor-code-bg);
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 0.88em;
+      color: var(--editor-code-text);
     }
-    
+
+    /* Блоки кода */
     pre {
-      background-color: #f6f8fa;
-      border-radius: 6px;
+      background: var(--codeblock-bg);
+      border-radius: 8px;
+      margin: 16px 0;
       padding: 16px;
       overflow: auto;
+      border: 1px solid var(--codeblock-border);
     }
-    
     pre code {
-      background-color: transparent;
+      background: transparent;
       padding: 0;
+      border-radius: 0;
+      font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--codeblock-text);
     }
-    
+
+    /* Цитаты */
     blockquote {
-      padding: 0 1em;
-      color: #6a737d;
-      border-left: 0.25em solid #dfe2e5;
-      margin: 0 0 16px 0;
+      border-left: 4px solid var(--editor-blockquote-border);
+      padding: 8px 16px;
+      margin: 16px 0;
+      color: var(--editor-blockquote-text);
+      background: var(--editor-blockquote-bg);
+      border-radius: 0 4px 4px 0;
     }
-    
+    blockquote p { margin-bottom: 0.5em; color: inherit; }
+    blockquote p:last-child { margin-bottom: 0; }
+
+    /* Списки */
+    ul, ol { padding-left: 24px; margin: 8px 0; }
+    ul { list-style-type: disc; }
+    ol { list-style-type: decimal; }
+    li { margin-bottom: 4px; line-height: 1.6; }
+
+    /* Task list */
+    .task-list-item { list-style-type: none; }
+    .task-list-item input[type="checkbox"] {
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    /* Таблицы */
     table {
+      border-collapse: separate;
       border-spacing: 0;
-      border-collapse: collapse;
-      margin-bottom: 16px;
       width: 100%;
+      margin: 12px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--codeblock-border);
     }
-    
-    table th, table td {
-      padding: 6px 13px;
-      border: 1px solid #dfe2e5;
+    th, td {
+      padding: 8px 16px;
+      border-bottom: 1px solid var(--table-border);
+      border-right: 1px solid var(--table-border);
+      vertical-align: top;
     }
-    
-    table tr:nth-child(2n) {
-      background-color: #f6f8fa;
+    th:last-child, td:last-child { border-right: none; }
+    tbody tr:last-child td { border-bottom: none; }
+    th {
+      background: var(--table-header-bg);
+      font-weight: 600;
+      color: var(--table-header-text);
+      border-bottom: 2px solid var(--codeblock-border);
     }
-    
-    hr {
-      height: 0.25em;
-      padding: 0;
-      margin: 24px 0;
-      background-color: #e1e4e8;
-      border: 0;
+    td { background: var(--table-cell-bg); color: var(--table-cell-text); }
+    tbody tr:nth-child(even) td { background: var(--table-even-bg); }
+
+    /* Горизонтальная линия */
+    hr { border: none; border-top: 1px solid var(--editor-hr); margin: 16px 0; }
+
+    /* Изображения */
+    img {
+      max-width: 100%;
+      border-radius: 6px;
+      display: block;
+      margin: 12px auto;
     }
-    
-    /* Стили для математических блоков, чтобы они не дублировались даже если CDN падает (ошибка -100) */
+
+    /* Спойлеры (отображаются открытыми в экспорте) */
+    .pm-spoiler {
+      background: var(--bg-hover);
+      border-radius: 4px;
+      padding: 0 4px;
+    }
+
+    /* KaTeX: скрыть дубликат MathML */
     .katex-mathml {
       position: absolute;
       clip: rect(1px, 1px, 1px, 1px);
-      padding: 0;
-      border: 0;
-      height: 1px;
-      width: 1px;
+      padding: 0; border: 0;
+      height: 1px; width: 1px;
       overflow: hidden;
     }
-    
     .katex-display {
       overflow-x: auto;
       overflow-y: hidden;
       padding: 1rem 0;
     }
-
-    /* Стили для нормального отображения чекбоксов (Task Lists) */
-    .task-list-item {
-      list-style-type: none;
-    }
-    .task-list-item input[type="checkbox"] {
-      margin-right: 8px;
-      vertical-align: middle;
-    }
+    .katex { color: var(--math-render); }
   </style>
 </head>
 <body>
