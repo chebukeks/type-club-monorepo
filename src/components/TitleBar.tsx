@@ -80,6 +80,18 @@ export function TitleBar() {
         className="flex items-center h-full"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
+        {/* Кнопка поиска (Ctrl+F) */}
+        <button
+          onClick={() => window.dispatchEvent(new Event('editor-open-search'))}
+          className="w-9 h-full flex items-center justify-center text-[var(--text-dim)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)] transition-colors"
+          title="Поиск (Ctrl+F)"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+        </button>
+
         {/* Иконка пользователя (заглушка) */}
         <button
           onClick={() => {/* заглушка — пока ничего не делает */ }}

@@ -34,6 +34,7 @@ import { focusModePlugin } from '../editor/focusModePlugin'
 import { typographyPlugin } from '../editor/typographyPlugin'
 import { toggleMark } from 'prosemirror-commands'
 import { schema } from '../editor/schema'
+import { SearchBar, searchPlugin } from './SearchBar'
 
 // Inject CSS один раз
 let styleInjected = false
@@ -95,6 +96,7 @@ export function MarkdownEditor() {
   const [editorView, setEditorView] = useState<EditorView | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
+  const [showSearch, setShowSearch] = useState(false)
   const lastWheelTimeRef = useRef(0)
 
   // -- Масштаб (для расчётов координат маски и фокуса) --
@@ -334,7 +336,7 @@ export function MarkdownEditor() {
 
     // Набор плагинов зависит от режима
     const plugins: Plugin[] = isPreview
-      ? [history(), dropCursor(), gapCursor(), syncPlugin, foldingPlugin, interactivePlugin, typewriterPlugin, focusPlugin, syntaxHighlightPlugin, typographyPlugin()]
+      ? [history(), dropCursor(), gapCursor(), syncPlugin, foldingPlugin, interactivePlugin, typewriterPlugin, focusPlugin, syntaxHighlightPlugin, typographyPlugin(), searchPlugin]
       : [
         ...getKeymapPlugins(),
         getInputRulesPlugin(),
@@ -354,6 +356,7 @@ export function MarkdownEditor() {
         focusPlugin,
         typographyPlugin(),
         tocPlugin((toc) => dispatchRef.current({ type: 'SET_ACTIVE_TOC', payload: toc })),
+        searchPlugin,
       ]
 
     const editorState = EditorState.create({ doc, plugins })
@@ -397,7 +400,7 @@ export function MarkdownEditor() {
       if (scrollContainer) {
         dispatchRef.current({ type: 'SAVE_SCROLL_POSITION', payload: { tabId, scrollTop: scrollContainer.scrollTop } })
       }
-      view.destroy(); viewRef.current = null; setEditorView(null)
+      view.destroy(); viewRef.current = null; setEditorView(null); setShowSearch(false)
     }
   }, [activeTab?.id, state.editorMode, activeTab?.refreshCounter])
 
@@ -431,10 +434,17 @@ export function MarkdownEditor() {
     return () => window.removeEventListener('editor-scroll-to', handleScrollTo)
   }, [editorView])
 
-  // --- Клавишные зумы ---
+  // --- Клавишные зумы + Ctrl+F ---
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!e.ctrlKey) return
+
+      // Ctrl+F — поиск
+      if (e.code === 'KeyF' && !e.shiftKey && !e.altKey) {
+        e.preventDefault()
+        setShowSearch(true)
+        return
+      }
 
       const isPlus = e.code === 'Equal' || e.code === 'NumpadAdd'
       const isMinus = e.code === 'Minus' || e.code === 'NumpadSubtract'
@@ -464,6 +474,13 @@ export function MarkdownEditor() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [state.textZoom, state.documentZoom, setTextZoom, setDocumentZoom])
+
+  // --- Открытие поиска из TitleBar (кнопка-лупа) ---
+  useEffect(() => {
+    const handler = () => setShowSearch(true)
+    window.addEventListener('editor-open-search', handler)
+    return () => window.removeEventListener('editor-open-search', handler)
+  }, [])
 
   // ============================================================
   // Заглушка при отсутствии открытых вкладок
@@ -582,6 +599,11 @@ export function MarkdownEditor() {
       onClick={() => setCtxMenu(null)}
       onScroll={() => { if (ctxMenu) setCtxMenu(null) }}
     >
+      {/* Поиск по документу */}
+      {showSearch && editorView && (
+        <SearchBar view={editorView} onClose={() => setShowSearch(false)} />
+      )}
+
       <div
         ref={editorRef}
         className="h-full w-full"

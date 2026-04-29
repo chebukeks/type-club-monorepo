@@ -528,5 +528,85 @@ export function getEditorStyles(): string {
 .focus-mode-sentence .focus-dimmed {
   opacity: 0.25;
 }
+
+/* ==========================================
+   Поиск по документу
+   ========================================== */
+.search-match {
+  background: rgba(255, 215, 0, 0.3);
+  border-radius: 2px;
+}
+.search-match-current {
+  background: rgba(255, 165, 0, 0.6);
+  border-radius: 2px;
+  outline: 1px solid rgba(255, 165, 0, 0.8);
+}
+
+.search-bar {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  max-width: 560px;
+  min-width: 280px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.search-input {
+  flex: 1;
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-size: 13px;
+  color: var(--text-primary);
+  outline: none;
+  font-family: inherit;
+  min-width: 0;
+}
+.search-input:focus {
+  border-color: var(--accent);
+}
+.search-input::placeholder {
+  color: var(--text-dim);
+}
+
+.search-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  min-width: 70px;
+  text-align: center;
+}
+
+.search-nav-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+.search-nav-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.search-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
 `
 }
