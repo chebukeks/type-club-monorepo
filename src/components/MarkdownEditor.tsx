@@ -34,7 +34,7 @@ import { focusModePlugin } from '../editor/focusModePlugin'
 import { typographyPlugin } from '../editor/typographyPlugin'
 import { toggleMark } from 'prosemirror-commands'
 import { schema } from '../editor/schema'
-import { SearchBar, searchPlugin } from './SearchBar'
+import { SearchBar, RawSearchBar, searchPlugin } from './SearchBar'
 
 // Inject CSS один раз
 let styleInjected = false
@@ -176,10 +176,9 @@ export function MarkdownEditor() {
   // ProseMirror (Seamless / Preview режимы)
   // ============================================================
   useEffect(() => {
+    injectStyles()
     if (!editorRef.current || !activeTab) return
     if (state.editorMode === 'raw') return // Raw = textarea, не ProseMirror
-
-    injectStyles()
     if (viewRef.current) { viewRef.current.destroy(); viewRef.current = null }
     console.log('[EDITOR] Creating ProseMirror for tab:', activeTab.id, 'mode:', state.editorMode)
 
@@ -482,6 +481,7 @@ export function MarkdownEditor() {
     return () => window.removeEventListener('editor-open-search', handler)
   }, [])
 
+
   // ============================================================
   // Заглушка при отсутствии открытых вкладок
   // ============================================================
@@ -516,9 +516,17 @@ export function MarkdownEditor() {
   // ============================================================
   // Raw-режим — textarea
   // ============================================================
+
   if (state.editorMode === 'raw') {
     return (
-      <div className="flex-1 overflow-auto bg-[var(--bg-base)]">
+      <div className="relative flex-1 overflow-auto bg-[var(--bg-base)]">
+        {showSearch && textareaRef.current && (
+          <RawSearchBar
+            textarea={textareaRef.current}
+            content={activeTab.content}
+            onClose={() => setShowSearch(false)}
+          />
+        )}
         <textarea
           ref={textareaRef}
           className="w-full h-full resize-none outline-none bg-transparent text-[var(--editor-text)] p-6"
