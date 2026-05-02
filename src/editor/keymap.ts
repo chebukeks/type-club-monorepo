@@ -140,6 +140,44 @@ const createMathBlockOnEnter: Command = (state, dispatch) => {
   return false
 }
 
+// Команда: автосоздание блока кода по ``` + Enter
+const createCodeBlockOnEnter: Command = (state, dispatch) => {
+  const { $head } = state.selection
+  if ($head.parent.type.name !== 'paragraph') return false
+  
+  const text = $head.parent.textContent
+  const match = text.match(/^```([a-zA-Z0-9]*)$/)
+  if (match) {
+    if (dispatch) {
+      const start = $head.before()
+      const end = $head.after()
+      const params = match[1]
+      const tr = state.tr.replaceWith(start, end, schema.nodes.code_block.create({ params }))
+      tr.setSelection(TextSelection.near(tr.doc.resolve(start + 1)))
+      dispatch(tr)
+    }
+    return true
+  }
+  return false
+}
+
+// Команда: удаление пустого блока кода по Backspace
+const codeBlockBackspaceCommand: Command = (state, dispatch) => {
+  const { $head } = state.selection
+  if ($head.parent.type.name !== 'code_block') return false
+  if ($head.parent.textContent.length === 0) {
+    if (dispatch) {
+      const start = $head.before()
+      const end = $head.after()
+      const tr = state.tr.replaceWith(start, end, schema.nodes.paragraph.create())
+      tr.setSelection(TextSelection.near(tr.doc.resolve(start + 1)))
+      dispatch(tr)
+    }
+    return true
+  }
+  return false
+}
+
 // ===== ИНЛАЙН МАТЕМАТИКА (TYPORA STYLE) =====
 
 const mathBackspaceCommand: Command = (state, dispatch) => {
@@ -438,13 +476,14 @@ const customKeymap = keymap({
   'Enter': chainCommands(
     tableEnterNav,
     createMathBlockOnEnter,
+    createCodeBlockOnEnter,
     mathEnterCommand,
     createTableOnEnter,
     splitListItem(schema.nodes.list_item)
   ),
 
-  // Математика, заголовки и табличный бэкспэйс
-  'Backspace': chainCommands(mathBackspaceCommand, headingBackspace, tableBackspaceCommand),
+  // Математика, заголовки, блоки кода и табличный бэкспэйс
+  'Backspace': chainCommands(mathBackspaceCommand, headingBackspace, tableBackspaceCommand, codeBlockBackspaceCommand),
   'Delete': mathDeleteCommand,
   'Space': mathSpaceCommand,
   '$': mathDollarCommand,
