@@ -34,7 +34,13 @@ class TooltipView {
     })
 
     this.tooltip.appendChild(this.input)
-    document.body.appendChild(this.tooltip)
+    const parent = this.view.dom.parentNode as HTMLElement
+    if (parent) {
+      parent.style.position = 'relative'
+      parent.appendChild(this.tooltip)
+    } else {
+      document.body.appendChild(this.tooltip)
+    }
     this.hide()
   }
 
@@ -124,8 +130,11 @@ class TooltipView {
     
     // Позиционируем
     const coords = view.coordsAtPos(this.activeRange.from)
-    this.tooltip.style.left = coords.left + 'px'
-    this.tooltip.style.top = coords.bottom + 5 + 'px' // чуть ниже текста
+    const parent = this.view.dom.parentNode as HTMLElement
+    const parentRect = parent ? parent.getBoundingClientRect() : { left: 0, top: 0 }
+    
+    this.tooltip.style.left = (coords.left - parentRect.left) + 'px'
+    this.tooltip.style.top = (coords.bottom - parentRect.top) + 5 + 'px' // чуть ниже текста
   }
 
   isImageNodeSelection(view: EditorView) {

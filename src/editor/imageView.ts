@@ -124,6 +124,12 @@ export class ImageView implements NodeView {
     return true
   }
 
-  stopEvent() { return true }
+  stopEvent(e: Event) {
+    const target = e.target as HTMLElement
+    if (this.caption.contains(target) || (this.captionInput && this.captionInput.contains(target))) {
+      return true
+    }
+    return false
+  }
   ignoreMutation() { return true }
 }
