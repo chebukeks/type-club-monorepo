@@ -33,6 +33,7 @@ export class MathInlineView implements NodeView {
   }
 
   renderMath() {
+    this.renderDOM.dataset.pos = String(this.getPos?.())
     const text = this.node.textContent?.trim() || ''
     if (!text) {
       this.renderDOM.innerHTML = '<span style="color: grey; opacity: 0.5;">Empty Math</span>'

@@ -262,6 +262,41 @@ const mathEscCommand: Command = (state, dispatch) => {
   return exitBlockByEsc(state, dispatch)
 }
 
+const mathEnterCommand: Command = (state, dispatch) => {
+  const { $head } = state.selection
+  if ($head.parent.type.name === 'math_inline') {
+    if ($head.parent.textContent.trim().length === 0) {
+      if (dispatch) {
+        let tr = state.tr
+        tr.replaceWith($head.before(), $head.after(), schema.text('$'))
+        tr.setSelection(TextSelection.near(tr.doc.resolve($head.before() + 1)))
+        dispatch(tr)
+      }
+      return true
+    } else {
+      if (dispatch) {
+        const text = $head.parent.textContent
+        const trimmed = text.trim()
+        const nodeStart = $head.before()
+        const nodeEnd = $head.after()
+        if (trimmed !== text && trimmed.length > 0) {
+          const newNode = $head.parent.type.create(null, schema.text(trimmed))
+          let tr = state.tr.replaceWith(nodeStart, nodeEnd, newNode)
+          const newNodeEnd = nodeStart + trimmed.length + 2
+          tr.setSelection(TextSelection.near(tr.doc.resolve(newNodeEnd)))
+          dispatch(tr)
+        } else {
+          let tr = state.tr
+          tr.setSelection(TextSelection.near(tr.doc.resolve($head.after())))
+          dispatch(tr)
+        }
+      }
+      return true
+    }
+  }
+  return false
+}
+
 const mathDollarCommand: Command = (state, dispatch) => {
   const { $head } = state.selection
   if ($head.parent.type.name === 'math_inline') {
@@ -403,6 +438,7 @@ const customKeymap = keymap({
   'Enter': chainCommands(
     tableEnterNav,
     createMathBlockOnEnter,
+    mathEnterCommand,
     createTableOnEnter,
     splitListItem(schema.nodes.list_item)
   ),

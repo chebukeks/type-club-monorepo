@@ -30,6 +30,7 @@ export const mathActivePlugin = new Plugin({
       if (renderEl) {
         process.env.NODE_ENV === 'development' && console.log('[mathActivePlugin] Found .math-inline-render!', renderEl)
         let clickPos = parseInt(renderEl.dataset.pos || '-1', 10)
+        if (isNaN(clickPos)) clickPos = -1
         
         // Попробуем получить позицию через view.posAtDOM как резервный вариант
         if (clickPos === -1) {
