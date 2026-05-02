@@ -110,28 +110,6 @@ function buildDecorations(state: any): DecorationSet {
         decos.push(Decoration.widget(pos + node.nodeSize, renderTooltip, { side: 1, ignoreSelection: true }))
       } else {
         decos.push(Decoration.node(pos, pos + node.nodeSize, { class: 'is-inactive' }))
-        
-        // Inline render Widget
-        const renderInline = () => {
-          const span = document.createElement('span')
-          span.className = 'math-inline-render'
-          span.dataset.pos = String(pos) // Сохраняем реальную позицию для клика
-          
-          const text = node.textContent?.trim() || ''
-          
-          if (!text) {
-             span.innerHTML = '<span style="color: grey; opacity: 0.5;">Empty Math</span>'
-          } else {
-             try {
-                katex.render(text, span, { throwOnError: false, displayMode: false })
-             } catch (e) {
-                span.textContent = text
-             }
-          }
-          return span
-        }
-        
-        decos.push(Decoration.widget(pos + node.nodeSize, renderInline, { side: 1, ignoreSelection: true }))
       }
     }
     

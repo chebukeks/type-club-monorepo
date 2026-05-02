@@ -19,11 +19,6 @@ export class MathInlineView implements NodeView {
     // ВАЖНО: класс должен матчить parseDOM ('math-inline')
     this.dom.className = 'math-inline'
 
-    const prefix = document.createElement('span')
-    prefix.className = 'math-inline-prefix'
-    prefix.textContent = '$'
-    this.dom.appendChild(prefix)
-
     this.contentDOM = document.createElement('span')
     this.contentDOM.className = 'math-inline-editor'
 

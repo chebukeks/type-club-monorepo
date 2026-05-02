@@ -175,8 +175,8 @@ function singleMathInlineRule(): InputRule {
       const node = schema.nodes.math_inline.create(null, schema.text(' '))
       tr.replaceWith(trStart, end, node)
       
-      // Ставим TextSelection ровно перед пробелом
-      tr.setSelection(TextSelection.create(tr.doc, trStart + 1))
+      // Ставим TextSelection после пробела (позиция 2 внутри ноды)
+      tr.setSelection(TextSelection.create(tr.doc, trStart + 2))
       return tr
     }
   )

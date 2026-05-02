@@ -307,7 +307,8 @@ export function getEditorStyles(): string {
 
 /* Math */
 .math-inline { position: relative; display: inline-block; cursor: text; }
-.math-inline.is-inactive { display: none; }
+.math-inline.is-inactive .math-inline-editor { display: none; }
+.math-inline.is-active .math-inline-render { display: none; }
 .math-inline.is-active { color: var(--math-text); font-family: inherit; font-size: 1em; }
 .math-inline.is-active::before { content: "$"; color: var(--math-dollar); }
 .math-inline.is-active::after { content: "$"; color: var(--math-dollar); }

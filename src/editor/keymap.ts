@@ -224,6 +224,7 @@ const mathSpaceCommand: Command = (state, dispatch) => {
   return false
 }
 
+
 const mathEscCommand: Command = (state, dispatch) => {
   const { $head } = state.selection
   if ($head.parent.type.name === 'math_inline') {
@@ -237,9 +238,23 @@ const mathEscCommand: Command = (state, dispatch) => {
       return true
     } else {
       if (dispatch) {
-        let tr = state.tr
-        tr.setSelection(TextSelection.near(tr.doc.resolve($head.after())))
-        dispatch(tr)
+        // Сначала trim, затем переставляем курсор
+        const text = $head.parent.textContent
+        const trimmed = text.trim()
+        const nodeStart = $head.before()
+        const nodeEnd = $head.after()
+        if (trimmed !== text && trimmed.length > 0) {
+          const newNode = $head.parent.type.create(null, schema.text(trimmed))
+          let tr = state.tr.replaceWith(nodeStart, nodeEnd, newNode)
+          // Нода пересоздана, ее размер = trimmed.length + 2
+          const newNodeEnd = nodeStart + trimmed.length + 2
+          tr.setSelection(TextSelection.near(tr.doc.resolve(newNodeEnd)))
+          dispatch(tr)
+        } else {
+          let tr = state.tr
+          tr.setSelection(TextSelection.near(tr.doc.resolve($head.after())))
+          dispatch(tr)
+        }
       }
       return true
     }
@@ -260,9 +275,22 @@ const mathDollarCommand: Command = (state, dispatch) => {
       return true
     } else {
       if (dispatch) {
-        let tr = state.tr
-        tr.setSelection(TextSelection.near(tr.doc.resolve($head.after())))
-        dispatch(tr)
+        // Сначала trim, затем выходим
+        const text = $head.parent.textContent
+        const trimmed = text.trim()
+        const nodeStart = $head.before()
+        const nodeEnd = $head.after()
+        if (trimmed !== text && trimmed.length > 0) {
+          const newNode = $head.parent.type.create(null, schema.text(trimmed))
+          let tr = state.tr.replaceWith(nodeStart, nodeEnd, newNode)
+          const newNodeEnd = nodeStart + trimmed.length + 2
+          tr.setSelection(TextSelection.near(tr.doc.resolve(newNodeEnd)))
+          dispatch(tr)
+        } else {
+          let tr = state.tr
+          tr.setSelection(TextSelection.near(tr.doc.resolve($head.after())))
+          dispatch(tr)
+        }
       }
       return true
     }
@@ -272,7 +300,36 @@ const mathDollarCommand: Command = (state, dispatch) => {
 
 // =========================================================
 
-// Команда: Backspace в начале заголовка уменьшает уровень (h3→h2→h1→paragraph)
+// Команда: пропуск math_inline стрелками (ArrowRight/ArrowLeft)
+// Когда курсор стоит прямо перед/после неактивной ноды — перепрыгиваем через неё целиком
+const mathArrowRightCommand: Command = (state, dispatch) => {
+  const { $head } = state.selection
+  if ($head.parent.type.name === 'math_inline') return false
+  const nodeAfter = $head.nodeAfter
+  if (nodeAfter?.type.name === 'math_inline') {
+    if (dispatch) {
+      const target = $head.pos + nodeAfter.nodeSize
+      dispatch(state.tr.setSelection(TextSelection.near(state.doc.resolve(target), 1)))
+    }
+    return true
+  }
+  return false
+}
+
+const mathArrowLeftCommand: Command = (state, dispatch) => {
+  const { $head } = state.selection
+  if ($head.parent.type.name === 'math_inline') return false
+  const nodeBefore = $head.nodeBefore
+  if (nodeBefore?.type.name === 'math_inline') {
+    if (dispatch) {
+      const target = $head.pos - nodeBefore.nodeSize
+      dispatch(state.tr.setSelection(TextSelection.near(state.doc.resolve(target), -1)))
+    }
+    return true
+  }
+  return false
+}
+
 const headingBackspace: Command = (state, dispatch) => {
   const { $head } = state.selection
   if (!state.selection.empty) return false
@@ -356,6 +413,8 @@ const customKeymap = keymap({
   'Space': mathSpaceCommand,
   '$': mathDollarCommand,
   'Escape': mathEscCommand,
+  'ArrowRight': mathArrowRightCommand,
+  'ArrowLeft': mathArrowLeftCommand,
 
   // Списки
   'Tab': sinkListItem(schema.nodes.list_item),
