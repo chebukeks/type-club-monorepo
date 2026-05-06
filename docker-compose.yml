@@ -1,0 +1,15 @@
+services:
+  backend:
+    build: .
+    container_name: type-club-backend
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./backend:/app
+    networks:
+      - eatsmart_net
+
+networks:
+  eatsmart_net:
+    external: true
+    name: eatsmart_bot_eatsmart_net
