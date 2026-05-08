@@ -363,11 +363,35 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     } catch (err) { /* ignore */ }
   }, [addRecentFile])
 
+  // --- Сохранить онлайн-статью ---
+  const saveOnlineArticle = useCallback(async (tabId: string) => {
+    const tab = state.tabs.find(t => t.id === tabId)
+    if (!tab) return
+    try {
+      if (tab.articleId) {
+        // Update existing
+        await articlesApi.update(tab.articleId, { title: tab.fileName, content: tab.content })
+      } else {
+        // Create new
+        const slug = tab.fileName.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-|-$/g, '')
+        const article = await articlesApi.create({ title: tab.fileName, content: tab.content, slug: slug || 'untitled' })
+        // Update the tab with the server-assigned articleId
+        dispatch({
+          type: 'OPEN_FILE',
+          payload: { filePath: `__online__/${article.id}`, fileName: article.title, content: article.content, articleId: article.id }
+        })
+        dispatch({ type: 'CLOSE_TAB', payload: { tabId } })
+        return
+      }
+      dispatch({ type: 'MARK_SAVED', payload: { tabId: tab.id } })
+    } catch (err) { console.error('Ошибка сохранения статьи:', err) }
+  }, [state.tabs])
+
   // --- Сохранить ---
   const saveActiveFile = useCallback(async () => {
     const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
     if (!activeTab) return
-    if (activeTab.articleId) {
+    if (activeTab.articleId || activeTab.filePath.startsWith('__online')) {
       await saveOnlineArticle(activeTab.id)
       return
     }
@@ -800,28 +824,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     } catch (err) { console.error('Ошибка открытия статьи:', err) }
   }, [state.tabs])
 
-  const saveOnlineArticle = useCallback(async (tabId: string) => {
-    const tab = state.tabs.find(t => t.id === tabId)
-    if (!tab) return
-    try {
-      if (tab.articleId) {
-        // Update existing
-        await articlesApi.update(tab.articleId, { title: tab.fileName, content: tab.content })
-      } else {
-        // Create new
-        const slug = tab.fileName.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-|-$/g, '')
-        const article = await articlesApi.create({ title: tab.fileName, content: tab.content, slug: slug || 'untitled' })
-        // Update the tab with the server-assigned articleId
-        dispatch({
-          type: 'OPEN_FILE',
-          payload: { filePath: `__online__/${article.id}`, fileName: article.title, content: article.content, articleId: article.id }
-        })
-        dispatch({ type: 'CLOSE_TAB', payload: { tabId } })
-        return
-      }
-      dispatch({ type: 'MARK_SAVED', payload: { tabId: tab.id } })
-    } catch (err) { console.error('Ошибка сохранения статьи:', err) }
-  }, [state.tabs])
+  // saveOnlineArticle defined earlier (before saveActiveFile)
 
   const deleteOnlineArticle = useCallback(async (id: number) => {
     try {
@@ -846,9 +849,11 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
   const duplicateOnlineArticle = useCallback(async (id: number) => {
     try {
       const article = await articlesApi.get(id)
-      const newArticle = await articlesApi.create({
+      const baseSlug = (article.slug || article.title.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-|-$/g, '')) || 'untitled'
+      await articlesApi.create({
         title: article.title + ' копия',
         content: article.content,
+        slug: baseSlug + '-copy',
       })
       await fetchOnlineArticles()
     } catch (err) { console.error('Ошибка копирования:', err) }

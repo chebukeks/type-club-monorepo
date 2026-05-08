@@ -9,7 +9,7 @@ import type { ArticleListItem } from '../api'
 
 export function Sidebar({ width }: { width: number }) {
   const { user } = useAuth()
-  const { state, dispatch, openFolder, openFile, createFile, createFolder, startCreating, setActiveExplorerPath, refreshFileTree, setShowEmptyFolders, startRenaming, deleteItem, showInExplorer, moveItem, setSidebarMode, fetchOnlineArticles, openOnlineArticle, deleteOnlineArticle, renameOnlineArticle, duplicateOnlineArticle, downloadOnlineArticle } = useEditor()
+  const { state, dispatch, openFolder, openFile, createFile, createFolder, startCreating, setActiveExplorerPath, refreshFileTree, setShowEmptyFolders, startRenaming, deleteItem, showInExplorer, moveItem, setSidebarMode, fetchOnlineArticles, openOnlineArticle, deleteOnlineArticle, renameOnlineArticle, duplicateOnlineArticle } = useEditor()
   const [copied, setCopied] = useState(false)
 
   const isOnline = state.sidebarMode === 'online'
