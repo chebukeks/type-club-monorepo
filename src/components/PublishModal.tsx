@@ -31,15 +31,18 @@ export function PublishModal({ onClose }: PublishModalProps) {
   const username = user?.nickname || "username";
 
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId);
-  const articleTitle = activeTab?.name?.replace(/\.md$/, "") || "Untitled";
   const articleContent = activeTab?.content || "";
+  const defaultTitle = activeTab?.name?.replace(/\.md$/, "") || "Untitled";
 
+  const [title, setTitle] = useState(defaultTitle);
   const [accessState, setAccessState] = useState("private");
-  const [slug, setSlug] = useState(_slugify(articleTitle));
+  const [slug, setSlug] = useState(_slugify(defaultTitle));
   const [copied, setCopied] = useState(false);
   const [status, setStatus] = useState<"idle" | "publishing" | "done" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [articleId, setArticleId] = useState<number | null>(null);
+
+  const titleError = !title.trim() ? "Title cannot be empty" : null;
 
   const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
@@ -50,16 +53,16 @@ export function PublishModal({ onClose }: PublishModalProps) {
     if (filtered.length <= 80) setSlug(filtered);
   };
 
-  const finalSlug = slug.trim() || _slugify(articleTitle);
+  const finalSlug = slug.trim() || _slugify(title);
   const serr = slugError(finalSlug);
 
   const handlePublish = async () => {
-    if (serr) return;
+    if (serr || titleError) return;
     setStatus("publishing");
     setErrorMsg("");
     try {
       const res = await articlesApi.create({
-        title: articleTitle,
+        title: title.trim(),
         content: articleContent,
         slug: finalSlug,
       });
@@ -170,8 +173,25 @@ export function PublishModal({ onClose }: PublishModalProps) {
           </div>
         )}
 
-        <div className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>
-          Publishing <strong style={{ color: "var(--text-primary)" }}>{articleTitle}</strong>
+        <div className="mb-4">
+          <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+            Title
+          </label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg outline-none text-sm transition-colors"
+            style={{
+              background: "var(--bg-input)",
+              border: titleError ? "1px solid #e81123" : "1px solid var(--border-default)",
+              color: "var(--text-primary)",
+            }}
+            placeholder="Article title"
+          />
+          {titleError && (
+            <p className="text-xs mt-1" style={{ color: "#e81123" }}>{titleError}</p>
+          )}
         </div>
 
         <div className="space-y-2 mb-5">
@@ -241,11 +261,11 @@ export function PublishModal({ onClose }: PublishModalProps) {
 
         <button
           onClick={handlePublish}
-          disabled={!!serr || status === "publishing"}
+          disabled={!!serr || !!titleError || status === "publishing"}
           className="w-full py-2 rounded-lg text-sm font-semibold text-white transition-colors"
           style={{
             background:
-              serr || status === "publishing" ? "var(--text-disabled)" : "var(--accent)",
+              serr || titleError || status === "publishing" ? "var(--text-disabled)" : "var(--accent)",
           }}
         >
           {status === "publishing" ? "Publishing..." : "Publish"}
