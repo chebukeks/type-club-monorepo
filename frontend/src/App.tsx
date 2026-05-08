@@ -9,6 +9,7 @@ import Articles from "./pages/Articles";
 import MyArticles from "./pages/MyArticles";
 import Editor from "./pages/Editor";
 import ReadArticle from "./pages/ReadArticle";
+import Download from "./pages/Download";
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -29,6 +30,7 @@ export default function App() {
         <Route path="/my-articles" element={<Protected><MyArticles /></Protected>} />
         <Route path="/editor" element={<Protected><Editor /></Protected>} />
         <Route path="/editor/:id" element={<Protected><Editor /></Protected>} />
+        <Route path="/download" element={<Download />} />
         <Route path="/:username/:slug" element={<ReadArticle />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Route>

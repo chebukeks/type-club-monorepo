@@ -41,8 +41,8 @@ export default function Landing() {
               and a distraction-free writing experience. All your favorite features
               — LaTeX math, syntax highlighting, focus mode — right on your desktop.
             </p>
-            <Link to="#" className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gray-900 dark:bg-white dark:text-gray-900 text-white font-semibold hover:opacity-90 transition-opacity">
-              <Download size={18} /> Download for Linux
+            <Link to="/download" className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gray-900 dark:bg-white dark:text-gray-900 text-white font-semibold hover:opacity-90 transition-opacity">
+              <Download size={18} /> Download
             </Link>
           </div>
           <div className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-2xl p-8 text-center">
