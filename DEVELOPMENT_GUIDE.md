@@ -86,25 +86,30 @@ type-club/
 │   └── electron-env.d.ts        #   Типы process.env
 │
 ├── src/                         # React + ProseMirror (Renderer)
-│   ├── main.tsx                 #   Точка входа React
+│   ├── main.tsx                 #   Точка входа React (AuthProvider + App)
 │   ├── App.tsx                  #   Корневой layout: TitleBar + Sidebar + TabBar + Editor + StatsToast
-│   ├── index.css                #   Глобальные стили + Tailwind v4 + CSS-переменные тем
+│   ├── api.ts                   #   HTTP-клиент для type-club.ru API (auth, articles)
+│   ├── index.css                #   Глобальные стили + Tailwind v4 + CSS-переменные тем + CSS-классы UI
 │   ├── types.ts                 #   TypeScript-интерфейсы (FileEntry, Tab, ThemeMode, EditorMode, IPC API)
 │   ├── vite-env.d.ts            #   Типы Vite
 │   │
 │   ├── assets/                  #   Статические ресурсы (импортируемые через Vite)
 │   │
 │   ├── context/
-│   │   └── EditorContext.tsx    #   Глобальное состояние (useReducer + Context)
+│   │   ├── EditorContext.tsx    #   Глобальное состояние (useReducer + Context)
+│   │   └── AuthContext.tsx      #   Авторизация type-club.ru (login, register, logout)
 │   │
 │   ├── components/
-│   │   ├── TitleBar.tsx         #   Кастомный titlebar (frameless window) + кнопка ⚙ настроек
+│   │   ├── TitleBar.tsx         #   Кастомный titlebar + кнопки auth/publish/settings
 │   │   ├── MenuBar.tsx          #   Меню: File, Edit (заглушка), View (тема, режим, акцентирование)
 │   │   ├── Sidebar.tsx          #   Файловый проводник (дерево .md) + создание файлов/папок
 │   │   ├── TabBar.tsx           #   Панель вкладок
 │   │   ├── MarkdownEditor.tsx   #   React-обёртка ProseMirror
+│   │   ├── SearchBar.tsx        #   Поиск по документу (Ctrl+F)
 │   │   ├── SettingsPopup.tsx    #   Всплывающие настройки (автосохр., спеллчекер, машинка, статистика)
-│   │   └── StatsToast.tsx       #   Плашка статистики: символы, слова, предложения, время чтения, лимит
+│   │   ├── StatsToast.tsx       #   Плашка статистики: символы, слова, предложения, время чтения, лимит
+│   │   ├── AuthModal.tsx        #   Модальное окно авторизации (Sign In / Register)
+│   │   └── PublishModal.tsx     #   Модальное окно публикации статьи на type-club.ru
 │   │
 │   └── editor/                  #   Ядро ProseMirror
 │       ├── schema.ts            #     Схема документа (ноды + марки)
@@ -507,6 +512,7 @@ Danger:            #e81123
 - Tailwind CSS v4 классы для компонентов (`src/components/`)
 - CSS-in-JS (строки-шаблоны) для ProseMirror тема (`src/editor/editorTheme.ts`)
 - Глобальные стили и CSS-переменные тем в `src/index.css`
+- **Переиспользуемые CSS-классы** в `src/index.css` для UI-элементов (`.menu-item`, `.modal-*`, `.btn-*`)
 
 ### Единый дизайн dropdown/popup
 
@@ -521,6 +527,69 @@ Hover:        .menu-item.enabled:hover → background: var(--menu-hover-bg)
 ```
 
 **НЕ** использовать: `rounded-lg`, произвольные padding, кастомные hover-цвета для popup-элементов.
+
+### Единый дизайн модальных окон
+
+Все модальные окна (AuthModal, PublishModal и любые будущие) **обязаны** использовать CSS-классы из `src/index.css`:
+
+| CSS-класс | Назначение |
+|---|---|
+| `.modal-overlay` | Затемнённый backdrop (fixed, z-50, flex center) |
+| `.modal-panel` | Контейнер окна (padding 20px 24px, border, shadow, rounded-8) |
+| `.modal-header` | Flex-контейнер: заголовок + кнопка закрытия |
+| `.modal-title` | Заголовок (14px, semibold) |
+| `.modal-close` | Кнопка × (padding 4px, hover bg) |
+| `.modal-label` | Подпись поля формы (12px, secondary) |
+| `.modal-input` | Текстовое поле (padding 8px 12px, focus: accent border) |
+| `.modal-input.error` | Поле с ошибкой (красный border) |
+| `.modal-error` | Блок ошибки (красный фон, текст) |
+| `.modal-field-error` | Текст ошибки под полем (11px, красный) |
+| `.modal-tabs` | Переключатель вкладок (login/register) |
+| `.modal-tab` / `.modal-tab.active` | Кнопка вкладки |
+| `.modal-option` / `.modal-option.selected` | Карточка-вариант (radio-style) |
+| `.btn-primary` | Основная кнопка (accent, white text) |
+| `.btn-secondary` | Вторичная кнопка (bg-hover, muted text) |
+
+**Правило:** при добавлении нового модального окна — использовать эти классы, **не** дублировать стили через inline style или ad-hoc Tailwind.
+
+---
+
+## Интеграция с type-club.ru
+
+### Архитектура
+
+```
+Renderer (src/api.ts)  →  fetch()  →  https://type-club.ru/api/*
+                                        ↕
+                                   JWT (Bearer token)
+                                   localStorage: access_token
+```
+
+### Модули
+
+| Файл | Назначение |
+|---|---|
+| `src/api.ts` | HTTP-клиент (get/post/patch/delete), типы User, Article, TokenResponse |
+| `src/context/AuthContext.tsx` | React Context: user state, login, register, logout, refresh |
+| `src/components/AuthModal.tsx` | UI: форма Sign In / Register |
+| `src/components/PublishModal.tsx` | UI: публикация статьи (title, access, slug) |
+
+### API endpoints
+
+| Метод | Endpoint | Описание |
+|---|---|---|
+| POST | `/api/auth/register` | Регистрация → access_token |
+| POST | `/api/auth/login` | Вход → access_token |
+| GET | `/api/auth/me` | Текущий пользователь |
+| PATCH | `/api/auth/me` | Обновить профиль |
+| POST | `/api/articles` | Создать статью |
+| PATCH | `/api/articles/:id` | Обновить статью (access_state, slug) |
+
+### UX-флоу
+
+1. Кнопка пользователя в TitleBar → если не залогинен, открывает `AuthModal`; если залогинен, разлогинивает
+2. Кнопка «Поделиться» (появляется только при наличии авторизации) → открывает `PublishModal`
+3. После публикации — экран успеха с кнопкой «Copy Link»
 
 ---
 

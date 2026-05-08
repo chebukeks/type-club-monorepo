@@ -1,5 +1,6 @@
 /**
  * PublishModal.tsx — Share article to type-club.ru from desktop app.
+ * Uses shared modal CSS classes from index.css.
  */
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
@@ -32,7 +33,7 @@ export function PublishModal({ onClose }: PublishModalProps) {
 
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId);
   const articleContent = activeTab?.content || "";
-  const defaultTitle = activeTab?.name?.replace(/\.md$/, "") || "Untitled";
+  const defaultTitle = activeTab?.fileName?.replace(/\.md$/, "") || "Untitled";
 
   const [title, setTitle] = useState(defaultTitle);
   const [accessState, setAccessState] = useState("private");
@@ -40,7 +41,6 @@ export function PublishModal({ onClose }: PublishModalProps) {
   const [copied, setCopied] = useState(false);
   const [status, setStatus] = useState<"idle" | "publishing" | "done" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
-  const [articleId, setArticleId] = useState<number | null>(null);
 
   const titleError = !title.trim() ? "Title cannot be empty" : null;
 
@@ -66,7 +66,6 @@ export function PublishModal({ onClose }: PublishModalProps) {
         content: articleContent,
         slug: finalSlug,
       });
-      setArticleId(res.id);
       await articlesApi.update(res.id, {
         access_state: accessState,
         slug: finalSlug,
@@ -88,75 +87,40 @@ export function PublishModal({ onClose }: PublishModalProps) {
 
   if (status === "done") {
     return (
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center"
-        style={{ background: "rgba(0,0,0,0.5)" }}
-        onClick={onClose}
-      >
+      <div className="modal-overlay" onClick={onClose}>
         <div
-          className="rounded-xl shadow-2xl w-full p-6 text-center"
-          style={{
-            maxWidth: "400px",
-            margin: "0 16px",
-            background: "var(--bg-elevated)",
-            border: "1px solid var(--border-strong)",
-          }}
+          className="modal-panel"
+          style={{ textAlign: "center" }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="text-3xl mb-3">✓</div>
-          <h2 className="text-lg font-semibold mb-2" style={{ color: "var(--text-primary)" }}>
-            Published!
-          </h2>
-          <p className="text-sm mb-4" style={{ color: "var(--text-muted)" }}>
+          <div style={{ fontSize: "28px", marginBottom: "12px", color: "var(--accent)" }}>✓</div>
+          <h2 className="modal-title" style={{ marginBottom: "8px" }}>Published!</h2>
+          <p style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "16px" }}>
             {`type-club.ru/${username}/${finalSlug}`}
           </p>
-          <button
-            onClick={handleCopy}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors mr-2"
-            style={{ background: "var(--accent)" }}
-          >
-            {copied ? "Copied!" : "Copy Link"}
-          </button>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-            style={{
-              background: "var(--bg-hover)",
-              color: "var(--text-secondary)",
-            }}
-          >
-            Close
-          </button>
+          <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
+            <button onClick={handleCopy} className="btn-primary" style={{ width: "auto" }}>
+              {copied ? "Copied!" : "Copy Link"}
+            </button>
+            <button onClick={onClose} className="btn-secondary">
+              Close
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.5)" }}
-      onClick={onClose}
-    >
+    <div className="modal-overlay" onClick={onClose}>
       <div
-        className="rounded-xl shadow-2xl w-full p-6"
-        style={{
-          maxWidth: "430px",
-          margin: "0 16px",
-          background: "var(--bg-elevated)",
-          border: "1px solid var(--border-strong)",
-        }}
+        className="modal-panel"
+        style={{ maxWidth: "430px" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-base font-semibold" style={{ color: "var(--text-primary)" }}>
-            Share to Type Club
-          </h2>
-          <button
-            onClick={onClose}
-            className="p-1 rounded-lg transition-colors"
-            style={{ color: "var(--text-dim)" }}
-          >
+        <div className="modal-header">
+          <h2 className="modal-title">Share to Type Club</h2>
+          <button onClick={onClose} className="modal-close">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
@@ -164,80 +128,52 @@ export function PublishModal({ onClose }: PublishModalProps) {
           </button>
         </div>
 
-        {status === "error" && (
-          <div
-            className="p-3 rounded-lg text-sm mb-4"
-            style={{ background: "rgba(232,17,35,0.1)", color: "#e81123" }}
-          >
-            {errorMsg}
-          </div>
-        )}
+        {status === "error" && <div className="modal-error">{errorMsg}</div>}
 
-        <div className="mb-4">
-          <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
-            Title
-          </label>
+        <div style={{ marginBottom: "16px" }}>
+          <label className="modal-label">Title</label>
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg outline-none text-sm transition-colors"
-            style={{
-              background: "var(--bg-input)",
-              border: titleError ? "1px solid #e81123" : "1px solid var(--border-default)",
-              color: "var(--text-primary)",
-            }}
+            className={`modal-input ${titleError ? "error" : ""}`}
             placeholder="Article title"
           />
-          {titleError && (
-            <p className="text-xs mt-1" style={{ color: "#e81123" }}>{titleError}</p>
-          )}
+          {titleError && <p className="modal-field-error">{titleError}</p>}
         </div>
 
-        <div className="space-y-2 mb-5">
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "20px" }}>
           {states.map((s) => (
             <button
               key={s.value}
               onClick={() => setAccessState(s.value)}
-              className="w-full text-left p-3 rounded-lg border transition-colors"
-              style={{
-                borderColor: accessState === s.value ? "var(--accent)" : "var(--border-default)",
-                background:
-                  accessState === s.value ? "rgba(108,140,255,0.08)" : "transparent",
-              }}
+              className={`modal-option ${accessState === s.value ? "selected" : ""}`}
             >
-              <div className="font-medium text-sm" style={{ color: "var(--text-primary)" }}>
+              <div style={{ fontSize: "13px", fontWeight: 500, color: "var(--text-primary)" }}>
                 {s.label}
               </div>
-              <div className="text-xs mt-0.5" style={{ color: "var(--text-dim)" }}>
+              <div style={{ fontSize: "11px", marginTop: "2px", color: "var(--text-dim)" }}>
                 {s.desc}
               </div>
             </button>
           ))}
         </div>
 
-        <div className="mb-5">
-          <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
-            Article slug
-          </label>
-          <div className="flex items-center gap-1 text-xs" style={{ color: "var(--text-dim)" }}>
+        <div style={{ marginBottom: "20px" }}>
+          <label className="modal-label">Article slug</label>
+          <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: "var(--text-dim)" }}>
             <span>type-club.ru/{username}/</span>
             <input
               type="text"
               value={slug}
               onChange={handleSlugChange}
-              className="flex-1 px-2 py-1 rounded outline-none text-sm transition-colors"
-              style={{
-                background: "var(--bg-input)",
-                border: serr ? "1px solid #e81123" : "1px solid var(--border-default)",
-                color: "var(--text-primary)",
-              }}
+              className={`modal-input ${serr ? "error" : ""}`}
+              style={{ flex: 1, padding: "6px 8px" }}
               placeholder="my-article"
             />
             <button
               onClick={handleCopy}
-              className="shrink-0 p-1 rounded transition-colors"
-              style={{ color: "var(--text-dim)" }}
+              className="modal-close"
               title="Copy link"
             >
               {copied ? (
@@ -252,21 +188,13 @@ export function PublishModal({ onClose }: PublishModalProps) {
               )}
             </button>
           </div>
-          {serr && (
-            <p className="text-xs mt-1" style={{ color: "#e81123" }}>
-              {serr}
-            </p>
-          )}
+          {serr && <p className="modal-field-error">{serr}</p>}
         </div>
 
         <button
           onClick={handlePublish}
           disabled={!!serr || !!titleError || status === "publishing"}
-          className="w-full py-2 rounded-lg text-sm font-semibold text-white transition-colors"
-          style={{
-            background:
-              serr || titleError || status === "publishing" ? "var(--text-disabled)" : "var(--accent)",
-          }}
+          className="btn-primary"
         >
           {status === "publishing" ? "Publishing..." : "Publish"}
         </button>

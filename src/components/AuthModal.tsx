@@ -1,6 +1,6 @@
 /**
  * AuthModal.tsx — Login / Register popup for the desktop app.
- * Styles use the desktop app's CSS variable system.
+ * Uses shared modal CSS classes from index.css.
  */
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
@@ -58,202 +58,97 @@ export function AuthModal({ onClose }: AuthModalProps) {
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.5)" }}
-      onClick={onClose}
-    >
-      <div
-        className="rounded-xl shadow-2xl w-full p-6"
-        style={{
-          maxWidth: "400px",
-          margin: "0 16px",
-          background: "var(--bg-elevated)",
-          border: "1px solid var(--border-strong)",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
         {/* Tabs */}
-        <div
-          className="flex rounded-lg p-0.5 mb-6"
-          style={{ background: "var(--bg-hover)" }}
-        >
+        <div className="modal-tabs">
           <button
             onClick={() => switchTab("login")}
-            className="flex-1 py-1.5 rounded-md text-xs font-medium transition-colors"
-            style={{
-              background: tab === "login" ? "var(--bg-active)" : "transparent",
-              color: tab === "login" ? "var(--text-primary)" : "var(--text-dim)",
-            }}
+            className={`modal-tab ${tab === "login" ? "active" : ""}`}
           >
             Sign In
           </button>
           <button
             onClick={() => switchTab("register")}
-            className="flex-1 py-1.5 rounded-md text-xs font-medium transition-colors"
-            style={{
-              background: tab === "register" ? "var(--bg-active)" : "transparent",
-              color: tab === "register" ? "var(--text-primary)" : "var(--text-dim)",
-            }}
+            className={`modal-tab ${tab === "register" ? "active" : ""}`}
           >
             Register
           </button>
         </div>
 
-        {error && (
-          <div
-            className="p-3 rounded-lg text-sm mb-4"
-            style={{ background: "rgba(232,17,35,0.1)", color: "#e81123" }}
-          >
-            {error}
-          </div>
-        )}
+        {error && <div className="modal-error">{error}</div>}
 
         {tab === "login" ? (
-          <form onSubmit={handleLogin} className="space-y-3">
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
-              <label
-                className="block text-xs font-medium mb-1"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                Email
-              </label>
+              <label className="modal-label">Email</label>
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg outline-none text-sm transition-colors"
-                style={{
-                  background: "var(--bg-input)",
-                  border: "1px solid var(--border-default)",
-                  color: "var(--text-primary)",
-                }}
+                className="modal-input"
               />
             </div>
             <div>
-              <label
-                className="block text-xs font-medium mb-1"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                Password
-              </label>
+              <label className="modal-label">Password</label>
               <input
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg outline-none text-sm transition-colors"
-                style={{
-                  background: "var(--bg-input)",
-                  border: "1px solid var(--border-default)",
-                  color: "var(--text-primary)",
-                }}
+                className="modal-input"
               />
             </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2 rounded-lg text-sm font-semibold text-white transition-colors"
-              style={{
-                background: loading ? "var(--text-disabled)" : "var(--accent)",
-              }}
-            >
+            <button type="submit" disabled={loading} className="btn-primary">
               {loading ? "Signing in..." : "Sign In"}
             </button>
           </form>
         ) : (
-          <form onSubmit={handleRegister} className="space-y-3">
+          <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
-              <label
-                className="block text-xs font-medium mb-1"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                Nickname
-              </label>
+              <label className="modal-label">Nickname</label>
               <input
                 type="text"
                 required
                 minLength={2}
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg outline-none text-sm transition-colors"
-                style={{
-                  background: "var(--bg-input)",
-                  border: "1px solid var(--border-default)",
-                  color: "var(--text-primary)",
-                }}
+                className="modal-input"
               />
             </div>
             <div>
-              <label
-                className="block text-xs font-medium mb-1"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                Email
-              </label>
+              <label className="modal-label">Email</label>
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg outline-none text-sm transition-colors"
-                style={{
-                  background: "var(--bg-input)",
-                  border: "1px solid var(--border-default)",
-                  color: "var(--text-primary)",
-                }}
+                className="modal-input"
               />
             </div>
             <div>
-              <label
-                className="block text-xs font-medium mb-1"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                Password
-              </label>
+              <label className="modal-label">Password</label>
               <input
                 type="password"
                 required
                 minLength={6}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg outline-none text-sm transition-colors"
-                style={{
-                  background: "var(--bg-input)",
-                  border: "1px solid var(--border-default)",
-                  color: "var(--text-primary)",
-                }}
+                className="modal-input"
               />
             </div>
             <div>
-              <label
-                className="block text-xs font-medium mb-1"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                Confirm Password
-              </label>
+              <label className="modal-label">Confirm Password</label>
               <input
                 type="password"
                 required
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg outline-none text-sm transition-colors"
-                style={{
-                  background: "var(--bg-input)",
-                  border: "1px solid var(--border-default)",
-                  color: "var(--text-primary)",
-                }}
+                className="modal-input"
               />
             </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2 rounded-lg text-sm font-semibold text-white transition-colors"
-              style={{
-                background: loading ? "var(--text-disabled)" : "var(--accent)",
-              }}
-            >
+            <button type="submit" disabled={loading} className="btn-primary">
               {loading ? "Creating account..." : "Create Account"}
             </button>
           </form>

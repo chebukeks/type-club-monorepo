@@ -292,3 +292,195 @@ body {
   color: var(--text-dim);
   cursor: default;
 }
+
+/* ============================================================
+   Модальные окна — единый дизайн-паттерн
+   ============================================================ */
+
+/* Затемнённый backdrop */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+/* Панель модального окна */
+.modal-panel {
+  width: 100%;
+  max-width: 400px;
+  margin: 0 16px;
+  padding: 20px 24px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* Заголовок модального окна */
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.modal-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Кнопка закрытия (×) */
+.modal-close {
+  padding: 4px;
+  border-radius: 4px;
+  color: var(--text-dim);
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, background 0.15s;
+}
+
+.modal-close:hover {
+  color: var(--text-secondary);
+  background: var(--bg-hover);
+}
+
+/* Подпись полей формы */
+.modal-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+/* Текстовое поле */
+.modal-input {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  outline: none;
+  font-size: 13px;
+  color: var(--text-primary);
+  transition: border-color 0.15s;
+}
+
+.modal-input:focus {
+  border-color: var(--accent);
+}
+
+.modal-input.error {
+  border-color: #e81123;
+}
+
+/* Блок ошибки */
+.modal-error {
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  background: rgba(232, 17, 35, 0.1);
+  color: #e81123;
+  margin-bottom: 12px;
+}
+
+/* Текст ошибки под полем */
+.modal-field-error {
+  font-size: 11px;
+  color: #e81123;
+  margin-top: 4px;
+}
+
+/* Кнопка: основная (accent) */
+.btn-primary {
+  width: 100%;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: white;
+  background: var(--accent);
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+}
+
+.btn-primary:disabled {
+  background: var(--text-disabled);
+  cursor: default;
+}
+
+/* Кнопка: вторичная */
+.btn-secondary {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--bg-hover);
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-secondary:hover {
+  background: var(--bg-active);
+}
+
+/* Переключатель вкладок (login/register и т.п.) */
+.modal-tabs {
+  display: flex;
+  border-radius: 6px;
+  padding: 2px;
+  background: var(--bg-hover);
+  margin-bottom: 20px;
+}
+
+.modal-tab {
+  flex: 1;
+  padding: 6px 0;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+  background: transparent;
+  color: var(--text-dim);
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.modal-tab.active {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+
+/* Карточка-вариант (radio-style) */
+.modal-option {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-default);
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.modal-option.selected {
+  border-color: var(--accent);
+  background: rgba(108, 140, 255, 0.08);
+}
