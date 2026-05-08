@@ -3,6 +3,7 @@
  */
 import React, { createContext, useContext, useReducer, useCallback, useEffect, useRef } from 'react'
 import type { AppState, AppAction, FileEntry, ThemeMode, EditorMode, WordLimit, FocusMode } from '../types'
+import { articlesApi } from '../api'
 
 // ============================================================
 // Начальное состояние
@@ -26,6 +27,8 @@ const initialState: AppState = {
   editorMode: 'seamless',
   textZoom: 100,
   documentZoom: 100,
+  sidebarMode: 'local' as 'local' | 'online',
+  onlineArticles: [] as import('../api').ArticleListItem[],
 }
 
 // ============================================================
@@ -47,21 +50,22 @@ function applyThemeToDOM(theme: ThemeMode) {
 function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'OPEN_FILE': {
-      const { filePath, fileName, content } = action.payload
+      const { filePath, fileName, content, articleId } = action.payload
       const sep = filePath.includes('/') ? '/' : '\\'
-      const dirPath = filePath.substring(0, filePath.lastIndexOf(sep))
+      const dirPath = articleId ? state.folderPath || null : filePath.substring(0, filePath.lastIndexOf(sep))
       
       const existingTab = state.tabs.find((t) => t.filePath === filePath)
       if (existingTab) {
         return { ...state, activeTabId: existingTab.id, activeExplorerPath: dirPath }
       }
-      const newTab = {
+      const newTab: any = {
         id: crypto.randomUUID(),
         filePath, fileName, content,
         isModified: false,
         refreshCounter: 0,
         scrollTop: 0,
       }
+      if (articleId !== undefined) newTab.articleId = articleId
       return { ...state, tabs: [...state.tabs, newTab], activeTabId: newTab.id, activeExplorerPath: dirPath }
     }
     case 'CLOSE_TAB': {
@@ -167,6 +171,10 @@ function appReducer(state: AppState, action: AppAction): AppState {
       newTabs.splice(toIndex, 0, moved)
       return { ...state, tabs: newTabs }
     }
+    case 'SET_SIDEBAR_MODE':
+      return { ...state, sidebarMode: action.payload.mode }
+    case 'SET_ONLINE_ARTICLES':
+      return { ...state, onlineArticles: action.payload.articles }
     default:
       return state
   }
@@ -209,6 +217,15 @@ interface EditorContextValue {
   getRecentFolders: () => Promise<string[]>
   clearRecentFiles: () => Promise<void>
   clearRecentFolders: () => Promise<void>
+  // --- Online articles ---
+  fetchOnlineArticles: () => Promise<void>
+  openOnlineArticle: (id: number) => Promise<void>
+  saveOnlineArticle: (tabId: string) => Promise<void>
+  deleteOnlineArticle: (id: number) => Promise<void>
+  renameOnlineArticle: (id: number, title: string) => Promise<void>
+  duplicateOnlineArticle: (id: number) => Promise<void>
+  downloadOnlineArticle: (tabId: string) => Promise<void>
+  setSidebarMode: (mode: 'local' | 'online') => void
 }
 
 const EditorContext = createContext<EditorContextValue | null>(null)
@@ -350,11 +367,15 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
   const saveActiveFile = useCallback(async () => {
     const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
     if (!activeTab) return
+    if (activeTab.articleId) {
+      await saveOnlineArticle(activeTab.id)
+      return
+    }
     try {
       await window.api.writeFile(activeTab.filePath, activeTab.content)
       dispatch({ type: 'MARK_SAVED', payload: { tabId: activeTab.id } })
     } catch (err) { console.error('Ошибка сохранения файла:', err) }
-  }, [state.tabs, state.activeTabId])
+  }, [state.tabs, state.activeTabId, saveOnlineArticle])
 
   // --- Открыть папку ---
   const openFolder = useCallback(async () => {
@@ -514,10 +535,14 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
 
   // --- Начать создание элемента ---
   const startCreating = useCallback((type: 'file' | 'folder') => {
+    if (state.sidebarMode === 'online') {
+      dispatch({ type: 'START_CREATING', payload: { itemType: 'file', targetPath: '__online__' } })
+      return
+    }
     if (!state.folderPath) return
     const targetPath = state.activeExplorerPath || state.folderPath
     dispatch({ type: 'START_CREATING', payload: { itemType: type, targetPath } })
-  }, [state.activeExplorerPath, state.folderPath])
+  }, [state.activeExplorerPath, state.folderPath, state.sidebarMode])
 
   // --- Установить активную директорию ---
   const setActiveExplorerPath = useCallback((path: string | null) => {
@@ -605,12 +630,16 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveActiveFileRef = useRef(saveActiveFile)
   saveActiveFileRef.current = saveActiveFile
+  const saveOnlineArticleRef = useRef(saveOnlineArticle)
+  saveOnlineArticleRef.current = saveOnlineArticle
 
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
   const isModified = activeTab?.isModified ?? false
 
   useEffect(() => {
     if (!state.autosave || !isModified) return
+    // Skip online tabs (they use interval-based autosave)
+    if (activeTab?.articleId) return
 
     autosaveTimerRef.current = setTimeout(() => {
       saveActiveFileRef.current()
@@ -619,7 +648,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     return () => {
       if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
     }
-  }, [state.autosave, isModified, activeTab?.content])
+  }, [state.autosave, isModified, activeTab?.content, activeTab?.articleId])
 
   // --- Автосохранение при потере фокуса окна ---
   useEffect(() => {
@@ -627,7 +656,11 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     const handleBlur = () => {
       const tab = state.tabs.find((t) => t.id === state.activeTabId)
       if (tab?.isModified) {
-        saveActiveFileRef.current()
+        if (tab.articleId) {
+          saveOnlineArticleRef.current(tab.id)
+        } else {
+          saveActiveFileRef.current()
+        }
       }
     }
     window.addEventListener('blur', handleBlur)
@@ -643,7 +676,11 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         // Сохраняем предыдущую вкладку
         void (async () => {
           try {
-            await window.api.writeFile(prevTab.filePath, prevTab.content)
+            if (prevTab.articleId) {
+              await articlesApi.update(prevTab.articleId, { title: prevTab.fileName, content: prevTab.content })
+            } else {
+              await window.api.writeFile(prevTab.filePath, prevTab.content)
+            }
             dispatch({ type: 'MARK_SAVED', payload: { tabId: prevTab.id } })
           } catch (err) { console.error('Ошибка автосохранения при переключении:', err) }
         })()
@@ -651,6 +688,19 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     }
     prevActiveTabIdRef.current = state.activeTabId
   }, [state.activeTabId, state.autosave])
+
+  // --- Автосохранение онлайн-статей: интервал 20 сек ---
+  useEffect(() => {
+    if (!state.autosave) return
+    const interval = setInterval(() => {
+      for (const tab of state.tabs) {
+        if (tab.articleId && tab.isModified) {
+          saveOnlineArticleRef.current(tab.id)
+        }
+      }
+    }, 20000)
+    return () => clearInterval(interval)
+  }, [state.autosave, state.tabs])
 
   // --- Диалог при закрытии окна (#16) ---
   const stateRef = useRef(state)
@@ -669,7 +719,11 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         // Сохраняем все несохранённые файлы
         for (const tab of modifiedTabs) {
           try {
-            await window.api.writeFile(tab.filePath, tab.content)
+            if (tab.articleId) {
+              await articlesApi.update(tab.articleId, { title: tab.fileName, content: tab.content })
+            } else {
+              await window.api.writeFile(tab.filePath, tab.content)
+            }
           } catch (err) { console.error('Ошибка сохранения:', err) }
         }
         window.api.confirmClose()
@@ -685,6 +739,20 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
   const closeTab = useCallback(async (tabId: string) => {
     const tab = state.tabs.find(t => t.id === tabId)
     if (tab?.isModified) {
+      if (tab.articleId) {
+        // Онлайн-статья: спрашиваем, сохранить на сервере?
+        const result = await window.api.confirmExit([tab.fileName])
+        if (result === 'save') {
+          try {
+            await articlesApi.update(tab.articleId, { title: tab.fileName, content: tab.content })
+            dispatch({ type: 'MARK_SAVED', payload: { tabId: tab.id } })
+          } catch (err) { console.error('Ошибка сохранения статьи:', err) }
+          dispatch({ type: 'CLOSE_TAB', payload: { tabId } })
+        } else if (result === 'discard') {
+          dispatch({ type: 'CLOSE_TAB', payload: { tabId } })
+        }
+        return
+      }
       const result = await window.api.confirmExit([tab.fileName])
       if (result === 'save') {
         try {
@@ -695,11 +763,112 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       } else if (result === 'discard') {
         dispatch({ type: 'CLOSE_TAB', payload: { tabId } })
       }
-      // 'cancel' — ничего не делаем
     } else {
       dispatch({ type: 'CLOSE_TAB', payload: { tabId } })
     }
   }, [state.tabs])
+
+  // ============================================================
+  // Online articles
+  // ============================================================
+
+  const fetchOnlineArticles = useCallback(async () => {
+    try {
+      const articles = await articlesApi.listMy(1, 50)
+      dispatch({ type: 'SET_ONLINE_ARTICLES', payload: { articles } })
+    } catch (err) { console.error('Ошибка загрузки статей:', err) }
+  }, [])
+
+  const openOnlineArticle = useCallback(async (id: number) => {
+    try {
+      // Check if already open
+      const existing = state.tabs.find(t => t.articleId === id)
+      if (existing) {
+        dispatch({ type: 'SET_ACTIVE_TAB', payload: { tabId: existing.id } })
+        return
+      }
+      const article = await articlesApi.get(id)
+      dispatch({
+        type: 'OPEN_FILE',
+        payload: {
+          filePath: `__online__/${id}`,
+          fileName: article.title,
+          content: article.content,
+          articleId: article.id,
+        }
+      })
+    } catch (err) { console.error('Ошибка открытия статьи:', err) }
+  }, [state.tabs])
+
+  const saveOnlineArticle = useCallback(async (tabId: string) => {
+    const tab = state.tabs.find(t => t.id === tabId)
+    if (!tab) return
+    try {
+      if (tab.articleId) {
+        // Update existing
+        await articlesApi.update(tab.articleId, { title: tab.fileName, content: tab.content })
+      } else {
+        // Create new
+        const slug = tab.fileName.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-|-$/g, '')
+        const article = await articlesApi.create({ title: tab.fileName, content: tab.content, slug: slug || 'untitled' })
+        // Update the tab with the server-assigned articleId
+        dispatch({
+          type: 'OPEN_FILE',
+          payload: { filePath: `__online__/${article.id}`, fileName: article.title, content: article.content, articleId: article.id }
+        })
+        dispatch({ type: 'CLOSE_TAB', payload: { tabId } })
+        return
+      }
+      dispatch({ type: 'MARK_SAVED', payload: { tabId: tab.id } })
+    } catch (err) { console.error('Ошибка сохранения статьи:', err) }
+  }, [state.tabs])
+
+  const deleteOnlineArticle = useCallback(async (id: number) => {
+    try {
+      await articlesApi.delete(id)
+      state.tabs.filter(t => t.articleId === id).forEach(t => {
+        dispatch({ type: 'CLOSE_TAB', payload: { tabId: t.id } })
+      })
+      await fetchOnlineArticles()
+    } catch (err) { console.error('Ошибка удаления статьи:', err) }
+  }, [state.tabs, fetchOnlineArticles])
+
+  const renameOnlineArticle = useCallback(async (id: number, title: string) => {
+    try {
+      await articlesApi.update(id, { title })
+      state.tabs.filter(t => t.articleId === id).forEach(t => {
+        dispatch({ type: 'CLOSE_TAB', payload: { tabId: t.id } })
+      })
+      await fetchOnlineArticles()
+    } catch (err) { console.error('Ошибка переименования:', err) }
+  }, [state.tabs, fetchOnlineArticles])
+
+  const duplicateOnlineArticle = useCallback(async (id: number) => {
+    try {
+      const article = await articlesApi.get(id)
+      const newArticle = await articlesApi.create({
+        title: article.title + ' копия',
+        content: article.content,
+      })
+      await fetchOnlineArticles()
+    } catch (err) { console.error('Ошибка копирования:', err) }
+  }, [fetchOnlineArticles])
+
+  const downloadOnlineArticle = useCallback(async (tabId: string) => {
+    const tab = state.tabs.find(t => t.id === tabId)
+    if (!tab) return
+    try {
+      const result = await window.api.saveFileAs(tab.content, tab.fileName + '.md')
+      if (!result) return
+    } catch (err) { console.error('Ошибка скачивания:', err) }
+  }, [state.tabs])
+
+  const setSidebarMode = useCallback((mode: 'local' | 'online') => {
+    dispatch({ type: 'SET_SIDEBAR_MODE', payload: { mode } })
+    if (mode === 'online') {
+      fetchOnlineArticles()
+    }
+  }, [fetchOnlineArticles])
 
   return (
     <EditorContext.Provider value={{
@@ -714,7 +883,11 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       setAutosave, setShowStats, setWordLimit,
       setTypewriterMode, setFocusMode, setShowEmptyFolders,
       setTextZoom, setDocumentZoom,
-      getRecentFiles, getRecentFolders, clearRecentFiles, clearRecentFolders
+      getRecentFiles, getRecentFolders, clearRecentFiles, clearRecentFolders,
+      // Online articles
+      fetchOnlineArticles, openOnlineArticle, saveOnlineArticle,
+      deleteOnlineArticle, renameOnlineArticle, duplicateOnlineArticle,
+      downloadOnlineArticle, setSidebarMode,
     }}>
       {children}
     </EditorContext.Provider>

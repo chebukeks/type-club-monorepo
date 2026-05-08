@@ -88,9 +88,22 @@ export interface Article {
   author_nickname?: string;
 }
 
+export interface ArticleListItem {
+  id: number;
+  title: string;
+  access_state: string;
+  slug: string;
+  author_nickname: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export const articlesApi = {
+  listMy: (page = 1, size = 50) => api.get<ArticleListItem[]>(`/articles/my?page=${page}&size=${size}`),
+  get: (id: number) => api.get<Article>(`/articles/${id}`),
   create: (data: { title: string; content?: string; slug?: string }) =>
     api.post<Article>("/articles", data),
   update: (id: number, data: { title?: string; content?: string; access_state?: string; slug?: string }) =>
     api.patch<Article>(`/articles/${id}`, data),
+  delete: (id: number) => api.delete<void>(`/articles/${id}`),
 };

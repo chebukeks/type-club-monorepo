@@ -1,7 +1,7 @@
 {
   "name": "type-club",
   "private": true,
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "A modern Markdown editor with LaTeX support.",
   "author": "chebukek",
   "type": "module",
@@ -19,6 +19,7 @@
     "@codemirror/theme-one-dark": "^6.1.3",
     "@codemirror/view": "^6.40.0",
     "@lezer/highlight": "^1.2.3",
+    "@tailwindcss/oxide-linux-x64-gnu": "^4.3.0",
     "@tailwindcss/vite": "^4.2.2",
     "@types/katex": "^0.16.8",
     "electron-store": "^11.0.2",

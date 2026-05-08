@@ -2,6 +2,7 @@
  * type-club — Общие TypeScript-типы
  * Интерфейсы для файловой системы, вкладок и IPC API
  */
+import type { ArticleListItem } from './api'
 
 /** Элемент файлового дерева (файл или папка) */
 export interface FileEntry {
@@ -39,6 +40,8 @@ export interface Tab {
   refreshCounter: number;
   /** Позиция прокрутки (для восстановления при переключении вкладок) */
   scrollTop: number;
+  /** Если заполнен — вкладка является онлайн-статьёй с type-club.ru */
+  articleId?: number;
 }
 
 /** Тип ограничения (символы или слова) */
@@ -66,6 +69,10 @@ export interface AppState {
   fileTree: FileEntry[];
   /** Режим создания файла/папки (inline-ввод в Sidebar) */
   creating: { type: 'file' | 'folder', targetPath: string } | null;
+  /** Режим отображения сайдбара: локальные файлы или онлайн-статьи */
+  sidebarMode: 'local' | 'online';
+  /** Кешированный список онлайн-статей (из type-club.ru) */
+  onlineArticles: ArticleListItem[];
   /** Активная папка для создания файлов/папок (выбранная в сайдбаре) */
   activeExplorerPath: string | null;
   /** Режим переименования файла/папки в Sidebar */
@@ -96,7 +103,7 @@ export interface AppState {
 
 /** Действия для редьюсера состояния */
 export type AppAction =
-  | { type: 'OPEN_FILE'; payload: { filePath: string; fileName: string; content: string } }
+  | { type: 'OPEN_FILE'; payload: { filePath: string; fileName: string; content: string; articleId?: number } }
   | { type: 'CLOSE_TAB'; payload: { tabId: string } }
   | { type: 'SET_ACTIVE_TAB'; payload: { tabId: string } }
   | { type: 'UPDATE_CONTENT'; payload: { tabId: string; content: string } }
@@ -122,7 +129,9 @@ export type AppAction =
   | { type: 'SAVE_SCROLL_POSITION'; payload: { tabId: string; scrollTop: number } }
   | { type: 'SET_TEXT_ZOOM'; payload: { zoom: number } }
   | { type: 'SET_DOCUMENT_ZOOM'; payload: { zoom: number } }
-  | { type: 'REORDER_TABS'; payload: { fromIndex: number; toIndex: number } };
+  | { type: 'REORDER_TABS'; payload: { fromIndex: number; toIndex: number } }
+  | { type: 'SET_SIDEBAR_MODE'; payload: { mode: 'local' | 'online' } }
+  | { type: 'SET_ONLINE_ARTICLES'; payload: { articles: ArticleListItem[] } };
 
 /** API, доступный из Renderer-процесса через contextBridge */
 export interface IElectronAPI {
