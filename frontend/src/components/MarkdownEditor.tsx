@@ -103,6 +103,7 @@ export function MarkdownEditor({
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const lastEmittedRef = useRef(content);
 
   const docScale = documentZoom / 100;
 
@@ -129,7 +130,9 @@ export function MarkdownEditor({
         return {
           update(view, prevState) {
             if (!view.state.doc.eq(prevState.doc)) {
-              onChangeRef.current(serializeMarkdown(view.state.doc));
+              const md = serializeMarkdown(view.state.doc);
+              lastEmittedRef.current = md;
+              onChangeRef.current(md);
             }
           },
         };
@@ -184,11 +187,13 @@ export function MarkdownEditor({
     };
   }, [editorMode, readOnly]);
 
-  // Update content from props (external change)
+  // Update content from props (external change only — skip editor's own emissions)
   useEffect(() => {
     if (!viewRef.current || editorMode === "raw") return;
+    if (content === lastEmittedRef.current) return;
     const newDoc = parseMarkdown(content);
     if (!viewRef.current.state.doc.eq(newDoc)) {
+      lastEmittedRef.current = content;
       viewRef.current.dispatch(
         viewRef.current.state.tr.replaceWith(0, viewRef.current.state.doc.content.size, newDoc.content)
       );

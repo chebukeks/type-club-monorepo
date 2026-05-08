@@ -2,6 +2,21 @@ import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { authApi } from "../api";
 
+function nickError(n: string): string | null {
+  const t = n.trim();
+  if (!t) return "Nickname cannot be empty";
+  if (t.length < 2) return "Nickname must be at least 2 characters";
+  if (t.length > 30) return "Nickname is too long (max 30)";
+  return null;
+}
+
+function passError(p: string): string | null {
+  if (!p) return null; // empty = skip
+  if (p.length < 6) return "Password must be at least 6 characters";
+  if (p.length > 128) return "Password is too long";
+  return null;
+}
+
 export default function Profile() {
   const { user, refresh } = useAuth();
   const [nickname, setNickname] = useState(user?.nickname || "");
@@ -13,24 +28,21 @@ export default function Profile() {
 
   if (!user) return null;
 
+  const ne = nickError(nickname);
+  const pe = passError(password);
+  const ce = password && password !== confirm ? "Passwords do not match" : null;
+  const canSubmit = !ne && !pe && !ce && (nickname !== user.nickname || password);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMsg("");
     setError("");
-    if (password && password !== confirm) {
-      setError("Passwords do not match");
-      return;
-    }
+    if (!canSubmit) return;
     setLoading(true);
     try {
       const data: any = {};
-      if (nickname !== user.nickname) data.nickname = nickname;
+      if (nickname.trim() !== user.nickname) data.nickname = nickname.trim();
       if (password) { data.password = password; data.confirm_password = confirm; }
-      if (Object.keys(data).length === 0) {
-        setMsg("No changes");
-        setLoading(false);
-        return;
-      }
       await authApi.updateMe(data);
       await refresh();
       setPassword("");
@@ -49,11 +61,20 @@ export default function Profile() {
       <form onSubmit={handleSubmit} className="space-y-4">
         {msg && <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950 text-green-600 text-sm">{msg}</div>}
         {error && <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950 text-red-600 text-sm">{error}</div>}
+
         <div>
           <label className="block text-sm font-medium mb-1">Nickname</label>
-          <input type="text" value={nickname} onChange={(e) => setNickname(e.target.value)}
-            className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <input
+            type="text"
+            value={nickname}
+            onChange={(e) => setNickname(e.target.value)}
+            className={`w-full px-4 py-2.5 rounded-xl border bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              ne && nickname ? "border-red-400 dark:border-red-600" : "border-gray-300 dark:border-gray-700"
+            }`}
+          />
+          {ne && nickname && <p className="text-red-500 text-xs mt-1">{ne}</p>}
         </div>
+
         <div>
           <label className="block text-sm font-medium mb-1">Email</label>
           <input type="email" value={user.email} disabled
@@ -62,21 +83,41 @@ export default function Profile() {
             {user.email_verified ? "✓ Verified" : "Email not verified"}
           </p>
         </div>
+
         <div>
           <label className="block text-sm font-medium mb-1">New Password</label>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             placeholder="Leave empty to keep current"
-            className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            className={`w-full px-4 py-2.5 rounded-xl border bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              pe && password ? "border-red-400 dark:border-red-600" : "border-gray-300 dark:border-gray-700"
+            }`}
+          />
+          {pe && password && <p className="text-red-500 text-xs mt-1">{pe}</p>}
         </div>
+
         {password && (
           <div>
             <label className="block text-sm font-medium mb-1">Confirm New Password</label>
-            <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input
+              type="password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              className={`w-full px-4 py-2.5 rounded-xl border bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                ce ? "border-red-400 dark:border-red-600" : "border-gray-300 dark:border-gray-700"
+              }`}
+            />
+            {ce && <p className="text-red-500 text-xs mt-1">{ce}</p>}
           </div>
         )}
-        <button type="submit" disabled={loading}
-          className="w-full py-2.5 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">
+
+        <button
+          type="submit"
+          disabled={loading || !canSubmit}
+          className="w-full py-2.5 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        >
           {loading ? "Saving..." : "Save Changes"}
         </button>
       </form>

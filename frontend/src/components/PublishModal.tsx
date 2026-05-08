@@ -15,6 +15,15 @@ const states = [
   { value: "public", label: "Public", desc: "Visible on the articles page" },
 ];
 
+const VALID_SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
+function slugError(s: string): string | null {
+  if (!s.trim()) return "Slug cannot be empty";
+  if (!VALID_SLUG.test(s)) return "Use only a–z, 0–9, and hyphens (not at start/end, no consecutive)";
+  if (s.length > 80) return "Slug is too long (max 80)";
+  return null;
+}
+
 export default function PublishModal({
   currentState,
   currentSlug,
@@ -27,13 +36,23 @@ export default function PublishModal({
   const [slug, setSlug] = useState(currentSlug);
   const [copied, setCopied] = useState(false);
 
+  const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    const filtered = raw.toLowerCase().replace(/[^a-z0-9-]/g, "").replace(/--+/g, "-");
+    if (filtered.length <= 80) setSlug(filtered);
+  };
+
+  const finalSlug = slug.trim() || _slugify("untitled");
+  const error = slugError(finalSlug);
+
   const handleApply = () => {
-    onApply(accessState, slug || _slugify("untitled"));
+    if (error) return;
+    onApply(accessState, finalSlug);
     onClose();
   };
 
   const handleCopy = () => {
-    const url = `https://type-club.ru/${username}/${slug || _slugify("untitled")}`;
+    const url = `https://type-club.ru/${username}/${finalSlug}`;
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -77,8 +96,10 @@ export default function PublishModal({
             <input
               type="text"
               value={slug}
-              onChange={(e) => setSlug(e.target.value)}
-              className="flex-1 px-2 py-1 rounded border border-gray-200 dark:border-gray-700 bg-transparent text-gray-900 dark:text-gray-100 outline-none focus:border-blue-500"
+              onChange={handleSlugChange}
+              className={`flex-1 px-2 py-1 rounded border bg-transparent text-gray-900 dark:text-gray-100 outline-none transition-colors ${
+                error ? "border-red-400 dark:border-red-600" : "border-gray-200 dark:border-gray-700 focus:border-blue-500"
+              }`}
               placeholder="my-article"
             />
             <button
@@ -89,11 +110,15 @@ export default function PublishModal({
               {copied ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
             </button>
           </div>
+          {error && (
+            <p className="text-red-500 text-xs mt-1">{error}</p>
+          )}
         </div>
 
         <button
           onClick={handleApply}
-          className="w-full py-2.5 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
+          disabled={!!error}
+          className="w-full py-2.5 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
         >
           Apply
         </button>
