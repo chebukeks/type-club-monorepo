@@ -1,4 +1,5 @@
 import datetime
+import secrets
 
 import bcrypt
 import jwt
@@ -30,3 +31,7 @@ def decode_jwt(token: str) -> int | None:
         return int(payload["sub"])
     except (jwt.InvalidTokenError, KeyError, ValueError):
         return None
+
+
+def generate_token() -> str:
+    return secrets.token_hex(32)

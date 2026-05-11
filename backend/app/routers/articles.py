@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
 from app.models import Article, User
-from app.routers.auth import get_current_user, get_optional_user
+from app.routers.auth import get_current_user, get_optional_user, get_verified_user
 from app.schemas import (
     ArticleCreateRequest,
     ArticleListItem,
@@ -64,7 +64,7 @@ async def list_articles(
 async def list_my_articles(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     session: AsyncSession = Depends(get_session),
 ):
     offset = (page - 1) * size
@@ -82,7 +82,7 @@ async def list_my_articles(
 @router.post("", response_model=ArticleResponse, status_code=201)
 async def create_article(
     data: ArticleCreateRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     session: AsyncSession = Depends(get_session),
 ):
     slug = data.slug or _slugify(data.title)
@@ -154,7 +154,7 @@ async def get_article(
 async def update_article(
     article_id: int,
     data: ArticleUpdateRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     session: AsyncSession = Depends(get_session),
 ):
     article = await session.get(Article, article_id)
@@ -194,7 +194,7 @@ async def update_article(
 @router.delete("/{article_id}", status_code=204)
 async def delete_article(
     article_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     session: AsyncSession = Depends(get_session),
 ):
     article = await session.get(Article, article_id)

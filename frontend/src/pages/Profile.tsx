@@ -25,6 +25,7 @@ export default function Profile() {
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
 
   if (!user) return null;
 
@@ -55,6 +56,20 @@ export default function Profile() {
     }
   };
 
+  const handleResend = async () => {
+    setResending(true);
+    setMsg("");
+    setError("");
+    try {
+      const res = await authApi.resendVerification();
+      setMsg(res.message);
+    } catch (err: any) {
+      setError(err.message || "Failed to resend");
+    } finally {
+      setResending(false);
+    }
+  };
+
   return (
     <div className="max-w-md mx-auto px-4 py-20">
       <h1 className="text-3xl font-bold mb-8 text-center">Profile</h1>
@@ -82,6 +97,16 @@ export default function Profile() {
           <p className="text-xs text-gray-400 mt-1">
             {user.email_verified ? "✓ Verified" : "Email not verified"}
           </p>
+          {!user.email_verified && (
+            <button
+              type="button"
+              onClick={handleResend}
+              disabled={resending}
+              className="mt-2 text-sm text-blue-600 hover:underline disabled:opacity-50"
+            >
+              {resending ? "Sending..." : "Resend verification email"}
+            </button>
+          )}
         </div>
 
         <div>

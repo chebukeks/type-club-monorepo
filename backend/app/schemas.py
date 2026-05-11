@@ -61,6 +61,37 @@ class UpdateProfileRequest(BaseModel):
         return v
 
 
+# ── Email verification / password reset ──
+
+class VerifyEmailRequest(BaseModel):
+    token: str
+
+
+class ResendVerificationResponse(BaseModel):
+    message: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ForgotPasswordResponse(BaseModel):
+    message: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    password: str
+    confirm_password: str
+
+    @field_validator("confirm_password")
+    @classmethod
+    def passwords_match(cls, v: str, info) -> str:
+        if "password" in info.data and v != info.data["password"]:
+            raise ValueError("Passwords do not match")
+        return v
+
+
 # ── Articles ──
 
 class ArticleCreateRequest(BaseModel):

@@ -1,16 +1,25 @@
-from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
-from sqlalchemy import select
+import datetime
+
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, status
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import create_jwt, decode_jwt, hash_password, verify_password
+from app.auth import create_jwt, decode_jwt, generate_token, hash_password, verify_password
+from app.config import settings
 from app.database import get_session
-from app.models import User
+from app.mail import send_reset_password_email, send_verification_email
+from app.models import User, VerificationToken
 from app.schemas import (
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
     LoginRequest,
     RegisterRequest,
+    ResendVerificationResponse,
+    ResetPasswordRequest,
     TokenResponse,
     UpdateProfileRequest,
     UserResponse,
+    VerifyEmailRequest,
 )
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -49,8 +58,34 @@ async def get_optional_user(
     return await session.get(User, user_id)
 
 
+async def get_verified_user(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    if not current_user.email_verified:
+        raise HTTPException(status_code=403, detail="Email not verified")
+    return current_user
+
+
+async def _create_and_send_verification(user: User, session: AsyncSession) -> None:
+    token_str = generate_token()
+    token = VerificationToken(
+        user_id=user.id,
+        token=token_str,
+        purpose="email_verify",
+        expires_at=datetime.datetime.now(datetime.timezone.utc)
+        + datetime.timedelta(minutes=settings.verify_email_token_minutes),
+    )
+    session.add(token)
+    await session.commit()
+    await send_verification_email(user.email, user.nickname, token_str)
+
+
 @router.post("/register", response_model=TokenResponse, status_code=201)
-async def register(data: RegisterRequest, session: AsyncSession = Depends(get_session)):
+async def register(
+    data: RegisterRequest,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+):
     existing = (await session.execute(select(User).where(User.email == data.email))).scalar_one_or_none()
     if existing:
         raise HTTPException(status_code=409, detail="Email already registered")
@@ -68,8 +103,9 @@ async def register(data: RegisterRequest, session: AsyncSession = Depends(get_se
     await session.commit()
     await session.refresh(user)
 
-    token = create_jwt(user.id)
-    return TokenResponse(access_token=token)
+    background_tasks.add_task(_create_and_send_verification, user, session)
+    jwt_token = create_jwt(user.id)
+    return TokenResponse(access_token=jwt_token)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -90,7 +126,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
 @router.patch("/me", response_model=UserResponse)
 async def update_me(
     data: UpdateProfileRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     session: AsyncSession = Depends(get_session),
 ):
     if data.nickname is not None:
@@ -109,3 +145,129 @@ async def update_me(
     await session.commit()
     await session.refresh(current_user)
     return current_user
+
+
+@router.post("/verify-email", response_model=ResendVerificationResponse)
+async def verify_email(data: VerifyEmailRequest, session: AsyncSession = Depends(get_session)):
+    token = (
+        await session.execute(
+            select(VerificationToken).where(
+                VerificationToken.token == data.token,
+                VerificationToken.purpose == "email_verify",
+                VerificationToken.used == False,
+            )
+        )
+    ).scalar_one_or_none()
+
+    if not token:
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    if token.expires_at < datetime.datetime.now(datetime.timezone.utc):
+        await session.delete(token)
+        await session.commit()
+        raise HTTPException(status_code=400, detail="Token has expired")
+
+    user = await session.get(User, token.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.email_verified = True
+    token.used = True
+    await session.commit()
+    return ResendVerificationResponse(message="Email verified successfully")
+
+
+@router.post("/resend-verification", response_model=ResendVerificationResponse)
+async def resend_verification(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    if current_user.email_verified:
+        return ResendVerificationResponse(message="Email already verified")
+
+    await session.execute(
+        update(VerificationToken)
+        .where(
+            VerificationToken.user_id == current_user.id,
+            VerificationToken.purpose == "email_verify",
+            VerificationToken.used == False,
+        )
+        .values(used=True)
+    )
+
+    token_str = generate_token()
+    token = VerificationToken(
+        user_id=current_user.id,
+        token=token_str,
+        purpose="email_verify",
+        expires_at=datetime.datetime.now(datetime.timezone.utc)
+        + datetime.timedelta(minutes=settings.verify_email_token_minutes),
+    )
+    session.add(token)
+    await session.commit()
+
+    await send_verification_email(current_user.email, current_user.nickname, token_str)
+    return ResendVerificationResponse(message="Verification email sent")
+
+
+@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+async def forgot_password(
+    data: ForgotPasswordRequest,
+    session: AsyncSession = Depends(get_session),
+):
+    user = (await session.execute(select(User).where(User.email == data.email))).scalar_one_or_none()
+    if user:
+        await session.execute(
+            update(VerificationToken)
+            .where(
+                VerificationToken.user_id == user.id,
+                VerificationToken.purpose == "password_reset",
+                VerificationToken.used == False,
+            )
+            .values(used=True)
+        )
+
+        token_str = generate_token()
+        token = VerificationToken(
+            user_id=user.id,
+            token=token_str,
+            purpose="password_reset",
+            expires_at=datetime.datetime.now(datetime.timezone.utc)
+            + datetime.timedelta(minutes=settings.reset_password_token_minutes),
+        )
+        session.add(token)
+        await session.commit()
+
+        await send_reset_password_email(user.email, user.nickname, token_str)
+
+    return ForgotPasswordResponse(message="If the email is registered, a reset link has been sent")
+
+
+@router.post("/reset-password", response_model=ResendVerificationResponse)
+async def reset_password(data: ResetPasswordRequest, session: AsyncSession = Depends(get_session)):
+    token = (
+        await session.execute(
+            select(VerificationToken).where(
+                VerificationToken.token == data.token,
+                VerificationToken.purpose == "password_reset",
+                VerificationToken.used == False,
+            )
+        )
+    ).scalar_one_or_none()
+
+    if not token:
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    if token.expires_at < datetime.datetime.now(datetime.timezone.utc):
+        await session.delete(token)
+        await session.commit()
+        raise HTTPException(status_code=400, detail="Token has expired")
+
+    user = await session.get(User, token.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.password_hash = hash_password(data.password)
+    token.used = True
+    await session.commit()
+    return ResendVerificationResponse(message="Password reset successfully")

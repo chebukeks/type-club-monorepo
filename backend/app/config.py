@@ -17,5 +17,20 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
 
+    # SMTP
+    smtp_host: str = "smtp.mail.ru"
+    smtp_port: int = 465
+    smtp_user: str = ""
+    smtp_pass: str = ""
+    smtp_from: str = "support@type-club.ru"
+    smtp_use_tls: bool = True
+
+    # Frontend URL for email links
+    frontend_url: str = "https://type-club.ru"
+
+    # Verification token TTL
+    verify_email_token_minutes: int = 1440  # 24 hours
+    reset_password_token_minutes: int = 60   # 1 hour
+
 
 settings = Settings()

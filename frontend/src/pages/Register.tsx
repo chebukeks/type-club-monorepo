@@ -1,16 +1,16 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function Register() {
   const { register } = useAuth();
-  const navigate = useNavigate();
   const [nickname, setNickname] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [registered, setRegistered] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,13 +22,30 @@ export default function Register() {
     setLoading(true);
     try {
       await register(nickname, email, password, confirm);
-      navigate("/");
+      setRegistered(true);
     } catch (err: any) {
       setError(err.message || "Registration failed");
     } finally {
       setLoading(false);
     }
   };
+
+  if (registered) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-20 text-center">
+        <h1 className="text-2xl font-bold mb-4 text-green-600">Account Created!</h1>
+        <p className="text-gray-500 dark:text-gray-400 mb-2">
+          We've sent a verification email to <strong>{email}</strong>.
+        </p>
+        <p className="text-gray-500 dark:text-gray-400 mb-6">
+          Please check your inbox and click the verification link to get started.
+        </p>
+        <Link to="/" className="inline-block px-6 py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700">
+          Go Home
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-md mx-auto px-4 py-20">
