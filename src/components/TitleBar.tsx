@@ -2,7 +2,7 @@
  * TitleBar.tsx — Кастомная шапка окна (frameless window).
  * Содержит логотип, MenuBar, переключатель режимов и кнопки управления окном.
  */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { MenuBar } from './MenuBar'
 import { SettingsPopup } from './SettingsPopup'
 import { AuthModal } from './AuthModal'
@@ -23,6 +23,14 @@ export function TitleBar() {
   const [showPublish, setShowPublish] = useState(false)
   const { state, setEditorMode } = useEditor()
   const { user, logout } = useAuth()
+  const [modeLoading, setModeLoading] = useState(false)
+
+  // Слушаем событие от MarkdownEditor, что редактор готов
+  useEffect(() => {
+    const handler = () => setModeLoading(false)
+    window.addEventListener('editor-mode-ready', handler)
+    return () => window.removeEventListener('editor-mode-ready', handler)
+  }, [])
 
   return (
     <>
@@ -67,7 +75,15 @@ export function TitleBar() {
             {modes.map((m) => (
               <button
                 key={m.key}
-                onClick={() => setEditorMode(m.key)}
+                onClick={() => {
+                  if (state.editorMode !== m.key) {
+                    setModeLoading(true)
+                    // Даём браузеру кадр на отрисовку спиннера,
+                    // прежде чем начать тяжёлую синхронную работу
+                    // (сериализация 32 МБ + рендер textarea)
+                    setTimeout(() => setEditorMode(m.key), 50)
+                  }
+                }}
                 className="transition-colors text-[11px] font-medium tracking-wide"
                 style={{
                   padding: '0 10px',
@@ -80,6 +96,18 @@ export function TitleBar() {
               </button>
             ))}
           </div>
+          {/* Спиннер при переключении режима */}
+          {modeLoading && (
+            <div
+              className="ml-2 flex items-center"
+              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="animate-spin">
+                <circle cx="12" cy="12" r="10" stroke="var(--text-dim)" strokeWidth="2" opacity="0.3" />
+                <path d="M12 2a10 10 0 0 1 10 10" stroke="var(--text-secondary)" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </div>
+          )}
         </div>
 
         {/* Кнопки: пользователь + настройки + управление окном */}

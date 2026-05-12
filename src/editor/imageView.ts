@@ -3,6 +3,10 @@
  * Показывает картинку с подписью (alt) по центру.
  * Клик по подписи открывает inline-редактирование.
  * Автоматически распознаёт ссылки на YouTube и рендерит плеер.
+ *
+ * Оптимизация: data: URI конвертируются в blob URL для отображения.
+ * Это убирает мегабайтные строки из DOM и даёт GPU нативные изображения,
+ * решая проблему "Failed to serialize op in 16777152 bytes".
  */
 import { Node as PMNode } from 'prosemirror-model'
 import { EditorView, NodeView } from 'prosemirror-view'
@@ -31,6 +35,35 @@ function parseYouTubeUrl(url: string): { videoId: string, start?: string } | nul
   }
 
   return { videoId, start };
+}
+
+// Кеш blob URL: data URI → blob URL.
+// Ключ = длина строки + первые 64 символа (достаточно для уникальности, избегаем хеширования МБ).
+const blobUrlCache = new Map<string, string>()
+
+function dataUriToBlobUrl(dataUri: string): string {
+  const cacheKey = dataUri.length + ':' + dataUri.substring(0, 64)
+  const cached = blobUrlCache.get(cacheKey)
+  if (cached) return cached
+
+  const commaIdx = dataUri.indexOf(',')
+  if (commaIdx === -1) return dataUri
+
+  const header = dataUri.substring(0, commaIdx)
+  const base64 = dataUri.substring(commaIdx + 1)
+  const mimeMatch = header.match(/data:([^;]+)/)
+  const mime = mimeMatch ? mimeMatch[1] : 'image/png'
+
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+
+  const blob = new Blob([bytes], { type: mime })
+  const url = URL.createObjectURL(blob)
+  blobUrlCache.set(cacheKey, url)
+  return url
 }
 
 export class ImageView implements NodeView {
@@ -109,7 +142,14 @@ export class ImageView implements NodeView {
       }
     } else {
       const img = document.createElement('img')
-      img.src = this.currentSrc
+      // Конвертируем data: URI в blob URL для отображения.
+      // Это убирает мегабайтные base64 строки из DOM-атрибутов
+      // и решает проблему GPU растеризатора Chromium (16 МБ лимит).
+      if (this.currentSrc.startsWith('data:')) {
+        img.src = dataUriToBlobUrl(this.currentSrc)
+      } else {
+        img.src = this.currentSrc
+      }
       if (this.node.attrs.alt) img.alt = this.node.attrs.alt
       if (this.node.attrs.title) img.title = this.node.attrs.title
       this.mediaContainer.appendChild(img)
