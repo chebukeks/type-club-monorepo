@@ -273,6 +273,11 @@ if (handlers) {
 // Сериализатор: ProseMirror doc → Markdown
 // ============================================================
 
+// Кеш сериализации image нод: ProseMirror переиспользует неизменённые ноды
+// (structural sharing), поэтому WeakMap по ссылке на ноду даёт ~100% cache hit
+// при редактировании текста. Избегаем конкатенации мегабайтных base64 строк.
+const imageSerializeCache = new WeakMap<PMNode, string>()
+
 export const markdownSerializer = new MarkdownSerializer(
   {
     // --- Ноды ---
@@ -409,10 +414,15 @@ export const markdownSerializer = new MarkdownSerializer(
       state.closeBlock(node)
     },
     image(state, node) {
-      const alt = node.attrs.alt || ''
-      const src = node.attrs.src || ''
-      const title = node.attrs.title ? ` "${node.attrs.title.replace(/"/g, '\\"')}"` : ''
-      state.write(`![${alt}](${src}${title})`)
+      let cached = imageSerializeCache.get(node)
+      if (!cached) {
+        const alt = node.attrs.alt || ''
+        const src = node.attrs.src || ''
+        const title = node.attrs.title ? ` "${node.attrs.title.replace(/"/g, '\\"')}"` : ''
+        cached = `![${alt}](${src}${title})`
+        imageSerializeCache.set(node, cached)
+      }
+      state.write(cached)
     },
   },
   {
@@ -515,15 +525,46 @@ function cellText(_state: unknown, cell: PMNode): string {
 /** Markdown string → ProseMirror document */
 export function parseMarkdown(markdown: string): PMNode {
   try {
-    const doc = markdownParser.parse(markdown)
+    // Оптимизация: если документ содержит data: URI (встроенные изображения),
+    // заменяем их на короткие плейсхолдеры перед парсингом markdown-it.
+    // Это сокращает строку с 32+ МБ до нескольких КБ и радикально ускоряет токенизацию.
+    const dataUriMap: Map<string, string> = new Map()
+    let processedMarkdown = markdown
+
+    if (markdown.includes('data:image/')) {
+      let idx = 0
+      processedMarkdown = markdown.replace(
+        /data:image\/[a-zA-Z+]+;base64,[A-Za-z0-9+/=\s]+/g,
+        (match) => {
+          const placeholder = `__DATAURI_${idx++}__`
+          dataUriMap.set(placeholder, match.trim())
+          return placeholder
+        }
+      )
+    }
+
+    const doc = markdownParser.parse(processedMarkdown)
     if (!doc) {
-      // Если парсинг вернул null — пустой документ
       return schema.node('doc', null, [schema.node('paragraph')])
     }
+
+    // Восстанавливаем оригинальные data: URI в атрибутах image нод
+    if (dataUriMap.size > 0) {
+      doc.descendants((node) => {
+        if (node.type.name === 'image' && node.attrs.src) {
+          const original = dataUriMap.get(node.attrs.src)
+          if (original) {
+            // attrs мутабельны на этапе после парсинга, до помещения в EditorState
+            ;(node.attrs as Record<string, unknown>).src = original
+          }
+        }
+        return true
+      })
+    }
+
     return doc
   } catch (error: any) {
     console.error('Markdown parse error:', error)
-    // Возвращаем документ с текстом ошибки, чтобы приложение не падало в "черный экран"
     return schema.node('doc', null, [
       schema.node('paragraph', null, [
          schema.text('CRITICAL PARSE ERROR: ' + (error.message || String(error)))

@@ -47,6 +47,14 @@ class TooltipView {
   saveUrl() {
     if (!this.activeRange) return
     const newUrl = this.input.value
+
+    // Если значение не менялось (или это сокращённый data: URI), не обновляем
+    if (newUrl === this.activeUrl || (this.activeUrl.startsWith('data:') && newUrl.includes('(встроенное изображение)'))) {
+      this.hide()
+      this.view.focus()
+      return
+    }
+
     const tr = this.view.state.tr
 
     if (this.isImage) {
@@ -125,7 +133,15 @@ class TooltipView {
       this.activeRange = { from, to }
     }
 
-    this.input.value = this.activeUrl
+    // Для data: URI показываем сокращённую версию, чтобы не вешать браузер
+    // (полный URL может быть 3+ МБ)
+    if (this.activeUrl && this.activeUrl.startsWith('data:')) {
+      const commaIdx = this.activeUrl.indexOf(',')
+      const header = commaIdx !== -1 ? this.activeUrl.substring(0, commaIdx) : 'data:image'
+      this.input.value = header + ',… (встроенное изображение)'
+    } else {
+      this.input.value = this.activeUrl
+    }
     this.show()
     
     // Позиционируем

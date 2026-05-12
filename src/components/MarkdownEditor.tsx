@@ -99,6 +99,7 @@ export function MarkdownEditor() {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
   const [showSearch, setShowSearch] = useState(false)
   const lastWheelTimeRef = useRef(0)
+  const flushSyncRef = useRef<(() => void) | null>(null)
 
   // -- Масштаб (для расчётов координат маски и фокуса) --
   const docScale = state.documentZoom / 100
@@ -108,6 +109,10 @@ export function MarkdownEditor() {
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
   const content = activeTab?.content || ''
   const isOverLimitRef = useRef(false)
+  const wordLimitRef = useRef(state.wordLimit)
+  useEffect(() => { wordLimitRef.current = state.wordLimit }, [state.wordLimit])
+
+  // Статистика для word limit: вычисляется из content (обновляется с debounce)
   const stats = useMemo(() => {
     const text = content.trim()
     const chars = text.length
@@ -195,6 +200,22 @@ export function MarkdownEditor() {
     })
 
     // Плагин синхронизации изменений → контекст
+    // Сериализация документа debounce'ится, чтобы не пересобирать
+    // огромные строки (32+ МБ при встроенных изображениях) на каждое нажатие.
+    let syncTimer: ReturnType<typeof setTimeout> | null = null
+    let pendingDoc: PMNode | null = null
+
+    function flushSync() {
+      if (syncTimer) { clearTimeout(syncTimer); syncTimer = null }
+      if (pendingDoc) {
+        const md = serializeMarkdown(pendingDoc)
+        dispatchRef.current({ type: 'UPDATE_CONTENT', payload: { tabId, content: md } })
+        pendingDoc = null
+      }
+    }
+    // Сохраняем в ref, чтобы cleanup мог вызвать flush
+    flushSyncRef.current = flushSync
+
     const syncPlugin = new Plugin({
       props: {
         handleKeyDown(view, event) {
@@ -210,9 +231,24 @@ export function MarkdownEditor() {
         return {
           update(view, prevState) {
             if (!view.state.doc.eq(prevState.doc)) {
-              const md = serializeMarkdown(view.state.doc)
-              dispatchRef.current({ type: 'UPDATE_CONTENT', payload: { tabId, content: md } })
+              pendingDoc = view.state.doc
+              if (syncTimer) clearTimeout(syncTimer)
+              syncTimer = setTimeout(flushSync, 1500)
+
+              // Обновляем word limit в реальном времени из doc.textContent
+              // (мгновенно, без сериализации, без учёта base64 данных)
+              const wl = wordLimitRef.current
+              if (wl.enabled) {
+                const text = view.state.doc.textContent.trim()
+                const val = wl.type === 'chars'
+                  ? text.length
+                  : (text ? text.split(/\s+/).filter(Boolean).length : 0)
+                isOverLimitRef.current = val > wl.value
+              }
             }
+          },
+          destroy() {
+            flushSync()
           },
         }
       },
@@ -391,9 +427,13 @@ export function MarkdownEditor() {
       if (scrollContainer && activeTab.scrollTop > 0) {
         scrollContainer.scrollTop = activeTab.scrollTop
       }
+      // Сигнал TitleBar, что редактор готов (убирает спиннер)
+      window.dispatchEvent(new Event('editor-mode-ready'))
     })
 
     return () => {
+      // Flush pending serialization before destroying
+      if (flushSyncRef.current) { flushSyncRef.current(); flushSyncRef.current = null }
       // Сохранить позицию прокрутки при размонтировании
       const scrollContainer = view.dom.closest('.overflow-auto') as HTMLElement
       if (scrollContainer) {
@@ -518,6 +558,8 @@ export function MarkdownEditor() {
   // ============================================================
 
   if (state.editorMode === 'raw') {
+    // Сигнал TitleBar после рендера textarea (убирает спиннер)
+    requestAnimationFrame(() => window.dispatchEvent(new Event('editor-mode-ready')))
     return (
       <div className="relative flex-1 overflow-auto bg-[var(--bg-base)]">
         {showSearch && textareaRef.current && (
