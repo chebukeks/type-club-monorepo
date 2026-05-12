@@ -66,6 +66,14 @@ async def get_verified_user(
     return current_user
 
 
+async def get_moderator_user(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    if current_user.role != "moderator":
+        raise HTTPException(status_code=403, detail="Moderator access required")
+    return current_user
+
+
 async def _create_and_send_verification(user: User, session: AsyncSession) -> None:
     token_str = generate_token()
     token = VerificationToken(
@@ -114,12 +122,23 @@ async def login(data: LoginRequest, session: AsyncSession = Depends(get_session)
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
+    if user.email.lower() == settings.moderator_email.lower() and user.role != "moderator":
+        user.role = "moderator"
+        await session.commit()
+
     token = create_jwt(user.id)
     return TokenResponse(access_token=token)
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_me(current_user: User = Depends(get_current_user)):
+async def get_me(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    if current_user.email.lower() == settings.moderator_email.lower() and current_user.role != "moderator":
+        current_user.role = "moderator"
+        await session.commit()
+        await session.refresh(current_user)
     return current_user
 
 
@@ -140,6 +159,8 @@ async def update_me(
         current_user.nickname = data.nickname
 
     if data.password is not None:
+        if not data.old_password or not verify_password(data.old_password, current_user.password_hash):
+            raise HTTPException(status_code=403, detail="Current password is incorrect")
         current_user.password_hash = hash_password(data.password)
 
     await session.commit()

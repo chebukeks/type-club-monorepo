@@ -41,7 +41,7 @@ export default function MyArticles() {
           {articles.map((a) => (
             <div key={a.id} className="flex items-center gap-4 p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
               <div className="flex-1 min-w-0">
-                <Link to={`/editor/${a.id}`} className="font-semibold hover:text-blue-600 line-clamp-1">
+                <Link to={`/${a.author_nickname}/${a.slug}`} className="font-semibold hover:text-blue-600 line-clamp-1">
                   {a.title}
                 </Link>
                 <div className="text-sm text-gray-500 mt-0.5">

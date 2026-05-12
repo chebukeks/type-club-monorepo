@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { articlesApi, ArticleListItem } from "../api";
+import { useAuth } from "../context/AuthContext";
 import { BookOpen, Download, PenTool } from "lucide-react";
 import ArticleCard from "../components/ArticleCard";
 
 export default function Landing() {
+  const { user } = useAuth();
   const [articles, setArticles] = useState<ArticleListItem[]>([]);
 
   useEffect(() => {
@@ -66,7 +68,7 @@ export default function Landing() {
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             {articles.map((a) => (
-              <ArticleCard key={a.id} article={a} />
+              <ArticleCard key={a.id} article={a} isModerator={user?.role === "moderator"} />
             ))}
           </div>
         </section>

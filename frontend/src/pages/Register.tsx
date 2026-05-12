@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { authApi } from "../api";
 
 export default function Register() {
   const { register } = useAuth();
@@ -11,6 +12,8 @@ export default function Register() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
+  const [resendMsg, setResendMsg] = useState("");
+  const [resending, setResending] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,6 +33,19 @@ export default function Register() {
     }
   };
 
+  const handleResend = async () => {
+    setResending(true);
+    setResendMsg("");
+    try {
+      const res = await authApi.resendVerification();
+      setResendMsg(res.message);
+    } catch (err: any) {
+      setResendMsg(err.message || "Failed to resend");
+    } finally {
+      setResending(false);
+    }
+  };
+
   if (registered) {
     return (
       <div className="max-w-md mx-auto px-4 py-20 text-center">
@@ -40,9 +56,25 @@ export default function Register() {
         <p className="text-gray-500 dark:text-gray-400 mb-6">
           Please check your inbox and click the verification link to get started.
         </p>
-        <Link to="/" className="inline-block px-6 py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700">
-          Go Home
-        </Link>
+        {resendMsg && (
+          <div className={`p-3 rounded-lg mb-4 text-sm ${
+            resendMsg.toLowerCase().includes("fail") || resendMsg.toLowerCase().includes("error")
+              ? "bg-red-50 dark:bg-red-950 text-red-600"
+              : "bg-green-50 dark:bg-green-950 text-green-600"
+          }`}>{resendMsg}</div>
+        )}
+        <div className="flex flex-col gap-3 items-center">
+          <button
+            onClick={handleResend}
+            disabled={resending}
+            className="text-blue-600 hover:underline text-sm disabled:opacity-50"
+          >
+            {resending ? "Sending..." : "Resend verification email"}
+          </button>
+          <Link to="/" className="px-6 py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700">
+            Go Home
+          </Link>
+        </div>
       </div>
     );
   }

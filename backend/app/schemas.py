@@ -43,6 +43,7 @@ class UserResponse(BaseModel):
     nickname: str
     email: str
     email_verified: bool
+    role: str
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -50,6 +51,7 @@ class UserResponse(BaseModel):
 
 class UpdateProfileRequest(BaseModel):
     nickname: Optional[str] = None
+    old_password: Optional[str] = None
     password: Optional[str] = None
     confirm_password: Optional[str] = None
 
@@ -138,3 +140,20 @@ class ArticleListItem(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+# ── Moderation ──
+
+class ModerateRequest(BaseModel):
+    action: str
+
+    @field_validator("action")
+    @classmethod
+    def valid_action(cls, v: str) -> str:
+        if v not in ("block", "unblock"):
+            raise ValueError("Action must be 'block' or 'unblock'")
+        return v
+
+
+class ModerateResponse(BaseModel):
+    message: str

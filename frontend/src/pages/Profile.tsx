@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { authApi } from "../api";
 
@@ -11,7 +12,7 @@ function nickError(n: string): string | null {
 }
 
 function passError(p: string): string | null {
-  if (!p) return null; // empty = skip
+  if (!p) return null;
   if (p.length < 6) return "Password must be at least 6 characters";
   if (p.length > 128) return "Password is too long";
   return null;
@@ -20,6 +21,8 @@ function passError(p: string): string | null {
 export default function Profile() {
   const { user, refresh } = useAuth();
   const [nickname, setNickname] = useState(user?.nickname || "");
+  const [showPassword, setShowPassword] = useState(false);
+  const [oldPassword, setOldPassword] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [msg, setMsg] = useState("");
@@ -30,9 +33,9 @@ export default function Profile() {
   if (!user) return null;
 
   const ne = nickError(nickname);
-  const pe = passError(password);
-  const ce = password && password !== confirm ? "Passwords do not match" : null;
-  const canSubmit = !ne && !pe && !ce && (nickname !== user.nickname || password);
+  const pe = showPassword ? passError(password) : null;
+  const ce = showPassword && password && password !== confirm ? "Passwords do not match" : null;
+  const canSubmit = !ne && !pe && !ce && (nickname !== user.nickname || (showPassword && password));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,11 +46,17 @@ export default function Profile() {
     try {
       const data: any = {};
       if (nickname.trim() !== user.nickname) data.nickname = nickname.trim();
-      if (password) { data.password = password; data.confirm_password = confirm; }
+      if (showPassword && password) {
+        data.old_password = oldPassword;
+        data.password = password;
+        data.confirm_password = confirm;
+      }
       await authApi.updateMe(data);
       await refresh();
+      setOldPassword("");
       setPassword("");
       setConfirm("");
+      setShowPassword(false);
       setMsg("Profile updated");
     } catch (err: any) {
       setError(err.message || "Update failed");
@@ -109,33 +118,60 @@ export default function Profile() {
           )}
         </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-1">New Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Leave empty to keep current"
-            className={`w-full px-4 py-2.5 rounded-xl border bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-              pe && password ? "border-red-400 dark:border-red-600" : "border-gray-300 dark:border-gray-700"
-            }`}
-          />
-          {pe && password && <p className="text-red-500 text-xs mt-1">{pe}</p>}
-        </div>
-
-        {password && (
-          <div>
-            <label className="block text-sm font-medium mb-1">Confirm New Password</label>
-            <input
-              type="password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              className={`w-full px-4 py-2.5 rounded-xl border bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                ce ? "border-red-400 dark:border-red-600" : "border-gray-300 dark:border-gray-700"
-              }`}
-            />
-            {ce && <p className="text-red-500 text-xs mt-1">{ce}</p>}
-          </div>
+        {!showPassword ? (
+          <button
+            type="button"
+            onClick={() => setShowPassword(true)}
+            className="w-full py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          >
+            Change Password
+          </button>
+        ) : (
+          <>
+            <div>
+              <label className="block text-sm font-medium mb-1">Current Password</label>
+              <input
+                type="password"
+                value={oldPassword}
+                onChange={(e) => setOldPassword(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                <Link to="/forgot-password" className="text-blue-600 hover:underline">I don't remember my password</Link>
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">New Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={`w-full px-4 py-2.5 rounded-xl border bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  pe && password ? "border-red-400 dark:border-red-600" : "border-gray-300 dark:border-gray-700"
+                }`}
+              />
+              {pe && password && <p className="text-red-500 text-xs mt-1">{pe}</p>}
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Confirm New Password</label>
+              <input
+                type="password"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                className={`w-full px-4 py-2.5 rounded-xl border bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  ce ? "border-red-400 dark:border-red-600" : "border-gray-300 dark:border-gray-700"
+                }`}
+              />
+              {ce && <p className="text-red-500 text-xs mt-1">{ce}</p>}
+            </div>
+            <button
+              type="button"
+              onClick={() => { setShowPassword(false); setOldPassword(""); setPassword(""); setConfirm(""); }}
+              className="text-sm text-gray-500 hover:underline w-full text-center"
+            >
+              Cancel
+            </button>
+          </>
         )}
 
         <button

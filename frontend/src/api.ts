@@ -50,6 +50,7 @@ export interface User {
   nickname: string;
   email: string;
   email_verified: boolean;
+  role: string;
   created_at: string;
 }
 
@@ -110,4 +111,6 @@ export const articlesApi = {
   update: (id: number, data: { title?: string; content?: string; access_state?: string; slug?: string }) =>
     api.patch<Article>(`/articles/${id}`, data),
   delete: (id: number) => api.delete<void>(`/articles/${id}`),
+  moderate: (id: number, action: "block" | "unblock") =>
+    api.post<{ message: string }>(`/articles/${id}/moderate`, { action }),
 };

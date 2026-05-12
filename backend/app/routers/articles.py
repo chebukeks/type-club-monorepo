@@ -4,12 +4,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
 from app.models import Article, User
-from app.routers.auth import get_current_user, get_optional_user, get_verified_user
+from app.routers.auth import get_current_user, get_moderator_user, get_optional_user, get_verified_user
 from app.schemas import (
     ArticleCreateRequest,
     ArticleListItem,
     ArticleResponse,
     ArticleUpdateRequest,
+    ModerateRequest,
+    ModerateResponse,
 )
 
 router = APIRouter(prefix="/api/articles", tags=["articles"])
@@ -46,16 +48,16 @@ def _article_to_list_item(article: Article) -> ArticleListItem:
 async def list_articles(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
+    current_user: User | None = Depends(get_optional_user),
     session: AsyncSession = Depends(get_session),
 ):
     offset = (page - 1) * size
-    result = await session.execute(
-        select(Article)
-        .where(Article.access_state == "public")
-        .order_by(Article.updated_at.desc())
-        .offset(offset)
-        .limit(size)
-    )
+    query = select(Article).order_by(Article.updated_at.desc()).offset(offset).limit(size)
+    if current_user and current_user.role == "moderator":
+        pass  # moderator sees all articles
+    else:
+        query = query.where(Article.access_state == "public")
+    result = await session.execute(query)
     articles = result.scalars().all()
     return [_article_to_list_item(a) for a in articles]
 
@@ -126,7 +128,8 @@ async def get_article_by_path(
         raise HTTPException(status_code=404, detail="Article not found")
 
     is_author = current_user and current_user.id == article.author_id
-    if not is_author and article.access_state not in ("public", "link"):
+    is_moderator = current_user and current_user.role == "moderator"
+    if not is_author and not is_moderator and article.access_state not in ("public", "link"):
         raise HTTPException(status_code=403, detail="Access denied")
 
     return _article_to_response(article, author)
@@ -143,7 +146,8 @@ async def get_article(
         raise HTTPException(status_code=404, detail="Article not found")
 
     is_author = current_user and current_user.id == article.author_id
-    if not is_author and article.access_state not in ("public", "link"):
+    is_moderator = current_user and current_user.role == "moderator"
+    if not is_author and not is_moderator and article.access_state not in ("public", "link"):
         raise HTTPException(status_code=403, detail="Access denied")
 
     author = await session.get(User, article.author_id)
@@ -191,6 +195,28 @@ async def update_article(
     return _article_to_response(article, current_user)
 
 
+@router.post("/{article_id}/moderate", response_model=ModerateResponse)
+async def moderate_article(
+    article_id: int,
+    data: ModerateRequest,
+    current_user: User = Depends(get_moderator_user),
+    session: AsyncSession = Depends(get_session),
+):
+    article = await session.get(Article, article_id)
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    if data.action == "block":
+        article.access_state = "blocked"
+    elif data.action == "unblock":
+        if article.access_state != "blocked":
+            raise HTTPException(status_code=400, detail="Article is not blocked")
+        article.access_state = "private"
+
+    await session.commit()
+    return ModerateResponse(message=f"Article {data.action}ed")
+
+
 @router.delete("/{article_id}", status_code=204)
 async def delete_article(
     article_id: int,
@@ -200,7 +226,7 @@ async def delete_article(
     article = await session.get(Article, article_id)
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
-    if article.author_id != current_user.id:
+    if article.author_id != current_user.id and current_user.role != "moderator":
         raise HTTPException(status_code=403, detail="Not your article")
 
     await session.delete(article)

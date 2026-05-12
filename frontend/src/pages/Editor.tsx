@@ -21,6 +21,7 @@ export default function Editor() {
   const [accessState, setAccessState] = useState("private");
   const [slug, setSlug] = useState("");
   const [showSiteHeader, setShowSiteHeader] = useState(false);
+  const [loaded, setLoaded] = useState(id ? false : true);
 
   const autosaveRef = useRef(autosave);
   autosaveRef.current = autosave;
@@ -37,13 +38,17 @@ export default function Editor() {
       setContent(a.content);
       setAccessState(a.access_state);
       setSlug(a.slug);
+      setLoaded(true);
     }).catch(() => navigate("/my-articles"));
   }, [articleId, navigate]);
 
   // Autosave
+  const loadedRef = useRef(loaded);
+  loadedRef.current = loaded;
   useEffect(() => {
     const interval = setInterval(async () => {
       if (!autosaveRef.current) return;
+      if (articleId && !loadedRef.current) return;
       if (!titleRef.current.trim() && !contentRef.current.trim()) return;
       try {
         if (articleId) {

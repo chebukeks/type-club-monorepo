@@ -32,5 +32,8 @@ class Settings(BaseSettings):
     verify_email_token_minutes: int = 1440  # 24 hours
     reset_password_token_minutes: int = 60   # 1 hour
 
+    # Moderation
+    moderator_email: str = "moderator@type-club.ru"
+
 
 settings = Settings()

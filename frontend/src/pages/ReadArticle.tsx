@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { articlesApi, Article } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { MarkdownEditor } from "../components/MarkdownEditor";
-import { Edit } from "lucide-react";
+import { Edit, Shield } from "lucide-react";
 
 export default function ReadArticle() {
   const { username, slug } = useParams<{ username: string; slug: string }>();
@@ -37,6 +37,29 @@ export default function ReadArticle() {
   }
 
   const isAuthor = user?.id === article.author_id;
+  const isModerator = user?.role === "moderator";
+
+  const handleBlock = async () => {
+    try {
+      const updated = await articlesApi.moderate(article.id, "block");
+      setArticle({ ...article, access_state: "blocked" });
+    } catch {}
+  };
+
+  const handleUnblock = async () => {
+    try {
+      const updated = await articlesApi.moderate(article.id, "unblock");
+      setArticle({ ...article, access_state: "private" });
+    } catch {}
+  };
+
+  const handleDelete = async () => {
+    if (!confirm("Delete this article?")) return;
+    try {
+      await articlesApi.delete(article.id);
+      navigate("/articles");
+    } catch {}
+  };
 
   return (
     <div className="max-w-3xl mx-auto px-2 sm:px-4 py-8">
@@ -64,6 +87,34 @@ export default function ReadArticle() {
           >
             <Edit size={14} /> Edit
           </Link>
+        )}
+        {isModerator && (
+          <div className="flex items-center gap-2 mt-4">
+            <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+              <Shield size={12} /> Moderator
+            </span>
+            {article.access_state === "blocked" ? (
+              <button
+                onClick={handleUnblock}
+                className="px-3 py-1.5 rounded-lg bg-green-100 dark:bg-green-950 text-green-700 text-sm font-medium hover:bg-green-200 dark:hover:bg-green-900 transition-colors"
+              >
+                Unblock
+              </button>
+            ) : (
+              <button
+                onClick={handleBlock}
+                className="px-3 py-1.5 rounded-lg bg-yellow-100 dark:bg-yellow-950 text-yellow-700 text-sm font-medium hover:bg-yellow-200 dark:hover:bg-yellow-900 transition-colors"
+              >
+                Block
+              </button>
+            )}
+            <button
+              onClick={handleDelete}
+              className="px-3 py-1.5 rounded-lg bg-red-100 dark:bg-red-950 text-red-600 text-sm font-medium hover:bg-red-200 dark:hover:bg-red-900 transition-colors"
+            >
+              Delete
+            </button>
+          </div>
         )}
       </div>
 
