@@ -101,6 +101,45 @@ export function MarkdownEditor() {
   const lastWheelTimeRef = useRef(0)
   const flushSyncRef = useRef<(() => void) | null>(null)
 
+  // --- Raw-режим: плейсхолдеры для data URI ---
+  // Вместо 32+ МБ base64 в textarea показываем короткие плейсхолдеры.
+  // Данные хранятся в карте и восстанавливаются при сохранении/переключении.
+  const [rawContent, setRawContent] = useState<string | null>(null)
+  const rawImageMapRef = useRef<Map<string, string>>(new Map())
+  const rawSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // ID вкладки, которой принадлежит текущий rawContent
+  const rawTabIdRef = useRef<string | null>(null)
+
+  /** Восстановить data URI и записать в tab.content */
+  const flushRawContentRef = useRef<(() => void) | null>(null)
+  flushRawContentRef.current = () => {
+    if (rawSyncTimerRef.current) { clearTimeout(rawSyncTimerRef.current); rawSyncTimerRef.current = null }
+    if (rawContent === null || !rawTabIdRef.current) return
+    let restored = rawContent
+    for (const [placeholder, original] of rawImageMapRef.current) {
+      restored = restored.split(placeholder).join(original)
+    }
+    dispatch({ type: 'UPDATE_CONTENT', payload: { tabId: rawTabIdRef.current, content: restored } })
+  }
+
+  // Сбрасываем raw state при смене вкладки или выходе из Raw режима
+  const prevTabIdRef = useRef(state.activeTabId)
+  const prevEditorModeRef = useRef(state.editorMode)
+  useEffect(() => {
+    const tabChanged = prevTabIdRef.current !== state.activeTabId
+    const modeChanged = prevEditorModeRef.current !== state.editorMode
+    prevTabIdRef.current = state.activeTabId
+    prevEditorModeRef.current = state.editorMode
+
+    if (tabChanged || modeChanged) {
+      // Flush raw content для предыдущей вкладки (rawTabIdRef хранит правильный ID)
+      flushRawContentRef.current?.()
+      setRawContent(null)
+      rawImageMapRef.current = new Map()
+      rawTabIdRef.current = null
+    }
+  }, [state.activeTabId, state.editorMode])
+
   // -- Масштаб (для расчётов координат маски и фокуса) --
   const docScale = state.documentZoom / 100
   const docScaleRef = useRef(docScale)
@@ -558,6 +597,30 @@ export function MarkdownEditor() {
   // ============================================================
 
   if (state.editorMode === 'raw') {
+    // При первом рендере Raw режима (или смене вкладки) — извлекаем data URI
+    const displayContent = (() => {
+      if (rawContent !== null) return rawContent
+      // Первый рендер: извлекаем data URI из content
+      const map = new Map<string, string>()
+      let idx = 0
+      const processed = activeTab.content.replace(
+        /data:image\/[a-zA-Z+]+;base64,[A-Za-z0-9+/=\s]+/g,
+        (match) => {
+          const placeholder = `<встроенное-изображение-${idx++}>`
+          map.set(placeholder, match.trim())
+          return placeholder
+        }
+      )
+      // Запускаем инициализацию через microtask, чтобы не мутировать state во время рендера
+      Promise.resolve().then(() => {
+        rawImageMapRef.current = map
+        rawTabIdRef.current = activeTab.id
+        setRawContent(processed)
+      })
+      // Первый рендер покажет исходный content (один раз, потом rawContent подхватится)
+      return map.size > 0 ? processed : activeTab.content
+    })()
+
     // Сигнал TitleBar после рендера textarea (убирает спиннер)
     requestAnimationFrame(() => window.dispatchEvent(new Event('editor-mode-ready')))
     return (
@@ -565,7 +628,7 @@ export function MarkdownEditor() {
         {showSearch && textareaRef.current && (
           <RawSearchBar
             textarea={textareaRef.current}
-            content={activeTab.content}
+            content={displayContent}
             onClose={() => setShowSearch(false)}
           />
         )}
@@ -581,9 +644,21 @@ export function MarkdownEditor() {
             display: 'block',
             tabSize: 2,
           }}
-          value={activeTab.content}
+          value={displayContent}
           onChange={(e) => {
-            dispatch({ type: 'UPDATE_CONTENT', payload: { tabId: activeTab.id, content: e.target.value } })
+            const val = e.target.value
+            setRawContent(val)
+            // Debounced restore: восстанавливаем data URI и обновляем tab.content
+            // только после паузы в 2 секунды (чтобы не дёргать 32 МБ на каждый символ)
+            if (rawSyncTimerRef.current) clearTimeout(rawSyncTimerRef.current)
+            if (rawImageMapRef.current.size > 0) {
+              rawSyncTimerRef.current = setTimeout(() => {
+                flushRawContentRef.current?.()
+              }, 2000)
+            } else {
+              // Нет изображений — обновляем напрямую (дёшево)
+              dispatch({ type: 'UPDATE_CONTENT', payload: { tabId: activeTab.id, content: val } })
+            }
           }}
           spellCheck={false}
         />
