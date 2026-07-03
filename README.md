@@ -45,7 +45,7 @@
 
 Установите бинарный файл установщика или соберите проект самостоятельно:
 
-1. Клонируйте репозиторий: `git clone https://github.com/chebukeks/type-club.git`
+1. Клонируйте репозиторий: `git clone https://github.com/type-club/type-club.git`
 2. Установите зависимости: `npm install`
 3. Запустите приложение: `npm run dev`
 
