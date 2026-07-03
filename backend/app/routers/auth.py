@@ -122,10 +122,6 @@ async def login(data: LoginRequest, session: AsyncSession = Depends(get_session)
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    if user.email.lower() == settings.moderator_email.lower() and user.role != "moderator":
-        user.role = "moderator"
-        await session.commit()
-
     token = create_jwt(user.id)
     return TokenResponse(access_token=token)
 
@@ -135,10 +131,6 @@ async def get_me(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    if current_user.email.lower() == settings.moderator_email.lower() and current_user.role != "moderator":
-        current_user.role = "moderator"
-        await session.commit()
-        await session.refresh(current_user)
     return current_user
 
 
