@@ -1,0 +1,8 @@
+{
+  "name": "type-club",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ]
+}
