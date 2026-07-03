@@ -1,0 +1,297 @@
+@import "tailwindcss";
+@import "katex/dist/katex.min.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root,
+[data-theme="dark"] {
+  --bg-base: #1a1b1e;
+  --bg-surface: #1e1f22;
+  --bg-elevated: #252526;
+  --bg-hover: #2a2d33;
+  --bg-active: #313238;
+  --bg-input: #2a2b30;
+  --border-default: #2d2e32;
+  --border-strong: #454545;
+  --border-subtle: rgba(128, 128, 128, 0.12);
+  --text-primary: #e1e1e3;
+  --text-secondary: #cccccc;
+  --text-muted: #a0a4ab;
+  --text-dim: #6a6e78;
+  --text-disabled: #4a4d54;
+  --text-heading: #e8eaed;
+  --accent: #6c8cff;
+  --accent-hover: #5a7aef;
+  --menu-hover-bg: #04395e;
+  --scrollbar-thumb: #3a3d44;
+  --scrollbar-thumb-hover: #4a4d54;
+  --close-hover-bg: #e81123;
+
+  --editor-text: #e1e1e3;
+  --editor-caret: #6c8cff;
+  --editor-selection: rgba(108, 140, 255, 0.2);
+  --editor-heading: #e8eaed;
+  --editor-heading-h3: #d2d4d7;
+  --editor-heading-h4: #c0c3c8;
+  --editor-heading-h5: #b0b3b8;
+  --editor-heading-h6: #9ca0a8;
+  --editor-prefix: #4a4d54;
+  --editor-strong: #f0f0f2;
+  --editor-em: #c8cad0;
+  --editor-strike: #7b7d85;
+  --editor-code-bg: rgba(108, 140, 255, 0.1);
+  --editor-code-text: #8ca8ff;
+  --editor-mark-bg: rgba(255, 215, 0, 0.2);
+  --editor-mark-text: #ffd700;
+  --editor-link: #5865f2;
+  --editor-syntax: #4a4d54;
+  --editor-hr: #3a3d44;
+  --editor-blockquote-border: #6c8cff;
+  --editor-blockquote-text: #a0a4ab;
+  --editor-blockquote-bg: rgba(108, 140, 255, 0.05);
+
+  --codeblock-bg: #1e1e1e;
+  --codeblock-border: #2d2e32;
+  --codeblock-header: rgba(255, 255, 255, 0.05);
+  --codeblock-text: #e4e6eb;
+  --codeblock-lang: #8bb4e7;
+  --codeblock-copy: #6a6e78;
+  --codeblock-copy-hover-text: #a0a4ae;
+  --codeblock-copy-hover-bg: rgba(255, 255, 255, 0.1);
+  --codeblock-copied: #98c379;
+
+  --table-border: #232428;
+  --table-header-bg: #1e2025;
+  --table-header-text: #e8eaed;
+  --table-cell-bg: rgba(30, 32, 37, 0.3);
+  --table-cell-text: #c8cad0;
+  --table-even-bg: rgba(30, 32, 37, 0.5);
+  --table-selected: rgba(108, 140, 255, 0.15);
+
+  --tooltip-bg: #232428;
+  --tooltip-border: #36373d;
+  --tooltip-shadow: rgba(0, 0, 0, 0.4);
+  --tooltip-input-bg: #1e1f22;
+  --tooltip-input-border: #4a4b53;
+
+  --math-text: #c678dd;
+  --math-dollar: #6a6e78;
+  --math-render: #abb2bf;
+  --math-block-editor-bg: #1e1e1e;
+  --math-block-editor-border: #2d2e32;
+  --math-block-header-bg: #232428;
+  --math-block-active-bg: rgba(255, 255, 255, 0.02);
+  --math-block-active-border: #36373d;
+  --math-btn-ok: #98c379;
+  --math-btn-ok-hover: rgba(152, 195, 121, 0.1);
+
+  --hljs-keyword: #c678dd;
+  --hljs-string: #98c379;
+  --hljs-title: #e06c75;
+  --hljs-number: #d19a66;
+  --hljs-comment: #5c6370;
+  --hljs-attr: #d19a66;
+  --hljs-symbol: #61aeee;
+  --hljs-deletion: #e06c75;
+}
+
+[data-theme="light"] {
+  --bg-base: #ffffff;
+  --bg-surface: #f3f3f3;
+  --bg-elevated: #ffffff;
+  --bg-hover: #e8e8e8;
+  --bg-active: #d4d4d4;
+  --bg-input: #f0f0f0;
+  --border-default: #e0e0e0;
+  --border-strong: #cccccc;
+  --border-subtle: rgba(128, 128, 128, 0.12);
+  --text-primary: #1e1e1e;
+  --text-secondary: #3c3c3c;
+  --text-muted: #6e6e6e;
+  --text-dim: #999999;
+  --text-disabled: #bbbbbb;
+  --text-heading: #1e1e1e;
+  --accent: #4472c4;
+  --accent-hover: #3561b3;
+  --menu-hover-bg: #d6e4ff;
+  --scrollbar-thumb: #cccccc;
+  --scrollbar-thumb-hover: #aaaaaa;
+  --close-hover-bg: #e81123;
+
+  --editor-text: #1e1e1e;
+  --editor-caret: #4472c4;
+  --editor-selection: rgba(68, 114, 196, 0.2);
+  --editor-heading: #1e1e1e;
+  --editor-heading-h3: #333333;
+  --editor-heading-h4: #444444;
+  --editor-heading-h5: #555555;
+  --editor-heading-h6: #666666;
+  --editor-prefix: #bbbbbb;
+  --editor-strong: #1e1e1e;
+  --editor-em: #333333;
+  --editor-strike: #999999;
+  --editor-code-bg: rgba(68, 114, 196, 0.08);
+  --editor-code-text: #4472c4;
+  --editor-mark-bg: rgba(255, 217, 0, 0.521);
+  --editor-mark-text: #704e00;
+  --editor-link: #4472c4;
+  --editor-syntax: #bbbbbb;
+  --editor-hr: #e0e0e0;
+  --editor-blockquote-border: #4472c4;
+  --editor-blockquote-text: #6e6e6e;
+  --editor-blockquote-bg: rgba(68, 114, 196, 0.05);
+
+  --codeblock-bg: #f5f5f5;
+  --codeblock-border: #e0e0e0;
+  --codeblock-header: rgba(0, 0, 0, 0.03);
+  --codeblock-text: #1e1e1e;
+  --codeblock-lang: #4472c4;
+  --codeblock-copy: #999999;
+  --codeblock-copy-hover-text: #666666;
+  --codeblock-copy-hover-bg: rgba(0, 0, 0, 0.05);
+  --codeblock-copied: #2e8b57;
+
+  --table-border: #e0e0e0;
+  --table-header-bg: #f0f0f0;
+  --table-header-text: #1e1e1e;
+  --table-cell-bg: transparent;
+  --table-cell-text: #333333;
+  --table-even-bg: rgba(0, 0, 0, 0.02);
+  --table-selected: rgba(68, 114, 196, 0.12);
+
+  --tooltip-bg: #ffffff;
+  --tooltip-border: #e0e0e0;
+  --tooltip-shadow: rgba(0, 0, 0, 0.1);
+  --tooltip-input-bg: #f5f5f5;
+  --tooltip-input-border: #cccccc;
+
+  --math-text: #9b59b6;
+  --math-dollar: #999999;
+  --math-render: #333333;
+  --math-block-editor-bg: #f5f5f5;
+  --math-block-editor-border: #e0e0e0;
+  --math-block-header-bg: #f0f0f0;
+  --math-block-active-bg: rgba(0, 0, 0, 0.02);
+  --math-block-active-border: #d0d0d0;
+  --math-btn-ok: #2e8b57;
+  --math-btn-ok-hover: rgba(46, 139, 87, 0.1);
+
+  --hljs-keyword: #a626a4;
+  --hljs-string: #50a14f;
+  --hljs-title: #e45649;
+  --hljs-number: #986801;
+  --hljs-comment: #a0a1a7;
+  --hljs-attr: #986801;
+  --hljs-symbol: #4078f2;
+  --hljs-deletion: #e45649;
+}
+
+@media (prefers-color-scheme: light) {
+  [data-theme="system"] {
+    --bg-base: #ffffff;
+    --bg-surface: #f3f3f3;
+    --bg-elevated: #ffffff;
+    --bg-hover: #e8e8e8;
+    --bg-active: #d4d4d4;
+    --bg-input: #f0f0f0;
+    --border-default: #e0e0e0;
+    --border-strong: #cccccc;
+    --border-subtle: rgba(128, 128, 128, 0.12);
+    --text-primary: #1e1e1e;
+    --text-secondary: #3c3c3c;
+    --text-muted: #6e6e6e;
+    --text-dim: #999999;
+    --text-disabled: #bbbbbb;
+    --text-heading: #1e1e1e;
+    --accent: #4472c4;
+    --accent-hover: #3561b3;
+    --menu-hover-bg: #d6e4ff;
+    --scrollbar-thumb: #cccccc;
+    --scrollbar-thumb-hover: #aaaaaa;
+    --close-hover-bg: #e81123;
+
+    --editor-text: #1e1e1e;
+    --editor-caret: #4472c4;
+    --editor-selection: rgba(68, 114, 196, 0.2);
+    --editor-heading: #1e1e1e;
+    --editor-heading-h3: #333333;
+    --editor-heading-h4: #444444;
+    --editor-heading-h5: #555555;
+    --editor-heading-h6: #666666;
+    --editor-prefix: #bbbbbb;
+    --editor-strong: #1e1e1e;
+    --editor-em: #333333;
+    --editor-strike: #999999;
+    --editor-code-bg: rgba(68, 114, 196, 0.08);
+    --editor-code-text: #4472c4;
+    --editor-mark-bg: rgba(255, 217, 0, 0.521);
+    --editor-mark-text: #704e00;
+    --editor-link: #4472c4;
+    --editor-syntax: #bbbbbb;
+    --editor-hr: #e0e0e0;
+    --editor-blockquote-border: #4472c4;
+    --editor-blockquote-text: #6e6e6e;
+    --editor-blockquote-bg: rgba(68, 114, 196, 0.05);
+
+    --codeblock-bg: #f5f5f5;
+    --codeblock-border: #e0e0e0;
+    --codeblock-header: rgba(0, 0, 0, 0.03);
+    --codeblock-text: #1e1e1e;
+    --codeblock-lang: #4472c4;
+    --codeblock-copy: #999999;
+    --codeblock-copy-hover-text: #666666;
+    --codeblock-copy-hover-bg: rgba(0, 0, 0, 0.05);
+    --codeblock-copied: #2e8b57;
+
+    --table-border: #e0e0e0;
+    --table-header-bg: #f0f0f0;
+    --table-header-text: #1e1e1e;
+    --table-cell-bg: transparent;
+    --table-cell-text: #333333;
+    --table-even-bg: rgba(0, 0, 0, 0.02);
+    --table-selected: rgba(68, 114, 196, 0.12);
+
+    --tooltip-bg: #ffffff;
+    --tooltip-border: #e0e0e0;
+    --tooltip-shadow: rgba(0, 0, 0, 0.1);
+    --tooltip-input-bg: #f5f5f5;
+    --tooltip-input-border: #cccccc;
+
+    --math-text: #9b59b6;
+    --math-dollar: #999999;
+    --math-render: #333333;
+    --math-block-editor-bg: #f5f5f5;
+    --math-block-editor-border: #e0e0e0;
+    --math-block-header-bg: #f0f0f0;
+    --math-block-active-bg: rgba(0, 0, 0, 0.02);
+    --math-block-active-border: #d0d0d0;
+    --math-btn-ok: #2e8b57;
+    --math-btn-ok-hover: rgba(46, 139, 87, 0.1);
+
+    --hljs-keyword: #a626a4;
+    --hljs-string: #50a14f;
+    --hljs-title: #e45649;
+    --hljs-number: #986801;
+    --hljs-comment: #a0a1a7;
+    --hljs-attr: #986801;
+    --hljs-symbol: #4078f2;
+    --hljs-deletion: #e45649;
+  }
+}
+
+body {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+
+@media (max-width: 640px) {
+  .ProseMirror {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+}

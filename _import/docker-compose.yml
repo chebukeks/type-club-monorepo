@@ -1,0 +1,15 @@
+services:
+  backend:
+    build: .
+    container_name: type-club-backend
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./backend:/app
+    networks:
+      - type-club-net
+
+networks:
+  type-club-net:
+    external: true
+    name: type-club-net
