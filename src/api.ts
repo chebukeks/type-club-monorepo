@@ -3,7 +3,9 @@
  * Works from Electron renderer (fetch is available).
  */
 
-const BASE = "https://type-club.ru/api";
+import { config } from "./config";
+
+const BASE = config.apiUrl;
 
 let token: string | null = localStorage.getItem("access_token");
 

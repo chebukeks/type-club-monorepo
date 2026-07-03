@@ -3,6 +3,7 @@
  * Uses shared modal CSS classes from index.css.
  */
 import { useState } from "react";
+import { config } from "../config";
 import { useAuth } from "../context/AuthContext";
 import { useEditor } from "../context/EditorContext";
 import { articlesApi } from "../api";
@@ -78,7 +79,7 @@ export function PublishModal({ onClose }: PublishModalProps) {
   };
 
   const handleCopy = () => {
-    const url = `https://type-club.ru/${username}/${finalSlug}`;
+    const url = `${config.siteUrl}/${username}/${finalSlug}`;
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -96,7 +97,7 @@ export function PublishModal({ onClose }: PublishModalProps) {
           <div style={{ fontSize: "28px", marginBottom: "12px", color: "var(--accent)" }}>✓</div>
           <h2 className="modal-title" style={{ marginBottom: "8px" }}>Published!</h2>
           <p style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "16px" }}>
-            {`type-club.ru/${username}/${finalSlug}`}
+            {`${new URL(config.siteUrl).hostname}/${username}/${finalSlug}`}
           </p>
           <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
             <button onClick={handleCopy} className="btn-primary" style={{ width: "auto" }}>
@@ -162,7 +163,7 @@ export function PublishModal({ onClose }: PublishModalProps) {
         <div style={{ marginBottom: "20px" }}>
           <label className="modal-label">Article slug</label>
           <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: "var(--text-dim)" }}>
-            <span>type-club.ru/{username}/</span>
+            <span>{new URL(config.siteUrl).hostname}/{username}/</span>
             <input
               type="text"
               value={slug}

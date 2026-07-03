@@ -3,6 +3,7 @@
  */
 import { useState, useEffect, useRef } from 'react'
 import { useEditor } from '../context/EditorContext'
+import { config } from '../config'
 import { useAuth } from '../context/AuthContext'
 import type { FileEntry, TocItem } from '../types'
 import type { ArticleListItem } from '../api'
@@ -322,7 +323,7 @@ export function Sidebar({ width }: { width: number }) {
             Переименовать
           </button>
           <button className="menu-item enabled" onClick={() => {
-            navigator.clipboard.writeText(`https://type-club.ru/${onlineUsername}/${onlineMenu.article.slug}`)
+            navigator.clipboard.writeText(`${config.siteUrl}/${onlineUsername}/${onlineMenu.article.slug}`)
             setOnlineMenu(null)
           }}>
             Копировать ссылку
@@ -342,7 +343,7 @@ export function Sidebar({ width }: { width: number }) {
           </button>
           <div className="border-t border-[var(--border-strong)] my-1" />
           <button className="menu-item enabled" onClick={() => {
-            window.api.openExternal(`https://type-club.ru/${onlineUsername}/${onlineMenu.article.slug}`)
+            window.api.openExternal(`${config.siteUrl}/${onlineUsername}/${onlineMenu.article.slug}`)
             setOnlineMenu(null)
           }}>
             Открыть в браузере
