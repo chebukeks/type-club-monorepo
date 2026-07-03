@@ -22,7 +22,7 @@ export const mathActivePlugin = new Plugin({
     decorations(state) {
       return mathActiveKey.getState(state)
     },
-    handleClick(view, pos, event) {
+    handleClick(view, _pos, event) {
       const target = event.target as HTMLElement
       const renderEl = target.closest('.math-inline-render') as HTMLElement
       if (renderEl) {

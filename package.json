@@ -11,5 +11,8 @@
     "build:web": "npm run build -w apps/web",
     "build:desktop": "npm run build -w apps/desktop",
     "build": "npm run build:web && npm run build:desktop"
+  },
+  "dependencies": {
+    "@tailwindcss/oxide-linux-x64-gnu": "^4.3.2"
   }
 }

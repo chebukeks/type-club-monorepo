@@ -1,3 +1,5 @@
+import type { EditorView } from 'prosemirror-view'
+
 export type EditorMode = 'raw' | 'seamless' | 'preview'
 
 export type FocusMode = 'off' | 'paragraph' | 'sentence' | 'lines'
@@ -16,4 +18,5 @@ export interface EditorProps {
   textZoom?: number
   documentZoom?: number
   readOnly?: boolean
+  onEditorView?: (view: EditorView) => void
 }

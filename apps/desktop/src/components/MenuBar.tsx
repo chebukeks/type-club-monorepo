@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useEditor } from '../context/EditorContext'
-import { generateExportHtml } from '../editor/markdownConfig'
+import { generateExportHtml } from '@type-club/editor'
 import type { Tab, ThemeMode, FocusMode } from '../types'
 
 export function MenuBar() {

@@ -1,14 +1,9 @@
 import { Plugin, PluginKey } from 'prosemirror-state'
 
-declare global {
-  interface Window {
-    api?: { openExternal: (url: string) => void }
-  }
-}
-
 function openUrl(url: string) {
-  if (window.api?.openExternal) {
-    window.api.openExternal(url)
+  const electronApi = (window as any).api
+  if (electronApi?.openExternal) {
+    electronApi.openExternal(url)
   } else {
     window.open(url, '_blank')
   }

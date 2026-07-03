@@ -12,6 +12,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@type-club/editor": "*",
     "@codemirror/commands": "^6.10.3",
     "@codemirror/lang-markdown": "^6.5.0",
     "@codemirror/language": "^6.12.2",
@@ -25,6 +26,7 @@
     "highlight.js": "^11.11.1",
     "katex": "^0.16.44",
     "lucide-react": "^1.6.0",
+    "markdown-it": "^14",
     "markdown-it-mark": "^4.0.0",
     "markdown-it-task-lists": "^2.1.1",
     "markdown-it-texmath": "^1.0.0",

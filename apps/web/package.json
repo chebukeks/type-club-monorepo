@@ -9,9 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@type-club/editor": "*",
     "highlight.js": "^11.11.1",
     "katex": "^0.16.44",
     "lucide-react": "^1.6.0",
+    "markdown-it": "^14",
     "markdown-it-mark": "^4.0.0",
     "markdown-it-task-lists": "^2.1.1",
     "markdown-it-texmath": "^1.0.0",

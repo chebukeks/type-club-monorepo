@@ -26,9 +26,8 @@ import { MathInlineView } from "./editor/mathInlineView";
 import { ImageView } from "./editor/imageView";
 import { interactivePlugin } from "./editor/interactivePlugin";
 import { typographyPlugin } from "./editor/typographyPlugin";
-import { schema } from "./editor/schema";
 
-import type { EditorMode, EditorProps } from "./types";
+import type { EditorProps } from "./types";
 
 let styleInjected = false;
 
@@ -85,6 +84,7 @@ export function EditorCore({
   textZoom = 100,
   documentZoom = 100,
   readOnly = false,
+  onEditorView,
 }: EditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -168,6 +168,7 @@ export function EditorCore({
     }
 
     viewRef.current = view;
+    onEditorView?.(view);
 
     return () => {
       view.destroy();
