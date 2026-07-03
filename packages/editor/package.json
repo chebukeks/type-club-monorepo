@@ -1,0 +1,31 @@
+{
+  "name": "@type-club/editor",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "peerDependencies": {
+    "highlight.js": "^11",
+    "katex": "^0.16",
+    "markdown-it": "^14",
+    "markdown-it-mark": "^4",
+    "markdown-it-task-lists": "^2",
+    "markdown-it-texmath": "^1",
+    "prosemirror-commands": "^1",
+    "prosemirror-dropcursor": "^1",
+    "prosemirror-gapcursor": "^1",
+    "prosemirror-history": "^1",
+    "prosemirror-inputrules": "^1",
+    "prosemirror-keymap": "^1",
+    "prosemirror-markdown": "^1",
+    "prosemirror-model": "^1",
+    "prosemirror-schema-basic": "^1",
+    "prosemirror-schema-list": "^1",
+    "prosemirror-state": "^1",
+    "prosemirror-tables": "^1",
+    "prosemirror-transform": "^1",
+    "prosemirror-view": "^1",
+    "react": "^18",
+    "react-dom": "^18"
+  }
+}
