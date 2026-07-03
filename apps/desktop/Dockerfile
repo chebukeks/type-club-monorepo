@@ -1,18 +1,17 @@
-# Используем официальный образ electron-builder.
-# Образ с суффиксом :wine позволяет собирать релизы как для Linux, так и для Windows (.exe).
+# Мультистейдж-сборка Type Club Desktop (Linux + Windows).
+# Использует образ electron-builder с Wine для кроссплатформенной сборки.
 FROM electronuserland/builder:wine
 
-# Устанавливаем рабочую директорию внутри контейнера
 WORKDIR /app
 
-# Копируем только файлы конфигурации зависимостей для кэширования слоя
-COPY package*.json ./
+# Копируем всю монорепу (нужно для npm workspaces)
+COPY package.json package-lock.json .npmrc tsconfig.base.json ./
+COPY packages/editor/ packages/editor/
+COPY apps/desktop/ apps/desktop/
 
-# Устанавливаем зависимости проекта
-RUN npm install
+# Устанавливаем зависимости
+RUN npm install --ignore-scripts
 
-# Копируем весь остальной исходный код проекта
-COPY . .
-
-# По умолчанию запускаем скрипт сборки
-CMD ["npm", "run", "build"]
+# Собираем релиз
+WORKDIR /app/apps/desktop
+CMD ["npx", "electron-builder", "--linux", "--win"]

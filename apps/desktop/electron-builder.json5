@@ -4,6 +4,8 @@
   "appId": "com.type-club.app",
   "asar": true,
   "productName": "TypeClub",
+  "npmRebuild": false,
+  "nodeGypRebuild": false,
   "fileAssociations": [
     {
       "ext": "md",

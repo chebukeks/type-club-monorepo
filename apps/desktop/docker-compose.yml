@@ -1,10 +1,10 @@
-version: '3.8'
-
 services:
   builder:
-    build: .
+    build:
+      context: ../..    # корень монорепы
+      dockerfile: apps/desktop/Dockerfile
     image: type-club-builder
     volumes:
-      - ./release:/app/release
+      - ./release:/app/apps/desktop/release
 
 # docker compose up --build
