@@ -7,9 +7,9 @@ services:
     volumes:
       - ./backend:/app
     networks:
-      - eatsmart_net
+      - type-club-net
 
 networks:
-  eatsmart_net:
+  type-club-net:
     external: true
-    name: eatsmart_bot_eatsmart_net
+    name: type-club-net

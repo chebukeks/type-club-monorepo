@@ -25,7 +25,7 @@ docker compose up
 ## Environment
 
 - `.env` at repo root is loaded by `pydantic-settings` in `backend/app/config.py`.
-- Database: PostgreSQL, accessible via external Docker network `eatsmart_bot_eatsmart_net`.
+- Database: PostgreSQL, configured via `DATABASE_URL` in `.env`.
 - JWT auth via HS256 tokens (key from `JWT_SECRET_KEY` env var).
 - `.npmrc` pins to `https://registry.npmmirror.com/` (Chinese mirror) — replace if unresolvable.
 
