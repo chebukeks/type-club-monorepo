@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-DOWNLOAD_DIR="/home/chebukek/typeclub-downloads"
+DOWNLOAD_DIR="${TYPECLUB_DOWNLOADS_DIR:-./downloads}"
 
 cd "$SCRIPT_DIR"
 
@@ -71,5 +71,5 @@ print(json.dumps(manifest, indent=2))
 PYEOF
 
 echo ""
-echo "==> Done! https://type-club.ru/downloads/latest.json"
-echo "    Next: rebuild the web frontend and restart nginx"
+echo "==> Done! Artifacts saved to ${DOWNLOAD_DIR}"
+echo "    Update the web frontend and restart the web server"
