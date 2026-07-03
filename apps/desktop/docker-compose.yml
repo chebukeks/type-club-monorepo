@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  builder:
+    build: .
+    image: type-club-builder
+    volumes:
+      - ./release:/app/release
+
+# docker compose up --build

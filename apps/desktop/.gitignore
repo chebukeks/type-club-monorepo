@@ -1,0 +1,56 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules
+
+# Build output
+dist
+dist-ssr
+dist-electron
+release/
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment
+.env
+.env.*
+
+# Agent / AI
+.agent
+.gemini
+.qwen
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+QWEN.md
+
+# Windows specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Tests & debug
+test-examples/
+test_bug.ts
+scripts/test_bug.ts
+RELEASE_GUIDE.md
+
+# Electron builder cache
+*.blockmap
