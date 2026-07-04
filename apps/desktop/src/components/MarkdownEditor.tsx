@@ -5,7 +5,7 @@
  */
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { toggleMark } from 'prosemirror-commands'
-import { Plugin } from 'prosemirror-state'
+import { Plugin, TextSelection } from 'prosemirror-state'
 import type { EditorView } from 'prosemirror-view'
 
 import { EditorCore, injectEditorStyles, schema } from '@type-club/editor'
@@ -16,7 +16,6 @@ export function MarkdownEditor() {
   const { state, dispatch, setTextZoom, setDocumentZoom } = useEditor()
   const [editorView, setEditorView] = useState<EditorView | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
   const [showSearch, setShowSearch] = useState(false)
   const lastWheelTimeRef = useRef(0)
 
@@ -284,10 +283,52 @@ export function MarkdownEditor() {
   }, [])
 
   // ── Context menu ──
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
+  const [ctxSubmenu, setCtxSubmenu] = useState<'table' | 'code' | null>(null)
+  const [tableCols, setTableCols] = useState(3)
+  const [tableRows, setTableRows] = useState(3)
+  const [codeLang, setCodeLang] = useState('')
+  const [showLangDropdown, setShowLangDropdown] = useState(false)
+  const langDropdownRef = useRef<HTMLDivElement>(null)
+
+  const LANGUAGES = [
+    { label: 'Без языка', value: '' },
+    { label: 'JavaScript', value: 'javascript' },
+    { label: 'TypeScript', value: 'typescript' },
+    { label: 'Python', value: 'python' },
+    { label: 'Bash', value: 'bash' },
+    { label: 'HTML', value: 'html' },
+    { label: 'CSS', value: 'css' },
+    { label: 'JSON', value: 'json' },
+    { label: 'SQL', value: 'sql' },
+    { label: 'Rust', value: 'rust' },
+    { label: 'Go', value: 'go' },
+    { label: 'Java', value: 'java' },
+    { label: 'C++', value: 'cpp' },
+    { label: 'C', value: 'c' },
+    { label: 'Ruby', value: 'ruby' },
+    { label: 'PHP', value: 'php' },
+    { label: 'YAML', value: 'yaml' },
+    { label: 'XML', value: 'xml' },
+    { label: 'Diff', value: 'diff' },
+    { label: 'Markdown', value: 'markdown' },
+    { label: 'Dockerfile', value: 'dockerfile' },
+    { label: 'GraphQL', value: 'graphql' },
+  ]
+
   const handleContextMenu = (e: React.MouseEvent) => {
     if (state.editorMode !== 'seamless') return
     e.preventDefault()
     setCtxMenu({ x: e.clientX, y: e.clientY })
+    setCtxSubmenu(null)
+    setTableCols(3)
+    setTableRows(3)
+    setCodeLang('')
+  }
+
+  const closeCtxMenu = () => {
+    setCtxMenu(null)
+    setCtxSubmenu(null)
   }
 
   const applyFormat = (markName: string) => {
@@ -297,23 +338,132 @@ export function MarkdownEditor() {
       toggleMark(mark as import('prosemirror-model').MarkType)(editorView.state, editorView.dispatch)
       editorView.focus()
     }
-    setCtxMenu(null)
+    closeCtxMenu()
+  }
+
+  const handleClipboard = (action: 'copy' | 'cut' | 'paste') => {
+    if (!editorView) return
+    editorView.dom.focus()
+    document.execCommand(action)
+    closeCtxMenu()
+  }
+
+  const insertBlockNode = (blockNode: import('prosemirror-model').Node) => {
+    if (!editorView) return
+    const { $head } = editorView.state.selection
+    let start: number, end: number
+    const parentType = $head.parent.type.name
+
+    if (parentType === 'paragraph' || parentType === 'heading') {
+      start = $head.before()
+      end = $head.after()
+    } else {
+      const blockStart = $head.before($head.depth - 1)
+      const blockEnd = $head.after($head.depth - 1)
+      start = blockStart
+      end = blockEnd
+    }
+
+    const tr = editorView.state.tr.replaceWith(start, end, blockNode)
+    const pos = start + 1
+    tr.setSelection(TextSelection.near(tr.doc.resolve(pos)))
+    editorView.dispatch(tr)
+    editorView.focus()
+    closeCtxMenu()
+  }
+
+  const insertTable = () => {
+    const headerCells = Array.from({ length: tableCols }, () =>
+      schema.nodes.table_header.create(null, schema.nodes.paragraph.create())
+    )
+    const bodyRows = Array.from({ length: tableRows - 1 }, () =>
+      schema.nodes.table_row.create(
+        null,
+        Array.from({ length: tableCols }, () =>
+          schema.nodes.table_cell.create(null, schema.nodes.paragraph.create())
+        )
+      )
+    )
+    const table = schema.nodes.table.create(null, [
+      schema.nodes.table_row.create(null, headerCells),
+      ...bodyRows,
+    ])
+    insertBlockNode(table)
+  }
+
+  const insertCodeBlock = () => {
+    const codeBlock = schema.nodes.code_block.create(
+      { params: codeLang },
+      codeLang ? undefined : schema.text('')
+    )
+    insertBlockNode(codeBlock)
+  }
+
+  const insertMathBlock = () => {
+    const mathBlock = schema.nodes.math_block.create()
+    insertBlockNode(mathBlock)
   }
 
   const formatItems = [
-    { label: 'Bold', hotkey: 'Ctrl+B', command: 'strong' },
-    { label: 'Italic', hotkey: 'Ctrl+I', command: 'em' },
-    { label: 'Code', hotkey: 'Ctrl+E', command: 'code' },
-    { label: 'Strikethrough', hotkey: 'Ctrl+Shift+X', command: 's' },
-    { label: 'Highlight', hotkey: 'Ctrl+Shift+H', command: 'highlight' },
+    { label: 'Жирный', hotkey: 'Ctrl+B', command: 'strong' },
+    { label: 'Курсив', hotkey: 'Ctrl+I', command: 'em' },
+    { label: 'Код', hotkey: 'Ctrl+E', command: 'code' },
+    { label: 'Зачёркнутый', hotkey: 'Ctrl+Shift+X', command: 's' },
+    { label: 'Выделение', hotkey: 'Ctrl+Shift+H', command: 'highlight' },
+    { label: 'Спойлер', hotkey: 'Ctrl+Shift+S', command: 'spoiler' },
   ]
+
+  const sep = <div className="border-t border-[var(--border-strong)] my-1" />
+
+  const ctxMenuItem = (label: string, hotkey?: string, onClick?: () => void, extraClass?: string) => (
+    <div
+      className={`menu-item enabled ${extraClass || ''}`}
+      onClick={onClick}
+    >
+      <span>{label}</span>
+      {hotkey && <span className="text-[11px] text-[var(--text-dim)]">{hotkey}</span>}
+    </div>
+  )
+
+  const numInput = (label: string, value: number, setValue: (v: number) => void, min = 1, max = 10) => (
+    <div className="flex items-center gap-2 px-2 py-1">
+      <span className="text-[12px] text-[var(--text-secondary)] w-16">{label}</span>
+      <button
+        className="w-6 h-6 flex items-center justify-center rounded text-[var(--text-secondary)] hover:bg-[var(--menu-hover-bg)] disabled:opacity-30 text-sm"
+        disabled={value <= min}
+        onClick={() => setValue(value - 1)}
+      >−</button>
+      <span className="w-8 text-center text-[13px] text-[var(--text-secondary)]">{value}</span>
+      <button
+        className="w-6 h-6 flex items-center justify-center rounded text-[var(--text-secondary)] hover:bg-[var(--menu-hover-bg)] disabled:opacity-30 text-sm"
+        disabled={value >= max}
+        onClick={() => setValue(value + 1)}
+      >+</button>
+    </div>
+  )
+
+  const tablePreview = useMemo(() => {
+    const rows: JSX.Element[] = []
+    for (let r = 0; r < tableRows; r++) {
+      const cells: JSX.Element[] = []
+      for (let c = 0; c < tableCols; c++) {
+        cells.push(
+          <td key={c} className={`border border-[var(--border-strong)] px-2 py-0.5 text-[11px] ${r === 0 ? 'font-semibold bg-[var(--menu-hover-bg)]' : ''}`}>
+            {r === 0 ? `Заголовок ${c + 1}` : `Ячейка ${c + 1}`}
+          </td>
+        )
+      }
+      rows.push(<tr key={r}>{cells}</tr>)
+    }
+    return rows
+  }, [tableCols, tableRows])
 
   // ── Render ──
   return (
     <div
       className="flex-1 flex flex-col overflow-hidden bg-[var(--bg-base)]"
       onContextMenu={handleContextMenu}
-      onClick={() => setCtxMenu(null)}
+      onClick={() => closeCtxMenu()}
     >
       {state.editorMode !== 'raw' && showSearch && editorView && (
         <SearchBar view={editorView} onClose={() => setShowSearch(false)} />
@@ -338,12 +488,16 @@ export function MarkdownEditor() {
         containerStyle={containerStyle}
       />
 
-      {ctxMenu && (
+      {ctxMenu && !ctxSubmenu && (
         <div
           className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
-          style={{ top: ctxMenu.y, left: ctxMenu.x, minWidth: '220px' }}
+          style={{ top: ctxMenu.y, left: ctxMenu.x, minWidth: '230px' }}
           onContextMenu={(e) => e.preventDefault()}
         >
+          {ctxMenuItem('Копировать', 'Ctrl+C', () => handleClipboard('copy'))}
+          {ctxMenuItem('Вырезать', 'Ctrl+X', () => handleClipboard('cut'))}
+          {ctxMenuItem('Вставить', 'Ctrl+V', () => handleClipboard('paste'))}
+          {sep}
           {formatItems.map((item) => (
             <div
               key={item.command}
@@ -354,6 +508,84 @@ export function MarkdownEditor() {
               <span className="text-[11px] text-[var(--text-dim)]">{item.hotkey}</span>
             </div>
           ))}
+          {sep}
+          {ctxMenuItem('Создать таблицу...', '▸', () => setCtxSubmenu('table'))}
+          {ctxMenuItem('Создать блок кода...', '▸', () => setCtxSubmenu('code'))}
+          {ctxMenuItem('Создать блок математики', undefined, insertMathBlock)}
+        </div>
+      )}
+
+      {ctxMenu && ctxSubmenu === 'table' && (
+        <div
+          className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
+          style={{ top: ctxMenu.y, left: ctxMenu.x, minWidth: '260px' }}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          {ctxMenuItem('← Назад', undefined, () => setCtxSubmenu(null))}
+          {sep}
+          {numInput('Столбцы', tableCols, setTableCols)}
+          {numInput('Строки', tableRows, setTableRows)}
+          {sep}
+          <div className="px-2 py-1 overflow-x-auto">
+            <table className="w-full border-collapse">
+              <tbody>{tablePreview}</tbody>
+            </table>
+          </div>
+          {sep}
+          <div className="px-2 py-1">
+            <button
+              className="w-full py-1 rounded bg-[var(--bg-active)] text-[var(--text-primary)] text-[13px] hover:opacity-90"
+              onClick={insertTable}
+            >Создать</button>
+          </div>
+        </div>
+      )}
+
+      {ctxMenu && ctxSubmenu === 'code' && (
+        <div
+          className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
+          style={{ top: ctxMenu.y, left: ctxMenu.x, minWidth: '250px' }}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          {ctxMenuItem('← Назад', undefined, () => setCtxSubmenu(null))}
+          {sep}
+          <div className="px-3 py-1">
+            <span className="text-[12px] text-[var(--text-secondary)]">Язык</span>
+            <div className="relative mt-1" ref={langDropdownRef}>
+              <input
+                className="w-full bg-[var(--bg-base)] border border-[var(--border-strong)] rounded px-2 py-1 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--text-dim)]"
+                placeholder="Без языка"
+                value={codeLang}
+                onChange={(e) => setCodeLang(e.target.value)}
+                onFocus={() => setShowLangDropdown(true)}
+                onBlur={() => setTimeout(() => setShowLangDropdown(false), 200)}
+              />
+              {showLangDropdown && (
+                <div className="absolute left-0 right-0 top-full mt-0.5 max-h-40 overflow-y-auto bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded shadow-lg z-[60]">
+                  {LANGUAGES.filter(l => !codeLang || l.label.toLowerCase().includes(codeLang.toLowerCase()) || l.value.includes(codeLang)).map((l) => (
+                    <div
+                      key={l.value}
+                      className={`px-3 py-1 text-[12px] cursor-pointer hover:bg-[var(--menu-hover-bg)] ${l.value === codeLang ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}
+                      onMouseDown={() => { setCodeLang(l.value); setShowLangDropdown(false) }}
+                    >{l.label}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          {sep}
+          <div className="px-2 py-1 flex gap-2">
+            <button
+              className="flex-1 py-1 rounded bg-[var(--bg-active)] text-[var(--text-primary)] text-[13px] hover:opacity-90"
+              onClick={insertCodeBlock}
+            >Создать</button>
+            {codeLang && (
+              <button
+                className="flex-1 py-1 rounded bg-[var(--bg-base)] border border-[var(--border-strong)] text-[var(--text-secondary)] text-[13px] hover:bg-[var(--menu-hover-bg)]"
+                onClick={() => { setCodeLang(''); insertCodeBlock() }}
+              >Без языка</button>
+            )}
+          </div>
         </div>
       )}
     </div>
