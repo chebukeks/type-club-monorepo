@@ -53,9 +53,19 @@ export function typographyPlugin(): Plugin {
             matchStr = `${enDashMatch[1]}–${enDashMatch[2]}`
           }
 
+          // Правило 3: "-- " в самом начале строки (ничего слева, пробел справа) -> "– "
+          if (!matchStr && $head.parentOffset >= 3) {
+            const fromStart = $head.parent.textBetween(0, $head.parentOffset, null, '\ufffc')
+            if (fromStart === '-- ') {
+              matchStr = `– `
+            }
+          }
+
           if (matchStr) {
             // Захватываем точные координаты на момент ввода
-            const startPos = $head.pos - 4
+            // Правила 1-2 (X--Y): 4 символа, Правило 3 (-- ): 3 символа
+            const matchLen = matchStr.length
+            const startPos = $head.pos - (matchLen + 1)
             const endPos = $head.pos
 
             // Вызываем пустую транзакцию, закрывающую историю.
