@@ -28,6 +28,8 @@ import { interactivePlugin } from "./editor/interactivePlugin";
 import { typographyPlugin } from "./editor/typographyPlugin";
 import { focusModePlugin } from "./editor/focusModePlugin";
 import { tocPlugin } from "./editor/tocPlugin";
+import { TableEditNodeView } from "./editor/tableEditView";
+import { tableEditPlugin } from "./editor/tableEditPlugin";
 
 import type { EditorProps } from "./types";
 
@@ -156,6 +158,7 @@ export function EditorCore({
           foldingPlugin,
           interactivePlugin,
           typographyPlugin(),
+          tableEditPlugin(),
           focusModePlugin(() => focusModeRef.current || 'none'),
           ...(onTocUpdateRef.current ? [tocPlugin((toc) => onTocUpdateRef.current?.(toc))] : []),
           ...(extraPlugins || []),
@@ -174,6 +177,7 @@ export function EditorCore({
         math_inline: isPreview
           ? (node: PMNode) => new MathInlinePreviewView(node)
           : (node, view, getPos) => new MathInlineView(node, view, getPos),
+        table: (node, view, getPos) => new TableEditNodeView(node, view, getPos),
       },
     });
 

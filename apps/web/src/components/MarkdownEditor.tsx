@@ -1,9 +1,10 @@
 import { useState, useRef, useMemo } from "react";
 import { toggleMark } from "prosemirror-commands";
 import { TextSelection } from "prosemirror-state";
+import { deleteTable } from "prosemirror-tables";
 import type { EditorView } from "prosemirror-view";
 
-import { EditorCore, schema } from "@type-club/editor";
+import { EditorCore, schema, tableEditPluginKey } from "@type-club/editor";
 import type { EditorMode } from "@type-club/editor";
 
 export type { EditorMode } from "@type-club/editor";
@@ -52,6 +53,7 @@ export function MarkdownEditor({
 }: MarkdownEditorProps) {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
   const [ctxSubmenu, setCtxSubmenu] = useState<"table" | "code" | null>(null);
+  const [ctxTable, setCtxTable] = useState<number | null>(null);
   const [tableCols, setTableCols] = useState(3);
   const [tableRows, setTableRows] = useState(3);
   const [codeLang, setCodeLang] = useState("");
@@ -61,11 +63,12 @@ export function MarkdownEditor({
   const closeCtxMenu = () => {
     setCtxMenu(null);
     setCtxSubmenu(null);
+    setCtxTable(null);
   };
 
   const ctxMenuStyle = useMemo((): React.CSSProperties | null => {
     if (!ctxMenu) return null;
-    const menuHeight = ctxSubmenu === "table" ? 300 : ctxSubmenu === "code" ? 260 : 400;
+    const menuHeight = ctxSubmenu === "table" ? 300 : ctxSubmenu === "code" ? 260 : ctxTable !== null ? 180 : 400;
     const vh = window.innerHeight;
     const fitsBelow = ctxMenu.y + menuHeight <= vh - 10;
     return {
@@ -74,16 +77,65 @@ export function MarkdownEditor({
       left: Math.min(ctxMenu.x, window.innerWidth - 270),
       minWidth: ctxSubmenu === "table" ? "260px" : ctxSubmenu === "code" ? "250px" : "230px",
     };
-  }, [ctxMenu, ctxSubmenu]);
+  }, [ctxMenu, ctxSubmenu, ctxTable]);
 
   const handleContextMenu = (e: React.MouseEvent) => {
+    const view = viewRef.current;
     if (editorMode !== "seamless") return;
     e.preventDefault();
-    setCtxMenu({ x: e.clientX, y: e.clientY });
+    setCtxTable(null);
     setCtxSubmenu(null);
     setTableCols(3);
     setTableRows(3);
     setCodeLang("");
+
+    if (view) {
+      try {
+        const clickPos = view.posAtDOM(e.target as Node, 0);
+        const $click = view.state.doc.resolve(clickPos);
+        for (let d = $click.depth; d > 0; d--) {
+          if ($click.node(d).type.name === "table") {
+            setCtxTable($click.before(d));
+            setCtxMenu({ x: e.clientX, y: e.clientY });
+            return;
+          }
+        }
+      } catch { /* ignore */ }
+    }
+
+    setCtxMenu({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleTableCopy = () => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dom.focus();
+    document.execCommand("copy");
+    closeCtxMenu();
+  };
+
+  const handleTableCut = () => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dom.focus();
+    document.execCommand("cut");
+    closeCtxMenu();
+  };
+
+  const handleTableEdit = () => {
+    const view = viewRef.current;
+    if (!view || ctxTable == null) return;
+    view.dispatch(view.state.tr.setMeta(tableEditPluginKey, ctxTable));
+    view.focus();
+    closeCtxMenu();
+  };
+
+  const handleTableDelete = () => {
+    const view = viewRef.current;
+    if (!view || ctxTable == null) return;
+    deleteTable(view.state, view.dispatch);
+    view.focus();
+    closeCtxMenu();
   };
 
   const applyFormat = (markName: string) => {
@@ -230,7 +282,29 @@ export function MarkdownEditor({
         onEditorView={(v) => { viewRef.current = v; }}
       />
 
-      {ctxMenu && !ctxSubmenu && (
+      {ctxMenu && ctxTable !== null && (
+        <div
+          className="fixed bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 py-1 flex flex-col text-sm"
+          style={ctxMenuStyle!}
+          onContextMenu={(e) => e.preventDefault()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button className={btnClass} onClick={handleTableCopy}>
+            <span>Копировать таблицу</span>
+          </button>
+          <button className={btnClass} onClick={handleTableCut}>
+            <span>Вырезать таблицу</span>
+          </button>
+          <button className={btnClass} onClick={handleTableEdit}>
+            <span>Редактировать таблицу</span>
+          </button>
+          <button className={btnClass} onClick={handleTableDelete}>
+            <span>Удалить таблицу</span>
+          </button>
+        </div>
+      )}
+
+      {ctxMenu && !ctxSubmenu && ctxTable === null && (
         <div
           className="fixed bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 py-1 flex flex-col text-sm"
           style={ctxMenuStyle!}

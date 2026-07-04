@@ -6,9 +6,10 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { toggleMark } from 'prosemirror-commands'
 import { Plugin, TextSelection } from 'prosemirror-state'
+import { deleteTable } from 'prosemirror-tables'
 import type { EditorView } from 'prosemirror-view'
 
-import { EditorCore, injectEditorStyles, schema } from '@type-club/editor'
+import { EditorCore, injectEditorStyles, schema, tableEditPluginKey } from '@type-club/editor'
 import { useEditor } from '../context/EditorContext'
 import { SearchBar, RawSearchBar } from './SearchBar'
 
@@ -285,6 +286,7 @@ export function MarkdownEditor() {
   // ── Context menu ──
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
   const [ctxSubmenu, setCtxSubmenu] = useState<'table' | 'code' | null>(null)
+  const [ctxTable, setCtxTable] = useState<number | null>(null)
   const [tableCols, setTableCols] = useState(3)
   const [tableRows, setTableRows] = useState(3)
   const [codeLang, setCodeLang] = useState('')
@@ -319,16 +321,61 @@ export function MarkdownEditor() {
   const handleContextMenu = (e: React.MouseEvent) => {
     if (state.editorMode !== 'seamless') return
     e.preventDefault()
-    setCtxMenu({ x: e.clientX, y: e.clientY })
+    setCtxTable(null)
     setCtxSubmenu(null)
     setTableCols(3)
     setTableRows(3)
     setCodeLang('')
+
+    if (editorView) {
+      try {
+        const clickPos = editorView.posAtDOM(e.target as Node, 0)
+        const $click = editorView.state.doc.resolve(clickPos)
+        for (let d = $click.depth; d > 0; d--) {
+          if ($click.node(d).type.name === 'table') {
+            setCtxTable($click.before(d))
+            setCtxMenu({ x: e.clientX, y: e.clientY })
+            return
+          }
+        }
+      } catch { /* ignore */ }
+    }
+
+    setCtxMenu({ x: e.clientX, y: e.clientY })
   }
 
   const closeCtxMenu = () => {
     setCtxMenu(null)
     setCtxSubmenu(null)
+    setCtxTable(null)
+  }
+
+  const handleTableCopy = () => {
+    if (!editorView) return
+    editorView.dom.focus()
+    document.execCommand('copy')
+    closeCtxMenu()
+  }
+
+  const handleTableCut = () => {
+    if (!editorView) return
+    editorView.dom.focus()
+    document.execCommand('cut')
+    closeCtxMenu()
+  }
+
+  const handleTableEdit = () => {
+    if (!editorView || ctxTable == null) return
+    editorView.dispatch(editorView.state.tr.setMeta(tableEditPluginKey, ctxTable))
+    editorView.focus()
+    closeCtxMenu()
+  }
+
+  const handleTableDelete = () => {
+    if (!editorView || ctxTable == null) return
+    deleteTable(editorView.state, editorView.dispatch)
+    editorView.focus()
+    closeCtxMenu()
   }
 
   // Вычисление позиции меню с учётом viewport
@@ -512,7 +559,21 @@ export function MarkdownEditor() {
         containerStyle={containerStyle}
       />
 
-      {ctxMenu && !ctxSubmenu && (
+      {ctxMenu && ctxTable !== null && (
+        <div
+          className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
+          style={ctxMenuStyle!}
+          onContextMenu={(e) => e.preventDefault()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {ctxMenuItem('Копировать таблицу', undefined, handleTableCopy)}
+          {ctxMenuItem('Вырезать таблицу', undefined, handleTableCut)}
+          {ctxMenuItem('Редактировать таблицу', undefined, handleTableEdit)}
+          {ctxMenuItem('Удалить таблицу', undefined, handleTableDelete)}
+        </div>
+      )}
+
+      {ctxMenu && !ctxSubmenu && ctxTable === null && (
         <div
           className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
           style={ctxMenuStyle!}
