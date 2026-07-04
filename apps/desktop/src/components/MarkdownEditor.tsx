@@ -450,7 +450,7 @@ export function MarkdownEditor() {
   )
 
   const numInput = (label: string, value: number, setValue: (v: number) => void, min = 1, max = 10) => (
-    <div className="flex items-center gap-2 px-5 py-2">
+    <div style={{ padding: '8px 20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
       <span className="text-xs text-[var(--text-dim)] w-16">{label}</span>
       <button
         className="w-6 h-6 flex items-center justify-center rounded text-[var(--text-secondary)] hover:bg-[var(--menu-hover-bg)] disabled:opacity-30 text-sm"
@@ -552,13 +552,13 @@ export function MarkdownEditor() {
           {numInput('Столбцы', tableCols, setTableCols)}
           {numInput('Строки', tableRows, setTableRows)}
           {sep}
-          <div className="px-5 py-2 overflow-x-auto">
+          <div className="overflow-x-auto" style={{ padding: '8px 20px' }}>
             <table className="w-full border-collapse border border-[var(--border-strong)]">
               <tbody>{tablePreview}</tbody>
             </table>
           </div>
           {sep}
-          <div className="px-3 py-1.5">
+          <div style={{ padding: '6px 12px' }}>
             <button
               className="w-full py-1.5 rounded text-white text-sm font-medium hover:opacity-90"
               style={{ backgroundColor: 'var(--accent)' }}
@@ -577,7 +577,7 @@ export function MarkdownEditor() {
         >
           {ctxMenuItem('← Назад', undefined, () => setCtxSubmenu(null))}
           {sep}
-          <div className="px-5 py-2">
+          <div style={{ padding: '8px 20px' }}>
             <span className="text-xs text-[var(--text-dim)]">Язык</span>
             <div className="relative mt-1" ref={langDropdownRef}>
               <input
@@ -602,7 +602,7 @@ export function MarkdownEditor() {
             </div>
           </div>
           {sep}
-          <div className="px-3 py-1.5 flex gap-2">
+          <div style={{ padding: '6px 12px' }} className="flex gap-2">
             <button
               className="flex-1 py-1.5 rounded text-white text-sm font-medium hover:opacity-90"
               style={{ backgroundColor: 'var(--accent)' }}

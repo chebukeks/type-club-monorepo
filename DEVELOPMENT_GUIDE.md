@@ -409,6 +409,12 @@ Hover:      .menu-item.enabled:hover → background: var(--menu-hover-bg)
 Текст:      text-[13px], шорткаты: text-[11px] text-[var(--text-dim)]
 ```
 
+**Важно:** для нестандартных элементов внутри меню (поля ввода, превью таблиц, кастомные контролы) **не использовать Tailwind-классы паддингов** (`px-5`, `py-2` и т.п.) — в некоторых контекстах (например, внутри `flex flex-col`-контейнера контекстного меню) они могут не применяться. Вместо этого задавать отступы инлайн-стилями, повторяющими `.menu-item`:
+```tsx
+style={{ padding: '8px 20px' }}  // идентично .menu-item
+style={{ padding: '6px 12px' }}  // для кнопочной строки
+```
+
 ### Единый дизайн модальных окон
 
 Все модалки используют CSS-классы: `.modal-overlay`, `.modal-panel`, `.modal-title`, `.modal-input`, `.btn-primary`, `.btn-secondary` и т.д. Определены в `src/index.css`.
