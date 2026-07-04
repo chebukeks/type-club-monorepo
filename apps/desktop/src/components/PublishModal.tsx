@@ -2,7 +2,7 @@
  * PublishModal.tsx — Share article to type-club.ru from desktop app.
  * Uses shared modal CSS classes from index.css.
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { config } from "../config";
 import { useAuth } from "../context/AuthContext";
 import { useEditor } from "../context/EditorContext";
@@ -34,14 +34,38 @@ export function PublishModal({ onClose }: PublishModalProps) {
 
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId);
   const articleContent = activeTab?.content || "";
-  const defaultTitle = activeTab?.fileName?.replace(/\.md$/, "") || "Untitled";
+  const articleId = activeTab?.articleId;
+  const isExisting = !!articleId;
 
-  const [title, setTitle] = useState(defaultTitle);
-  const [accessState, setAccessState] = useState("private");
-  const [slug, setSlug] = useState(_slugify(defaultTitle));
+  const [loading, setLoading] = useState(isExisting);
+
+  const defaultFn = activeTab?.fileName?.replace(/\.md$/, "") || "Untitled";
+  const [title, setTitle] = useState(isExisting ? defaultFn : defaultFn);
+  const [accessState, setAccessState] = useState<string>("private");
+  const [slug, setSlug] = useState(_slugify(defaultFn));
   const [copied, setCopied] = useState(false);
   const [status, setStatus] = useState<"idle" | "publishing" | "done" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+
+  // Fetch existing article data
+  useEffect(() => {
+    if (!articleId) { setLoading(false); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const article = await articlesApi.get(articleId);
+        if (cancelled) return;
+        setTitle(article.title);
+        setAccessState(article.access_state);
+        setSlug(article.slug);
+      } catch {
+        // Fallback to defaults
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [articleId]);
 
   const titleError = !title.trim() ? "Title cannot be empty" : null;
 
@@ -62,15 +86,24 @@ export function PublishModal({ onClose }: PublishModalProps) {
     setStatus("publishing");
     setErrorMsg("");
     try {
-      const res = await articlesApi.create({
-        title: title.trim(),
-        content: articleContent,
-        slug: finalSlug,
-      });
-      await articlesApi.update(res.id, {
-        access_state: accessState,
-        slug: finalSlug,
-      });
+      if (articleId) {
+        await articlesApi.update(articleId, {
+          title: title.trim(),
+          content: articleContent,
+          access_state: accessState,
+          slug: finalSlug,
+        });
+      } else {
+        const res = await articlesApi.create({
+          title: title.trim(),
+          content: articleContent,
+          slug: finalSlug,
+        });
+        await articlesApi.update(res.id, {
+          access_state: accessState,
+          slug: finalSlug,
+        });
+      }
       setStatus("done");
     } catch (err: any) {
       setErrorMsg(err.message || "Failed to publish");
@@ -95,7 +128,9 @@ export function PublishModal({ onClose }: PublishModalProps) {
           onClick={(e) => e.stopPropagation()}
         >
           <div style={{ fontSize: "28px", marginBottom: "12px", color: "var(--accent)" }}>✓</div>
-          <h2 className="modal-title" style={{ marginBottom: "8px" }}>Published!</h2>
+          <h2 className="modal-title" style={{ marginBottom: "8px" }}>
+            {isExisting ? "Updated!" : "Published!"}
+          </h2>
           <p style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "16px" }}>
             {`${new URL(config.siteUrl).hostname}/${username}/${finalSlug}`}
           </p>
@@ -120,7 +155,9 @@ export function PublishModal({ onClose }: PublishModalProps) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-header">
-          <h2 className="modal-title">Share to Type Club</h2>
+          <h2 className="modal-title">
+            {isExisting ? "Update Article" : "Share to Type Club"}
+          </h2>
           <button onClick={onClose} className="modal-close">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="18" y1="6" x2="6" y2="18" />
@@ -129,76 +166,88 @@ export function PublishModal({ onClose }: PublishModalProps) {
           </button>
         </div>
 
-        {status === "error" && <div className="modal-error">{errorMsg}</div>}
-
-        <div style={{ marginBottom: "16px" }}>
-          <label className="modal-label">Title</label>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className={`modal-input ${titleError ? "error" : ""}`}
-            placeholder="Article title"
-          />
-          {titleError && <p className="modal-field-error">{titleError}</p>}
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "20px" }}>
-          {states.map((s) => (
-            <button
-              key={s.value}
-              onClick={() => setAccessState(s.value)}
-              className={`modal-option ${accessState === s.value ? "selected" : ""}`}
-            >
-              <div style={{ fontSize: "13px", fontWeight: 500, color: "var(--text-primary)" }}>
-                {s.label}
-              </div>
-              <div style={{ fontSize: "11px", marginTop: "2px", color: "var(--text-dim)" }}>
-                {s.desc}
-              </div>
-            </button>
-          ))}
-        </div>
-
-        <div style={{ marginBottom: "20px" }}>
-          <label className="modal-label">Article slug</label>
-          <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: "var(--text-dim)" }}>
-            <span>{new URL(config.siteUrl).hostname}/{username}/</span>
-            <input
-              type="text"
-              value={slug}
-              onChange={handleSlugChange}
-              className={`modal-input ${serr ? "error" : ""}`}
-              style={{ flex: 1, padding: "6px 8px" }}
-              placeholder="my-article"
-            />
-            <button
-              onClick={handleCopy}
-              className="modal-close"
-              title="Copy link"
-            >
-              {copied ? (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              ) : (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                  <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-                </svg>
-              )}
-            </button>
+        {loading ? (
+          <div style={{ padding: "40px 0", textAlign: "center" }}>
+            <div style={{ fontSize: "13px", color: "var(--text-dim)" }}>Loading…</div>
           </div>
-          {serr && <p className="modal-field-error">{serr}</p>}
-        </div>
+        ) : (
+          <>
+            {status === "error" && <div className="modal-error">{errorMsg}</div>}
 
-        <button
-          onClick={handlePublish}
-          disabled={!!serr || !!titleError || status === "publishing"}
-          className="btn-primary"
-        >
-          {status === "publishing" ? "Publishing..." : "Publish"}
-        </button>
+            <div style={{ marginBottom: "16px" }}>
+              <label className="modal-label">Title</label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className={`modal-input ${titleError ? "error" : ""}`}
+                placeholder="Article title"
+              />
+              {titleError && <p className="modal-field-error">{titleError}</p>}
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "20px" }}>
+              {states.map((s) => (
+                <button
+                  key={s.value}
+                  onClick={() => setAccessState(s.value)}
+                  className={`modal-option ${accessState === s.value ? "selected" : ""}`}
+                >
+                  <div style={{ fontSize: "13px", fontWeight: 500, color: "var(--text-primary)" }}>
+                    {s.label}
+                  </div>
+                  <div style={{ fontSize: "11px", marginTop: "2px", color: "var(--text-dim)" }}>
+                    {s.desc}
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <div style={{ marginBottom: "20px" }}>
+              <label className="modal-label">Article slug</label>
+              <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: "var(--text-dim)" }}>
+                <span>{new URL(config.siteUrl).hostname}/{username}/</span>
+                <input
+                  type="text"
+                  value={slug}
+                  onChange={handleSlugChange}
+                  className={`modal-input ${serr ? "error" : ""}`}
+                  style={{ flex: 1, padding: "6px 8px" }}
+                  placeholder="my-article"
+                />
+                <button
+                  onClick={handleCopy}
+                  className="modal-close"
+                  title="Copy link"
+                >
+                  {copied ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                      <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+              {serr && <p className="modal-field-error">{serr}</p>}
+            </div>
+
+            <button
+              onClick={handlePublish}
+              disabled={!!serr || !!titleError || status === "publishing"}
+              className="btn-primary"
+            >
+              {status === "publishing"
+                ? "Publishing..."
+                : isExisting
+                  ? "Update"
+                  : "Publish"}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

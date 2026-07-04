@@ -25,6 +25,9 @@ export function TitleBar() {
   const { user, logout } = useAuth()
   const [modeLoading, setModeLoading] = useState(false)
 
+  const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
+  const isOnlineArticle = !!(activeTab?.articleId)
+
   // Слушаем событие от MarkdownEditor, что редактор готов
   useEffect(() => {
     const handler = () => setModeLoading(false)
@@ -131,7 +134,20 @@ export function TitleBar() {
           {user && (
             <button
               onClick={() => setShowPublish(true)}
-              className="w-9 h-full flex items-center justify-center text-[var(--text-dim)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)] transition-colors"
+              className="w-9 h-full flex items-center justify-center transition-colors"
+              style={{
+                color: isOnlineArticle ? 'var(--accent)' : 'var(--text-dim)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = isOnlineArticle
+                  ? 'var(--accent)'
+                  : 'var(--text-secondary)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = isOnlineArticle
+                  ? 'var(--accent)'
+                  : 'var(--text-dim)'
+              }}
               title="Поделиться на type-club.ru"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
