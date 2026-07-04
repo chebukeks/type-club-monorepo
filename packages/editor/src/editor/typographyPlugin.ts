@@ -54,10 +54,11 @@ export function typographyPlugin(): Plugin {
           }
 
           // Правило 3: "-- " в самом начале строки (ничего слева, пробел справа) -> "– "
+          // ProseMirror может заменить обычный пробел на неразрывный (U+00A0) в начале параграфа
           if (!matchStr && $head.parentOffset >= 3) {
             const fromStart = $head.parent.textBetween(0, $head.parentOffset, null, '\ufffc')
-            if (fromStart === '-- ') {
-              matchStr = `– `
+            if (fromStart.length === 3 && fromStart[0] === '-' && fromStart[1] === '-' && /[\s\u00A0]/.test(fromStart[2])) {
+              matchStr = `–${fromStart[2]}`
             }
           }
 
