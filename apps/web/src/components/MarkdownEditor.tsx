@@ -295,9 +295,9 @@ export function MarkdownEditor({
             </table>
           </div>
           <div className={sepClass} />
-          <div className="px-2 py-1">
+          <div className="px-3 py-1.5">
             <button
-              className="w-full py-1.5 rounded bg-blue-600 text-white text-sm hover:bg-blue-700"
+              className="w-full py-1.5 rounded bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
               onClick={insertTable}
             >Создать</button>
           </div>
@@ -315,9 +315,9 @@ export function MarkdownEditor({
             <span>← Назад</span>
           </button>
           <div className={sepClass} />
-          <div className="px-3 py-1">
+          <div className="px-5 py-2">
             <span className="text-xs text-gray-500 dark:text-gray-400">Язык</span>
-            <div className="relative mt-1">
+            <div className="relative mt-1.5">
               <input
                 className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-sm text-gray-700 dark:text-gray-300 outline-none focus:border-gray-400"
                 placeholder="Без языка"
@@ -340,9 +340,9 @@ export function MarkdownEditor({
             </div>
           </div>
           <div className={sepClass} />
-          <div className="px-2 py-1 flex gap-2">
+          <div className="px-3 py-1.5 flex gap-2">
             <button
-              className="flex-1 py-1.5 rounded bg-blue-600 text-white text-sm hover:bg-blue-700"
+              className="flex-1 py-1.5 rounded bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
               onClick={() => insertCodeBlock()}
             >Создать</button>
             {codeLang && (

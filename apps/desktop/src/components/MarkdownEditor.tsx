@@ -558,9 +558,10 @@ export function MarkdownEditor() {
             </table>
           </div>
           {sep}
-          <div className="px-2 py-1">
+          <div className="px-3 py-1.5">
             <button
-              className="w-full py-1.5 rounded bg-[var(--bg-active)] text-[var(--text-primary)] text-[13px] hover:opacity-90"
+              className="w-full py-1.5 rounded text-white text-[13px] font-medium hover:opacity-90"
+              style={{ backgroundColor: 'var(--accent)' }}
               onClick={insertTable}
             >Создать</button>
           </div>
@@ -601,9 +602,10 @@ export function MarkdownEditor() {
             </div>
           </div>
           {sep}
-          <div className="px-2 py-1 flex gap-2">
+          <div className="px-3 py-1.5 flex gap-2">
             <button
-              className="flex-1 py-1.5 rounded bg-[var(--bg-active)] text-[var(--text-primary)] text-[13px] hover:opacity-90"
+              className="flex-1 py-1.5 rounded text-white text-[13px] font-medium hover:opacity-90"
+              style={{ backgroundColor: 'var(--accent)' }}
               onClick={() => insertCodeBlock()}
             >Создать</button>
             {codeLang && (
