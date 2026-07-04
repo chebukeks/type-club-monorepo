@@ -1,7 +1,7 @@
 {
   "name": "type-club",
   "private": true,
-  "version": "0.6.5",
+  "version": "0.6.6",
   "description": "A modern Markdown editor with LaTeX support.",
   "author": "chebukek",
   "type": "module",
