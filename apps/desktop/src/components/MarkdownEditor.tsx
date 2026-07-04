@@ -450,14 +450,14 @@ export function MarkdownEditor() {
   )
 
   const numInput = (label: string, value: number, setValue: (v: number) => void, min = 1, max = 10) => (
-    <div className="flex items-center gap-2 px-5 py-2">
-      <span className="text-[13px] text-[var(--text-secondary)] flex-1">{label}</span>
+    <div className="flex items-center gap-2 px-2 py-1">
+      <span className="text-xs text-[var(--text-dim)] w-16">{label}</span>
       <button
         className="w-6 h-6 flex items-center justify-center rounded text-[var(--text-secondary)] hover:bg-[var(--menu-hover-bg)] disabled:opacity-30 text-sm"
         disabled={value <= min}
         onClick={() => setValue(value - 1)}
       >−</button>
-      <span className="w-8 text-center text-[13px] text-[var(--text-secondary)]">{value}</span>
+      <span className="w-8 text-center text-sm text-[var(--text-secondary)]">{value}</span>
       <button
         className="w-6 h-6 flex items-center justify-center rounded text-[var(--text-secondary)] hover:bg-[var(--menu-hover-bg)] disabled:opacity-30 text-sm"
         disabled={value >= max}
@@ -552,7 +552,7 @@ export function MarkdownEditor() {
           {numInput('Столбцы', tableCols, setTableCols)}
           {numInput('Строки', tableRows, setTableRows)}
           {sep}
-          <div className="px-5 py-2 overflow-x-auto">
+          <div className="px-2 py-1 overflow-x-auto">
             <table className="w-full border-collapse">
               <tbody>{tablePreview}</tbody>
             </table>
@@ -560,7 +560,7 @@ export function MarkdownEditor() {
           {sep}
           <div className="px-3 py-1.5">
             <button
-              className="w-full py-1.5 rounded text-white text-[13px] font-medium hover:opacity-90"
+              className="w-full py-1.5 rounded text-white text-sm font-medium hover:opacity-90"
               style={{ backgroundColor: 'var(--accent)' }}
               onClick={insertTable}
             >Создать</button>
@@ -577,11 +577,11 @@ export function MarkdownEditor() {
         >
           {ctxMenuItem('← Назад', undefined, () => setCtxSubmenu(null))}
           {sep}
-          <div className="px-5 py-2">
-            <span className="text-[13px] text-[var(--text-secondary)]">Язык</span>
-            <div className="relative mt-1.5" ref={langDropdownRef}>
+          <div className="px-3 py-1">
+            <span className="text-xs text-[var(--text-dim)]">Язык</span>
+            <div className="relative mt-1" ref={langDropdownRef}>
               <input
-                className="w-full bg-[var(--bg-base)] border border-[var(--border-strong)] rounded px-2 py-1 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--text-dim)]"
+                className="w-full bg-[var(--bg-base)] border border-[var(--border-strong)] rounded px-2 py-1 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--text-dim)]"
                 placeholder="Без языка"
                 value={codeLang}
                 onChange={(e) => setCodeLang(e.target.value)}
@@ -593,7 +593,7 @@ export function MarkdownEditor() {
                   {LANGUAGES.filter(l => !codeLang || l.label.toLowerCase().includes(codeLang.toLowerCase()) || l.value.includes(codeLang)).map((l) => (
                     <div
                       key={l.value}
-                      className={`px-5 py-1.5 text-[12px] cursor-pointer hover:bg-[var(--menu-hover-bg)] menu-item enabled`}
+                      className="px-3 py-1 text-xs cursor-pointer hover:bg-[var(--menu-hover-bg)] menu-item enabled"
                       onMouseDown={() => { setCodeLang(l.value); setShowLangDropdown(false) }}
                     >{l.label}</div>
                   ))}
@@ -604,13 +604,13 @@ export function MarkdownEditor() {
           {sep}
           <div className="px-3 py-1.5 flex gap-2">
             <button
-              className="flex-1 py-1.5 rounded text-white text-[13px] font-medium hover:opacity-90"
+              className="flex-1 py-1.5 rounded text-white text-sm font-medium hover:opacity-90"
               style={{ backgroundColor: 'var(--accent)' }}
               onClick={() => insertCodeBlock()}
             >Создать</button>
             {codeLang && (
               <button
-                className="flex-1 py-1.5 rounded bg-[var(--bg-base)] border border-[var(--border-strong)] text-[var(--text-secondary)] text-[13px] hover:bg-[var(--menu-hover-bg)]"
+                className="flex-1 py-1.5 rounded bg-[var(--bg-base)] border border-[var(--border-strong)] text-[var(--text-secondary)] text-sm hover:bg-[var(--menu-hover-bg)]"
                 onClick={() => insertCodeBlock('')}
               >Без языка</button>
             )}
