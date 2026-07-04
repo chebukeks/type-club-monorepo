@@ -450,7 +450,7 @@ export function MarkdownEditor() {
   )
 
   const numInput = (label: string, value: number, setValue: (v: number) => void, min = 1, max = 10) => (
-    <div className="flex items-center gap-2 px-2 py-1">
+    <div className="flex items-center gap-2 px-5 py-2">
       <span className="text-xs text-[var(--text-dim)] w-16">{label}</span>
       <button
         className="w-6 h-6 flex items-center justify-center rounded text-[var(--text-secondary)] hover:bg-[var(--menu-hover-bg)] disabled:opacity-30 text-sm"
@@ -552,8 +552,8 @@ export function MarkdownEditor() {
           {numInput('Столбцы', tableCols, setTableCols)}
           {numInput('Строки', tableRows, setTableRows)}
           {sep}
-          <div className="px-2 py-1 overflow-x-auto">
-            <table className="w-full border-collapse">
+          <div className="px-5 py-2 overflow-x-auto">
+            <table className="w-full border-collapse border border-[var(--border-strong)]">
               <tbody>{tablePreview}</tbody>
             </table>
           </div>
@@ -577,7 +577,7 @@ export function MarkdownEditor() {
         >
           {ctxMenuItem('← Назад', undefined, () => setCtxSubmenu(null))}
           {sep}
-          <div className="px-3 py-1">
+          <div className="px-5 py-2">
             <span className="text-xs text-[var(--text-dim)]">Язык</span>
             <div className="relative mt-1" ref={langDropdownRef}>
               <input
@@ -593,7 +593,7 @@ export function MarkdownEditor() {
                   {LANGUAGES.filter(l => !codeLang || l.label.toLowerCase().includes(codeLang.toLowerCase()) || l.value.includes(codeLang)).map((l) => (
                     <div
                       key={l.value}
-                      className="px-3 py-1 text-xs cursor-pointer hover:bg-[var(--menu-hover-bg)] menu-item enabled"
+                      className="menu-item enabled text-xs"
                       onMouseDown={() => { setCodeLang(l.value); setShowLangDropdown(false) }}
                     >{l.label}</div>
                   ))}
