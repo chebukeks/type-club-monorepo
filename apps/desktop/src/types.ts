@@ -138,6 +138,7 @@ export interface IElectronAPI {
   readFile: (filePath: string) => Promise<string>;
   writeFile: (filePath: string, content: string) => Promise<void>;
   readDir: (dirPath: string) => Promise<FileEntry[]>;
+  exists: (filePath: string) => Promise<boolean>;
   createDir: (dirPath: string) => Promise<void>;
   renameItem: (oldPath: string, newPath: string) => Promise<void>;
   deleteItem: (filePath: string) => Promise<void>;

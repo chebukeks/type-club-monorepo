@@ -25,6 +25,11 @@ contextBridge.exposeInMainWorld('api', {
     return ipcRenderer.invoke('fs:readDir', dirPath)
   },
 
+  /** Проверка существования файла/папки */
+  exists: (filePath: string): Promise<boolean> => {
+    return ipcRenderer.invoke('fs:exists', filePath)
+  },
+
   /** Создание директории */
   createDir: (dirPath: string) => {
     return ipcRenderer.invoke('fs:createDir', dirPath)

@@ -317,6 +317,15 @@ ipcMain.handle('fs:createDir', async (_event, dirPath: string): Promise<void> =>
   fs.mkdirSync(dirPath, { recursive: true })
 })
 
+// --- Проверка существования ---
+ipcMain.handle('fs:exists', async (_event, filePath: string): Promise<boolean> => {
+  try {
+    return fs.existsSync(filePath)
+  } catch {
+    return false
+  }
+})
+
 // --- Переименование ---
 ipcMain.handle('fs:rename', async (_event, oldPath: string, newPath: string): Promise<void> => {
   fs.renameSync(oldPath, newPath)
