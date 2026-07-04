@@ -1,9 +1,11 @@
 /**
  * MarkdownEditor.tsx — Desktop wrapper around @type-club/editor EditorCore.
- * Adds desktop-specific features: zoom, data URI placeholders, search bar, context menu.
+ * Adds desktop-specific features: zoom, data URI placeholders, search bar,
+ * typewriter mode, focus mask, context menu.
  */
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { toggleMark } from 'prosemirror-commands'
+import { Plugin } from 'prosemirror-state'
 import type { EditorView } from 'prosemirror-view'
 
 import { EditorCore, injectEditorStyles, schema } from '@type-club/editor'
@@ -51,14 +53,9 @@ export function MarkdownEditor() {
     }
   }, [state.activeTabId, state.editorMode])
 
-  const docScale = state.documentZoom / 100
-  const docScaleRef = useRef(docScale)
-  useEffect(() => { docScaleRef.current = docScale }, [docScale])
-
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
   const content = activeTab?.content || ''
 
-  // Data URI → placeholder replacement
   const replaceDataUris = useCallback((md: string): string => {
     const map = new Map<string, string>()
     let idx = 0
@@ -75,7 +72,7 @@ export function MarkdownEditor() {
     injectEditorStyles()
   }, [])
 
-  // Zoom: Ctrl+scroll
+  // ── Zoom: Ctrl+scroll ──
   useEffect(() => {
     const onWheel = (e: WheelEvent) => {
       if (e.ctrlKey || e.metaKey) {
@@ -86,12 +83,14 @@ export function MarkdownEditor() {
         const delta = e.deltaY < 0 ? 10 : -10
         if (e.altKey) setDocumentZoom(state.documentZoom + delta)
         else if (e.shiftKey) setTextZoom(state.textZoom + delta)
+        else setDocumentZoom(state.documentZoom + delta)
       }
     }
     window.addEventListener('wheel', onWheel, { passive: false })
     return () => window.removeEventListener('wheel', onWheel)
   }, [state.documentZoom, state.textZoom, setDocumentZoom, setTextZoom])
 
+  // ── Zoom: keyboard shortcuts ──
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isPlus = e.code === 'Equal' || e.code === 'NumpadAdd'
@@ -126,17 +125,12 @@ export function MarkdownEditor() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [state.textZoom, state.documentZoom, setTextZoom, setDocumentZoom])
 
-  // Content change handler
+  // ── Content handlers ──
   const handleChange = useCallback((md: string) => {
     if (!state.activeTabId) return
-    if (state.editorMode === 'raw') {
-      dispatch({ type: 'UPDATE_CONTENT', payload: { tabId: state.activeTabId, content: md } })
-    } else {
-      dispatch({ type: 'UPDATE_CONTENT', payload: { tabId: state.activeTabId, content: md } })
-    }
-  }, [state.activeTabId, state.editorMode, dispatch])
+    dispatch({ type: 'UPDATE_CONTENT', payload: { tabId: state.activeTabId, content: md } })
+  }, [state.activeTabId, dispatch])
 
-  // Raw mode content sync
   useEffect(() => {
     if (state.editorMode === 'raw' && state.activeTabId) {
       if (rawTabIdRef.current !== state.activeTabId || rawContent === null) {
@@ -156,8 +150,10 @@ export function MarkdownEditor() {
     }, 1500)
   }, [state.activeTabId])
 
-  // Typewriter mode: scroll to caret when enabled
+  // ── Typewriter plugin ──
+  const isTypewriterModeRef = useRef(state.typewriterMode)
   useEffect(() => {
+    isTypewriterModeRef.current = state.typewriterMode
     if (state.typewriterMode && editorView && !editorView.isDestroyed) {
       requestAnimationFrame(() => {
         if (editorView.isDestroyed) return
@@ -170,52 +166,124 @@ export function MarkdownEditor() {
           const caretCenterY = (coords.top + coords.bottom) / 2
           const containerCenterY = containerRect.top + containerRect.height / 2
           const offset = caretCenterY - containerCenterY
-          if (Math.abs(offset) > 1) {
-            scrollContainer.scrollBy({ top: offset })
-          }
+          if (Math.abs(offset) > 1) scrollContainer.scrollBy({ top: offset })
         } catch {
-          const paddingTop = parseFloat(getComputedStyle(editorView.dom).paddingTop) || 0
-          scrollContainer.scrollTop = Math.max(0, paddingTop - scrollContainer.clientHeight / 2)
+          const pt = parseFloat(getComputedStyle(editorView.dom).paddingTop) || 0
+          scrollContainer.scrollTop = Math.max(0, pt - scrollContainer.clientHeight / 2)
         }
       })
     }
   }, [state.typewriterMode, editorView])
 
-  // Update focus mask-image position on the scroll container
-  useEffect(() => {
-    if (!editorView || editorView.isDestroyed) return
-    const scrollContainer = editorView.dom.closest('.overflow-auto') as HTMLElement
+  const isMouseSelectingRef = useRef(false)
+  const caretDocY = useRef(-1)
+
+  function updateFocusMaskFromDocY(scrollContainer: HTMLElement) {
+    if (caretDocY.current < 0) return
+    scrollContainer.style.setProperty('--focus-mask-y', `${caretDocY.current - scrollContainer.scrollTop}px`)
+  }
+
+  function updateCaretDocY(view: EditorView) {
+    const scrollContainer = view.dom.closest('.overflow-auto') as HTMLElement
     if (!scrollContainer) return
 
-    if (state.focusMode === 'lines') {
-      const updateMask = () => {
-        try {
-          const { head } = editorView.state.selection
-          const coords = editorView.coordsAtPos(head)
-          const containerRect = scrollContainer.getBoundingClientRect()
-          const caretDocY = coords.top - containerRect.top + scrollContainer.scrollTop
-          scrollContainer.style.setProperty('--focus-mask-y', `${caretDocY}px`)
-        } catch {}
-      }
-      updateMask()
-      scrollContainer.addEventListener('scroll', updateMask)
-      return () => scrollContainer.removeEventListener('scroll', updateMask)
+    let caretCenterY: number
+    const activeEl = document.activeElement as HTMLElement
+    if (activeEl && activeEl !== view.dom && scrollContainer.contains(activeEl)) {
+      const rect = activeEl.getBoundingClientRect()
+      caretCenterY = (rect.top + rect.bottom) / 2
+    } else {
+      try {
+        const coords = view.coordsAtPos(view.state.selection.head)
+        caretCenterY = (coords.top + coords.bottom) / 2
+      } catch { return }
     }
-  }, [state.focusMode, editorView])
 
-  // TOC update handler
+    const containerRect = scrollContainer.getBoundingClientRect()
+    caretDocY.current = (caretCenterY - containerRect.top) + scrollContainer.scrollTop
+    updateFocusMaskFromDocY(scrollContainer)
+    return { scrollContainer, caretCenterY, containerRect }
+  }
+
+  function typewriterScrollToHead(view: EditorView) {
+    const result = updateCaretDocY(view)
+    if (!result) return
+    const { scrollContainer, caretCenterY, containerRect } = result
+    const containerCenterY = containerRect.top + containerRect.height / 2
+    const offset = caretCenterY - containerCenterY
+    if (Math.abs(offset) > 1) {
+      scrollContainer.scrollBy({ top: offset, behavior: 'smooth' })
+    }
+  }
+
+  const typewriterPlugin = useMemo(() => new Plugin({
+    props: {
+      handleScrollToSelection() {
+        return isTypewriterModeRef.current
+      },
+      handleDOMEvents: {
+        mousedown: () => { isMouseSelectingRef.current = true; return false },
+        mouseup: (view) => {
+          isMouseSelectingRef.current = false
+          requestAnimationFrame(() => {
+            if (isTypewriterModeRef.current) typewriterScrollToHead(view)
+            else updateCaretDocY(view)
+          })
+          return false
+        },
+      },
+    },
+    view() {
+      let scrollHandler: (() => void) | null = null
+      let scrollContainer: HTMLElement | null = null
+
+      return {
+        update(view, prevState) {
+          if (!scrollHandler) {
+            scrollContainer = view.dom.closest('.overflow-auto') as HTMLElement
+            if (scrollContainer) {
+              scrollHandler = () => updateFocusMaskFromDocY(scrollContainer!)
+              scrollContainer.addEventListener('scroll', scrollHandler, { passive: true })
+            }
+          }
+
+          const needsUpdate = !view.state.selection.eq(prevState.selection) || !view.state.doc.eq(prevState.doc) || view.state !== prevState
+          if (needsUpdate && !isMouseSelectingRef.current) {
+            if (isTypewriterModeRef.current) typewriterScrollToHead(view)
+            else updateCaretDocY(view)
+          }
+        },
+        destroy() {
+          if (scrollHandler && scrollContainer) {
+            scrollContainer.removeEventListener('scroll', scrollHandler)
+          }
+        },
+      }
+    },
+  }), [])
+
+  // ── Focus mask-image style ──
+  const containerStyle = useMemo((): React.CSSProperties => {
+    if (state.focusMode !== 'lines') return {}
+    return {
+      maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.3) calc(var(--focus-mask-y, 50%) - calc(50px * var(--doc-scale, 1))), black calc(var(--focus-mask-y, 50%) - calc(30px * var(--doc-scale, 1))), black calc(var(--focus-mask-y, 50%) + calc(30px * var(--doc-scale, 1))), rgba(0,0,0,0.3) calc(var(--focus-mask-y, 50%) + calc(50px * var(--doc-scale, 1))))',
+      WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.3) calc(var(--focus-mask-y, 50%) - calc(50px * var(--doc-scale, 1))), black calc(var(--focus-mask-y, 50%) - calc(30px * var(--doc-scale, 1))), black calc(var(--focus-mask-y, 50%) + calc(30px * var(--doc-scale, 1))), rgba(0,0,0,0.3) calc(var(--focus-mask-y, 50%) + calc(50px * var(--doc-scale, 1))))',
+    }
+  }, [state.focusMode])
+
+  // ── TOC ──
   const handleTocUpdate = useCallback((toc: any[]) => {
     dispatch({ type: 'SET_ACTIVE_TOC', payload: toc })
   }, [dispatch])
 
-  // Listen for search-open event from TitleBar
+  // ── Search open event ──
   useEffect(() => {
     const handler = () => setShowSearch(true)
     window.addEventListener('editor-open-search', handler)
     return () => window.removeEventListener('editor-open-search', handler)
   }, [])
 
-  // Context menu
+  // ── Context menu ──
   const handleContextMenu = (e: React.MouseEvent) => {
     if (state.editorMode !== 'seamless') return
     e.preventDefault()
@@ -240,6 +308,7 @@ export function MarkdownEditor() {
     { label: 'Highlight', hotkey: 'Ctrl+Shift+H', command: 'highlight' },
   ]
 
+  // ── Render ──
   return (
     <div
       className="flex-1 flex flex-col overflow-hidden bg-[var(--bg-base)]"
@@ -265,6 +334,8 @@ export function MarkdownEditor() {
         className={state.typewriterMode ? 'typewriter-mode' : ''}
         focusMode={state.focusMode}
         onTocUpdate={handleTocUpdate}
+        extraPlugins={[typewriterPlugin]}
+        containerStyle={containerStyle}
       />
 
       {ctxMenu && (
