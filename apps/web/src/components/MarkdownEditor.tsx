@@ -63,6 +63,19 @@ export function MarkdownEditor({
     setCtxSubmenu(null);
   };
 
+  const ctxMenuStyle = useMemo((): React.CSSProperties | null => {
+    if (!ctxMenu) return null;
+    const menuHeight = ctxSubmenu === "table" ? 300 : ctxSubmenu === "code" ? 260 : 400;
+    const vh = window.innerHeight;
+    const fitsBelow = ctxMenu.y + menuHeight <= vh - 10;
+    return {
+      top: fitsBelow ? ctxMenu.y : undefined,
+      bottom: fitsBelow ? undefined : vh - ctxMenu.y,
+      left: Math.min(ctxMenu.x, window.innerWidth - 270),
+      minWidth: ctxSubmenu === "table" ? "260px" : ctxSubmenu === "code" ? "250px" : "230px",
+    };
+  }, [ctxMenu, ctxSubmenu]);
+
   const handleContextMenu = (e: React.MouseEvent) => {
     if (editorMode !== "seamless") return;
     e.preventDefault();
@@ -213,8 +226,9 @@ export function MarkdownEditor({
       {ctxMenu && !ctxSubmenu && (
         <div
           className="fixed bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 py-1 flex flex-col text-sm"
-          style={{ top: ctxMenu.y, left: ctxMenu.x, minWidth: "230px" }}
+          style={ctxMenuStyle!}
           onContextMenu={(e) => e.preventDefault()}
+          onClick={(e) => e.stopPropagation()}
         >
           <button className={btnClass} onClick={() => handleClipboard("copy")}>
             <span>Копировать</span>
@@ -257,8 +271,9 @@ export function MarkdownEditor({
       {ctxMenu && ctxSubmenu === "table" && (
         <div
           className="fixed bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 py-1 flex flex-col text-sm"
-          style={{ top: ctxMenu.y, left: ctxMenu.x, minWidth: "260px" }}
+          style={ctxMenuStyle!}
           onContextMenu={(e) => e.preventDefault()}
+          onClick={(e) => e.stopPropagation()}
         >
           <button className={btnClass} onClick={() => setCtxSubmenu(null)}>
             <span>← Назад</span>
@@ -285,8 +300,9 @@ export function MarkdownEditor({
       {ctxMenu && ctxSubmenu === "code" && (
         <div
           className="fixed bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 py-1 flex flex-col text-sm"
-          style={{ top: ctxMenu.y, left: ctxMenu.x, minWidth: "250px" }}
+          style={ctxMenuStyle!}
           onContextMenu={(e) => e.preventDefault()}
+          onClick={(e) => e.stopPropagation()}
         >
           <button className={btnClass} onClick={() => setCtxSubmenu(null)}>
             <span>← Назад</span>

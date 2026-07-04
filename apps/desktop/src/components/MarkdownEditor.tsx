@@ -331,6 +331,20 @@ export function MarkdownEditor() {
     setCtxSubmenu(null)
   }
 
+  // Вычисление позиции меню с учётом viewport
+  const ctxMenuStyle = useMemo((): React.CSSProperties | null => {
+    if (!ctxMenu) return null
+    const menuHeight = ctxSubmenu === 'table' ? 300 : ctxSubmenu === 'code' ? 260 : 400
+    const vh = window.innerHeight
+    const fitsBelow = ctxMenu.y + menuHeight <= vh - 10
+    return {
+      top: fitsBelow ? ctxMenu.y : undefined,
+      bottom: fitsBelow ? undefined : vh - ctxMenu.y,
+      left: Math.min(ctxMenu.x, window.innerWidth - 270),
+      minWidth: ctxSubmenu === 'table' ? '260px' : ctxSubmenu === 'code' ? '250px' : '230px',
+    }
+  }, [ctxMenu, ctxSubmenu])
+
   const applyFormat = (markName: string) => {
     if (!editorView) return
     const mark = (schema.marks as Record<string, unknown>)[markName]
@@ -491,8 +505,9 @@ export function MarkdownEditor() {
       {ctxMenu && !ctxSubmenu && (
         <div
           className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
-          style={{ top: ctxMenu.y, left: ctxMenu.x, minWidth: '230px' }}
+          style={ctxMenuStyle!}
           onContextMenu={(e) => e.preventDefault()}
+          onClick={(e) => e.stopPropagation()}
         >
           {ctxMenuItem('Копировать', 'Ctrl+C', () => handleClipboard('copy'))}
           {ctxMenuItem('Вырезать', 'Ctrl+X', () => handleClipboard('cut'))}
@@ -518,8 +533,9 @@ export function MarkdownEditor() {
       {ctxMenu && ctxSubmenu === 'table' && (
         <div
           className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
-          style={{ top: ctxMenu.y, left: ctxMenu.x, minWidth: '260px' }}
+          style={ctxMenuStyle!}
           onContextMenu={(e) => e.preventDefault()}
+          onClick={(e) => e.stopPropagation()}
         >
           {ctxMenuItem('← Назад', undefined, () => setCtxSubmenu(null))}
           {sep}
@@ -544,8 +560,9 @@ export function MarkdownEditor() {
       {ctxMenu && ctxSubmenu === 'code' && (
         <div
           className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
-          style={{ top: ctxMenu.y, left: ctxMenu.x, minWidth: '250px' }}
+          style={ctxMenuStyle!}
           onContextMenu={(e) => e.preventDefault()}
+          onClick={(e) => e.stopPropagation()}
         >
           {ctxMenuItem('← Назад', undefined, () => setCtxSubmenu(null))}
           {sep}
