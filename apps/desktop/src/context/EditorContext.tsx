@@ -217,6 +217,8 @@ interface EditorContextValue {
   getRecentFolders: () => Promise<string[]>
   clearRecentFiles: () => Promise<void>
   clearRecentFolders: () => Promise<void>
+  removeRecentFile: (filePath: string) => Promise<void>
+  removeRecentFolder: (folderPath: string) => Promise<void>
   // --- Online articles ---
   fetchOnlineArticles: () => Promise<void>
   openOnlineArticle: (id: number) => Promise<void>
@@ -337,6 +339,14 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     try { await window.api.storeSet('recentFiles', []) } catch { /* ignore */ }
   }, [])
 
+  const removeRecentFile = useCallback(async (filePath: string) => {
+    try {
+      const recent = (await window.api.storeGet('recentFiles') as string[] | undefined) || []
+      const updated = recent.filter(f => f !== filePath)
+      await window.api.storeSet('recentFiles', updated)
+    } catch { /* ignore */ }
+  }, [])
+
   // --- Недавние папки ---
   const addRecentFolder = useCallback(async (folderPath: string) => {
     try {
@@ -352,6 +362,14 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
   }, [])
   const clearRecentFolders = useCallback(async () => {
     try { await window.api.storeSet('recentFolders', []) } catch { /* ignore */ }
+  }, [])
+
+  const removeRecentFolder = useCallback(async (folderPath: string) => {
+    try {
+      const recent = (await window.api.storeGet('recentFolders') as string[] | undefined) || []
+      const updated = recent.filter(f => f !== folderPath)
+      await window.api.storeSet('recentFolders', updated)
+    } catch { /* ignore */ }
   }, [])
 
   // --- Открыть файл ---
@@ -889,6 +907,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       setTypewriterMode, setFocusMode, setShowEmptyFolders,
       setTextZoom, setDocumentZoom,
       getRecentFiles, getRecentFolders, clearRecentFiles, clearRecentFolders,
+      removeRecentFile, removeRecentFolder,
       // Online articles
       fetchOnlineArticles, openOnlineArticle, saveOnlineArticle,
       deleteOnlineArticle, renameOnlineArticle, duplicateOnlineArticle,

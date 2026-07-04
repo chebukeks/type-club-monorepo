@@ -11,6 +11,7 @@ export function MenuBar() {
     startCreating, startRenaming,
     setTheme, refreshTab, setFocusMode,
     getRecentFiles, getRecentFolders, clearRecentFiles, clearRecentFolders,
+    removeRecentFile, removeRecentFolder,
   } = useEditor()
   const { activeTabId, tabs, folderPath, theme, focusMode } = state
   const [openMenu, setOpenMenu] = useState<string | null>(null)
@@ -116,10 +117,22 @@ export function MenuBar() {
   const handleSetTheme = (t: ThemeMode) => { closeMenu(); setTheme(t) }
   const handleSetFocusMode = (m: FocusMode) => { closeMenu(); setFocusMode(m) }
 
-  // Недавние файлы/папки — ленивая загрузка
-  const loadRecent = () => {
-    getRecentFiles().then(setRecentFiles)
-    getRecentFolders().then(setRecentFolders)
+  // Недавние файлы/папки — ленивая загрузка с автоочисткой несуществующих путей
+  const loadRecent = async () => {
+    const [files, folders] = await Promise.all([
+      getRecentFiles(),
+      getRecentFolders(),
+    ])
+    const validFiles = await filterExisting(files)
+    const validFolders = await filterExisting(folders)
+    setRecentFiles(validFiles)
+    setRecentFolders(validFolders)
+  }
+  const filterExisting = async (paths: string[]): Promise<string[]> => {
+    const results = await Promise.all(paths.map(async (p) => {
+      try { return await window.api.exists(p) ? p : null } catch { return p }
+    }))
+    return results.filter((p): p is string => p !== null)
   }
   const handleOpenRecent = (filePath: string) => {
     closeMenu()
@@ -184,9 +197,13 @@ export function MenuBar() {
                   ) : (
                     <>
                       {recentFiles.map((fp) => (
-                        <div key={fp} className={`${itemCls(true)}`} onClick={() => handleOpenRecent(fp)}>
-                          <span className="truncate text-[12px]">{fp.replace(/^.*[\\/]/, '')}</span>
-                          <span className="text-[10px] text-[var(--text-dim)] truncate ml-auto" style={{ maxWidth: '140px' }}>{fp}</span>
+                        <div key={fp} className={`${itemCls(true)} group`}>
+                          <span className="truncate text-[12px] flex-1" onClick={() => handleOpenRecent(fp)}>{fp.replace(/^.*[\\/]/, '')}</span>
+                          <span className="text-[10px] text-[var(--text-dim)] truncate ml-auto mr-1" style={{ maxWidth: '140px' }} onClick={() => handleOpenRecent(fp)}>{fp}</span>
+                          <button
+                            className="opacity-0 group-hover:opacity-100 text-[var(--text-dim)] hover:text-[var(--text-danger)] px-1 text-[14px] leading-none flex-shrink-0"
+                            onClick={(e) => { e.stopPropagation(); removeRecentFile(fp); setRecentFiles(prev => prev.filter(f => f !== fp)) }}
+                          >×</button>
                         </div>
                       ))}
                       {sep}
@@ -215,9 +232,13 @@ export function MenuBar() {
                   ) : (
                     <>
                       {recentFolders.map((fp) => (
-                        <div key={fp} className={`${itemCls(true)}`} onClick={() => handleOpenRecentFolder(fp)}>
-                          <span className="truncate text-[12px]">{fp.replace(/^.*[\\/]/, '')}</span>
-                          <span className="text-[10px] text-[var(--text-dim)] truncate ml-auto" style={{ maxWidth: '140px' }}>{fp}</span>
+                        <div key={fp} className={`${itemCls(true)} group`}>
+                          <span className="truncate text-[12px] flex-1" onClick={() => handleOpenRecentFolder(fp)}>{fp.replace(/^.*[\\/]/, '')}</span>
+                          <span className="text-[10px] text-[var(--text-dim)] truncate ml-auto mr-1" style={{ maxWidth: '140px' }} onClick={() => handleOpenRecentFolder(fp)}>{fp}</span>
+                          <button
+                            className="opacity-0 group-hover:opacity-100 text-[var(--text-dim)] hover:text-[var(--text-danger)] px-1 text-[14px] leading-none flex-shrink-0"
+                            onClick={(e) => { e.stopPropagation(); removeRecentFolder(fp); setRecentFolders(prev => prev.filter(f => f !== fp)) }}
+                          >×</button>
                         </div>
                       ))}
                       {sep}
