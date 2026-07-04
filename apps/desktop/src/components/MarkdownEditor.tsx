@@ -75,33 +75,55 @@ export function MarkdownEditor() {
     injectEditorStyles()
   }, [])
 
-  // Zoom handlers
+  // Zoom: Ctrl+scroll
   useEffect(() => {
     const onWheel = (e: WheelEvent) => {
-      const now = Date.now()
-      if (now - lastWheelTimeRef.current < 100) return
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault()
+        const now = Date.now()
+        if (now - lastWheelTimeRef.current < 30) return
         lastWheelTimeRef.current = now
-        const delta = e.deltaY > 0 ? -5 : 5
-        setDocumentZoom(Math.max(30, Math.min(300, state.documentZoom + delta)))
+        const delta = e.deltaY < 0 ? 10 : -10
+        if (e.altKey) setDocumentZoom(state.documentZoom + delta)
+        else if (e.shiftKey) setTextZoom(state.textZoom + delta)
       }
     }
     window.addEventListener('wheel', onWheel, { passive: false })
     return () => window.removeEventListener('wheel', onWheel)
-  }, [state.documentZoom, setDocumentZoom])
+  }, [state.documentZoom, state.textZoom, setDocumentZoom, setTextZoom])
 
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isPlus = e.code === 'Equal' || e.code === 'NumpadAdd'
+      const isMinus = e.code === 'Minus' || e.code === 'NumpadSubtract'
+      const isZero = e.code === 'Digit0' || e.code === 'Numpad0'
+
       if (e.ctrlKey || e.metaKey) {
-        if (e.key === '=' || e.key === '+') { e.preventDefault(); setTextZoom(Math.min(300, state.textZoom + 5)) }
-        if (e.key === '-') { e.preventDefault(); setTextZoom(Math.max(30, state.textZoom - 5)) }
-        if (e.key === '0') { e.preventDefault(); setTextZoom(100); setDocumentZoom(100) }
-        if (e.key === 'f') { e.preventDefault(); setShowSearch(s => !s) }
+        if (e.code === 'KeyF' && !e.shiftKey && !e.altKey) {
+          e.preventDefault()
+          setShowSearch(s => !s)
+          return
+        }
+        if (!isPlus && !isMinus && !isZero) return
+
+        if (e.altKey && !e.shiftKey) {
+          e.preventDefault()
+          if (isZero) setDocumentZoom(100)
+          else setDocumentZoom(state.documentZoom + (isPlus ? 10 : -10))
+        } else if (e.shiftKey && !e.altKey) {
+          e.preventDefault()
+          if (isZero) setTextZoom(100)
+          else setTextZoom(state.textZoom + (isPlus ? 10 : -10))
+        } else if (!e.shiftKey && !e.altKey) {
+          e.preventDefault()
+          if (isZero) window.api?.zoomReset?.()
+          else if (isPlus) window.api?.zoomIn?.()
+          else window.api?.zoomOut?.()
+        }
       }
     }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
   }, [state.textZoom, state.documentZoom, setTextZoom, setDocumentZoom])
 
   // Content change handler
@@ -133,6 +155,65 @@ export function MarkdownEditor() {
       flushRawContentRef.current?.()
     }, 1500)
   }, [state.activeTabId])
+
+  // Typewriter mode: scroll to caret when enabled
+  useEffect(() => {
+    if (state.typewriterMode && editorView && !editorView.isDestroyed) {
+      requestAnimationFrame(() => {
+        if (editorView.isDestroyed) return
+        const { head } = editorView.state.selection
+        const scrollContainer = editorView.dom.closest('.overflow-auto') as HTMLElement
+        if (!scrollContainer) return
+        try {
+          const coords = editorView.coordsAtPos(head)
+          const containerRect = scrollContainer.getBoundingClientRect()
+          const caretCenterY = (coords.top + coords.bottom) / 2
+          const containerCenterY = containerRect.top + containerRect.height / 2
+          const offset = caretCenterY - containerCenterY
+          if (Math.abs(offset) > 1) {
+            scrollContainer.scrollBy({ top: offset })
+          }
+        } catch {
+          const paddingTop = parseFloat(getComputedStyle(editorView.dom).paddingTop) || 0
+          scrollContainer.scrollTop = Math.max(0, paddingTop - scrollContainer.clientHeight / 2)
+        }
+      })
+    }
+  }, [state.typewriterMode, editorView])
+
+  // Update focus mask-image position on the scroll container
+  useEffect(() => {
+    if (!editorView || editorView.isDestroyed) return
+    const scrollContainer = editorView.dom.closest('.overflow-auto') as HTMLElement
+    if (!scrollContainer) return
+
+    if (state.focusMode === 'lines') {
+      const updateMask = () => {
+        try {
+          const { head } = editorView.state.selection
+          const coords = editorView.coordsAtPos(head)
+          const containerRect = scrollContainer.getBoundingClientRect()
+          const caretDocY = coords.top - containerRect.top + scrollContainer.scrollTop
+          scrollContainer.style.setProperty('--focus-mask-y', `${caretDocY}px`)
+        } catch {}
+      }
+      updateMask()
+      scrollContainer.addEventListener('scroll', updateMask)
+      return () => scrollContainer.removeEventListener('scroll', updateMask)
+    }
+  }, [state.focusMode, editorView])
+
+  // TOC update handler
+  const handleTocUpdate = useCallback((toc: any[]) => {
+    dispatch({ type: 'SET_ACTIVE_TOC', payload: toc })
+  }, [dispatch])
+
+  // Listen for search-open event from TitleBar
+  useEffect(() => {
+    const handler = () => setShowSearch(true)
+    window.addEventListener('editor-open-search', handler)
+    return () => window.removeEventListener('editor-open-search', handler)
+  }, [])
 
   // Context menu
   const handleContextMenu = (e: React.MouseEvent) => {
@@ -181,28 +262,27 @@ export function MarkdownEditor() {
         documentZoom={state.documentZoom}
         readOnly={state.editorMode === 'preview'}
         onEditorView={(v) => setEditorView(v)}
+        className={state.typewriterMode ? 'typewriter-mode' : ''}
+        focusMode={state.focusMode}
+        onTocUpdate={handleTocUpdate}
       />
 
       {ctxMenu && (
         <div
-          className="fixed bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg shadow-xl z-50 py-1 flex flex-col text-sm"
+          className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
           style={{ top: ctxMenu.y, left: ctxMenu.x, minWidth: '220px' }}
           onContextMenu={(e) => e.preventDefault()}
         >
           {formatItems.map((item) => (
-            <button
+            <div
               key={item.command}
-              className="flex items-center justify-between px-3 py-2 hover:bg-[var(--bg-hover)] text-left"
+              className="menu-item enabled"
               onClick={() => applyFormat(item.command)}
             >
-              <span style={{ color: 'var(--text-primary)' }}>{item.label}</span>
-              <span style={{ color: 'var(--text-muted)' }} className="text-xs">{item.hotkey}</span>
-            </button>
+              <span>{item.label}</span>
+              <span className="text-[11px] text-[var(--text-dim)]">{item.hotkey}</span>
+            </div>
           ))}
-          <div className="border-t border-[var(--border-strong)] my-1" />
-          <div className="px-3 py-1 text-xs" style={{ color: 'var(--text-muted)' }}>
-            Text: {state.textZoom}% | Doc: {state.documentZoom}%
-          </div>
         </div>
       )}
     </div>

@@ -137,7 +137,7 @@ export function EditorCore({
     });
 
     const plugins: Plugin[] = isPreview
-      ? [history(), dropCursor(), gapCursor(), syncPlugin, foldingPlugin, interactivePlugin, syntaxHighlightPlugin, typographyPlugin(), focusModePlugin]
+      ? [history(), dropCursor(), gapCursor(), syncPlugin, foldingPlugin, interactivePlugin, syntaxHighlightPlugin, typographyPlugin(), focusModePlugin(() => focusModeRef.current || 'none')]
       : [
           ...getKeymapPlugins(),
           getInputRulesPlugin(),
@@ -233,7 +233,7 @@ export function EditorCore({
     );
   }
 
-    const focusClass = focusMode && focusMode !== 'off'
+    const focusClass = focusMode && focusMode !== 'none'
       ? focusMode === 'paragraph' ? 'focus-mode-paragraph'
         : focusMode === 'sentence' ? 'focus-mode-sentence'
         : 'focus-mode-lines'
