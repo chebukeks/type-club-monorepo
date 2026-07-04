@@ -365,22 +365,34 @@ export function MarkdownEditor() {
   const insertBlockNode = (blockNode: import('prosemirror-model').Node) => {
     if (!editorView) return
     const { $head } = editorView.state.selection
-    let start: number, end: number
-    const parentType = $head.parent.type.name
 
-    if (parentType === 'paragraph' || parentType === 'heading') {
-      start = $head.before()
-      end = $head.after()
+    // Ищем родительский блок
+    let blockDepth = -1
+    for (let d = $head.depth; d >= 0; d--) {
+      const name = $head.node(d).type.name
+      if (name === 'paragraph' || name === 'heading' || name === 'code_block' || name === 'math_block') {
+        blockDepth = d
+        break
+      }
+    }
+    if (blockDepth === -1) return
+
+    const blockStart = $head.before(blockDepth)
+    const blockEnd = $head.after(blockDepth)
+    const blockNodeAt = editorView.state.doc.nodeAt($head.before(blockDepth))
+
+    // Если блок пустой — заменяем его; иначе вставляем после
+    const isEmpty = !blockNodeAt || blockNodeAt.textContent.trim() === ''
+    let tr: import('prosemirror-state').Transaction
+
+    if (isEmpty) {
+      tr = editorView.state.tr.replaceWith(blockStart, blockEnd, blockNode)
+      tr.setSelection(TextSelection.near(tr.doc.resolve(blockStart + 1)))
     } else {
-      const blockStart = $head.before($head.depth - 1)
-      const blockEnd = $head.after($head.depth - 1)
-      start = blockStart
-      end = blockEnd
+      tr = editorView.state.tr.insert(blockEnd, blockNode)
+      tr.setSelection(TextSelection.near(tr.doc.resolve(blockEnd + 1)))
     }
 
-    const tr = editorView.state.tr.replaceWith(start, end, blockNode)
-    const pos = start + 1
-    tr.setSelection(TextSelection.near(tr.doc.resolve(pos)))
     editorView.dispatch(tr)
     editorView.focus()
     closeCtxMenu()
@@ -405,11 +417,9 @@ export function MarkdownEditor() {
     insertBlockNode(table)
   }
 
-  const insertCodeBlock = () => {
-    const codeBlock = schema.nodes.code_block.create(
-      { params: codeLang },
-      codeLang ? undefined : schema.text('')
-    )
+  const insertCodeBlock = (lang?: string) => {
+    const language = lang !== undefined ? lang : codeLang
+    const codeBlock = schema.nodes.code_block.create({ params: language || '' })
     insertBlockNode(codeBlock)
   }
 
@@ -440,8 +450,8 @@ export function MarkdownEditor() {
   )
 
   const numInput = (label: string, value: number, setValue: (v: number) => void, min = 1, max = 10) => (
-    <div className="flex items-center gap-2 px-2 py-1">
-      <span className="text-[12px] text-[var(--text-secondary)] w-16">{label}</span>
+    <div className="flex items-center gap-2 px-5 py-2">
+      <span className="text-[13px] text-[var(--text-secondary)] flex-1">{label}</span>
       <button
         className="w-6 h-6 flex items-center justify-center rounded text-[var(--text-secondary)] hover:bg-[var(--menu-hover-bg)] disabled:opacity-30 text-sm"
         disabled={value <= min}
@@ -542,7 +552,7 @@ export function MarkdownEditor() {
           {numInput('Столбцы', tableCols, setTableCols)}
           {numInput('Строки', tableRows, setTableRows)}
           {sep}
-          <div className="px-2 py-1 overflow-x-auto">
+          <div className="px-5 py-2 overflow-x-auto">
             <table className="w-full border-collapse">
               <tbody>{tablePreview}</tbody>
             </table>
@@ -550,7 +560,7 @@ export function MarkdownEditor() {
           {sep}
           <div className="px-2 py-1">
             <button
-              className="w-full py-1 rounded bg-[var(--bg-active)] text-[var(--text-primary)] text-[13px] hover:opacity-90"
+              className="w-full py-1.5 rounded bg-[var(--bg-active)] text-[var(--text-primary)] text-[13px] hover:opacity-90"
               onClick={insertTable}
             >Создать</button>
           </div>
@@ -566,9 +576,9 @@ export function MarkdownEditor() {
         >
           {ctxMenuItem('← Назад', undefined, () => setCtxSubmenu(null))}
           {sep}
-          <div className="px-3 py-1">
-            <span className="text-[12px] text-[var(--text-secondary)]">Язык</span>
-            <div className="relative mt-1" ref={langDropdownRef}>
+          <div className="px-5 py-2">
+            <span className="text-[13px] text-[var(--text-secondary)]">Язык</span>
+            <div className="relative mt-1.5" ref={langDropdownRef}>
               <input
                 className="w-full bg-[var(--bg-base)] border border-[var(--border-strong)] rounded px-2 py-1 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--text-dim)]"
                 placeholder="Без языка"
@@ -582,7 +592,7 @@ export function MarkdownEditor() {
                   {LANGUAGES.filter(l => !codeLang || l.label.toLowerCase().includes(codeLang.toLowerCase()) || l.value.includes(codeLang)).map((l) => (
                     <div
                       key={l.value}
-                      className={`px-3 py-1 text-[12px] cursor-pointer hover:bg-[var(--menu-hover-bg)] ${l.value === codeLang ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}
+                      className={`px-5 py-1.5 text-[12px] cursor-pointer hover:bg-[var(--menu-hover-bg)] menu-item enabled`}
                       onMouseDown={() => { setCodeLang(l.value); setShowLangDropdown(false) }}
                     >{l.label}</div>
                   ))}
@@ -593,13 +603,13 @@ export function MarkdownEditor() {
           {sep}
           <div className="px-2 py-1 flex gap-2">
             <button
-              className="flex-1 py-1 rounded bg-[var(--bg-active)] text-[var(--text-primary)] text-[13px] hover:opacity-90"
-              onClick={insertCodeBlock}
+              className="flex-1 py-1.5 rounded bg-[var(--bg-active)] text-[var(--text-primary)] text-[13px] hover:opacity-90"
+              onClick={() => insertCodeBlock()}
             >Создать</button>
             {codeLang && (
               <button
-                className="flex-1 py-1 rounded bg-[var(--bg-base)] border border-[var(--border-strong)] text-[var(--text-secondary)] text-[13px] hover:bg-[var(--menu-hover-bg)]"
-                onClick={() => { setCodeLang(''); insertCodeBlock() }}
+                className="flex-1 py-1.5 rounded bg-[var(--bg-base)] border border-[var(--border-strong)] text-[var(--text-secondary)] text-[13px] hover:bg-[var(--menu-hover-bg)]"
+                onClick={() => insertCodeBlock('')}
               >Без языка</button>
             )}
           </div>

@@ -109,23 +109,32 @@ export function MarkdownEditor({
     const view = viewRef.current;
     if (!view) return;
     const { $head } = view.state.selection;
-    let start: number, end: number;
-    const parentType = $head.parent.type.name;
 
-    if (parentType === "paragraph" || parentType === "heading") {
-      start = $head.before();
-      end = $head.after();
+    let blockDepth = -1;
+    for (let d = $head.depth; d >= 0; d--) {
+      const name = $head.node(d).type.name;
+      if (name === "paragraph" || name === "heading" || name === "code_block" || name === "math_block") {
+        blockDepth = d;
+        break;
+      }
+    }
+    if (blockDepth === -1) return;
+
+    const blockStart = $head.before(blockDepth);
+    const blockEnd = $head.after(blockDepth);
+    const blockNodeAt = view.state.doc.nodeAt($head.before(blockDepth));
+    const isEmpty = !blockNodeAt || blockNodeAt.textContent.trim() === "";
+
+    if (isEmpty) {
+      const tr = view.state.tr.replaceWith(blockStart, blockEnd, blockNode);
+      tr.setSelection(TextSelection.near(tr.doc.resolve(blockStart + 1)));
+      view.dispatch(tr);
     } else {
-      const blockStart = $head.before($head.depth - 1);
-      const blockEnd = $head.after($head.depth - 1);
-      start = blockStart;
-      end = blockEnd;
+      const tr = view.state.tr.insert(blockEnd, blockNode);
+      tr.setSelection(TextSelection.near(tr.doc.resolve(blockEnd + 1)));
+      view.dispatch(tr);
     }
 
-    const tr = view.state.tr.replaceWith(start, end, blockNode);
-    const pos = start + 1;
-    tr.setSelection(TextSelection.near(tr.doc.resolve(pos)));
-    view.dispatch(tr);
     view.focus();
     closeCtxMenu();
   };
@@ -149,11 +158,9 @@ export function MarkdownEditor({
     insertBlockNode(table);
   };
 
-  const insertCodeBlock = () => {
-    const codeBlock = schema.nodes.code_block.create(
-      { params: codeLang },
-      codeLang ? undefined : schema.text("")
-    );
+  const insertCodeBlock = (lang?: string) => {
+    const language = lang !== undefined ? lang : codeLang;
+    const codeBlock = schema.nodes.code_block.create({ params: language || "" });
     insertBlockNode(codeBlock);
   };
 
@@ -336,12 +343,12 @@ export function MarkdownEditor({
           <div className="px-2 py-1 flex gap-2">
             <button
               className="flex-1 py-1.5 rounded bg-blue-600 text-white text-sm hover:bg-blue-700"
-              onClick={insertCodeBlock}
+              onClick={() => insertCodeBlock()}
             >Создать</button>
             {codeLang && (
               <button
                 className="flex-1 py-1.5 rounded bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm hover:bg-gray-200 dark:hover:bg-gray-700"
-                onClick={() => { setCodeLang(""); insertCodeBlock(); }}
+                onClick={() => insertCodeBlock("")}
               >Без языка</button>
             )}
           </div>
