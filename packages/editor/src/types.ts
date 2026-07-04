@@ -19,4 +19,7 @@ export interface EditorProps {
   documentZoom?: number
   readOnly?: boolean
   onEditorView?: (view: EditorView) => void
+  className?: string
+  focusMode?: FocusMode
+  onTocUpdate?: (toc: TocItem[]) => void
 }

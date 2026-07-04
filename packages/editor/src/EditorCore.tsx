@@ -26,6 +26,8 @@ import { MathInlineView } from "./editor/mathInlineView";
 import { ImageView } from "./editor/imageView";
 import { interactivePlugin } from "./editor/interactivePlugin";
 import { typographyPlugin } from "./editor/typographyPlugin";
+import { focusModePlugin } from "./editor/focusModePlugin";
+import { tocPlugin } from "./editor/tocPlugin";
 
 import type { EditorProps } from "./types";
 
@@ -85,6 +87,9 @@ export function EditorCore({
   documentZoom = 100,
   readOnly = false,
   onEditorView,
+  className,
+  focusMode,
+  onTocUpdate,
 }: EditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -92,6 +97,10 @@ export function EditorCore({
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const lastEmittedRef = useRef(content);
+  const onTocUpdateRef = useRef(onTocUpdate);
+  onTocUpdateRef.current = onTocUpdate;
+  const focusModeRef = useRef(focusMode);
+  focusModeRef.current = focusMode;
 
   const docScale = documentZoom / 100;
 
@@ -128,7 +137,7 @@ export function EditorCore({
     });
 
     const plugins: Plugin[] = isPreview
-      ? [history(), dropCursor(), gapCursor(), syncPlugin, foldingPlugin, interactivePlugin, syntaxHighlightPlugin, typographyPlugin()]
+      ? [history(), dropCursor(), gapCursor(), syncPlugin, foldingPlugin, interactivePlugin, syntaxHighlightPlugin, typographyPlugin(), focusModePlugin]
       : [
           ...getKeymapPlugins(),
           getInputRulesPlugin(),
@@ -145,6 +154,8 @@ export function EditorCore({
           foldingPlugin,
           interactivePlugin,
           typographyPlugin(),
+          focusModePlugin(() => focusModeRef.current || 'none'),
+          ...(onTocUpdateRef.current ? [tocPlugin((toc) => onTocUpdateRef.current?.(toc))] : []),
         ];
 
     const editorState = EditorState.create({ doc, plugins });
@@ -170,6 +181,10 @@ export function EditorCore({
     viewRef.current = view;
     onEditorView?.(view);
 
+    requestAnimationFrame(() => {
+      window.dispatchEvent(new Event('editor-mode-ready'))
+    });
+
     return () => {
       view.destroy();
       viewRef.current = null;
@@ -187,6 +202,12 @@ export function EditorCore({
       );
     }
   }, [content, editorMode]);
+
+  useEffect(() => {
+    if (viewRef.current && !viewRef.current.isDestroyed) {
+      viewRef.current.dispatch(viewRef.current.state.tr.setMeta('focusModeUpdate', true))
+    }
+  }, [focusMode]);
 
   if (editorMode === "raw") {
     return (
@@ -212,15 +233,21 @@ export function EditorCore({
     );
   }
 
-  return (
-    <div
-      className="flex-1 overflow-auto bg-[var(--bg-base)]"
-      style={{
-        "--editor-font-size": `${15 * (textZoom / 100) * docScale}px`,
-        "--doc-scale": docScale,
-      } as React.CSSProperties}
-    >
-      <div ref={editorRef} className="h-full w-full" />
-    </div>
-  );
+    const focusClass = focusMode && focusMode !== 'off'
+      ? focusMode === 'paragraph' ? 'focus-mode-paragraph'
+        : focusMode === 'sentence' ? 'focus-mode-sentence'
+        : 'focus-mode-lines'
+      : '';
+
+    return (
+      <div
+        className={`flex-1 overflow-auto bg-[var(--bg-base)] ${className || ''} ${focusClass}`}
+        style={{
+          "--editor-font-size": `${15 * (textZoom / 100) * docScale}px`,
+          "--doc-scale": docScale,
+        } as React.CSSProperties}
+      >
+        <div ref={editorRef} className="h-full w-full" />
+      </div>
+    );
 }
