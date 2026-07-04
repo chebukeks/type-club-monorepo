@@ -90,6 +90,8 @@ export function EditorCore({
   className,
   focusMode,
   onTocUpdate,
+  extraPlugins,
+  containerStyle,
 }: EditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -137,7 +139,7 @@ export function EditorCore({
     });
 
     const plugins: Plugin[] = isPreview
-      ? [history(), dropCursor(), gapCursor(), syncPlugin, foldingPlugin, interactivePlugin, syntaxHighlightPlugin, typographyPlugin(), focusModePlugin(() => focusModeRef.current || 'none')]
+      ? [history(), dropCursor(), gapCursor(), syncPlugin, foldingPlugin, interactivePlugin, syntaxHighlightPlugin, typographyPlugin(), focusModePlugin(() => focusModeRef.current || 'none'), ...(extraPlugins || [])]
       : [
           ...getKeymapPlugins(),
           getInputRulesPlugin(),
@@ -156,6 +158,7 @@ export function EditorCore({
           typographyPlugin(),
           focusModePlugin(() => focusModeRef.current || 'none'),
           ...(onTocUpdateRef.current ? [tocPlugin((toc) => onTocUpdateRef.current?.(toc))] : []),
+          ...(extraPlugins || []),
         ];
 
     const editorState = EditorState.create({ doc, plugins });
@@ -209,9 +212,17 @@ export function EditorCore({
     }
   }, [focusMode]);
 
+  useEffect(() => {
+    if (editorMode === 'raw') {
+      requestAnimationFrame(() => {
+        window.dispatchEvent(new Event('editor-mode-ready'))
+      })
+    }
+  }, [editorMode]);
+
   if (editorMode === "raw") {
     return (
-      <div className="flex-1 overflow-auto bg-[var(--bg-base)]">
+      <div className="flex-1 overflow-auto bg-[var(--bg-base)]" style={containerStyle}>
         <textarea
           ref={textareaRef}
           className="w-full h-full resize-none outline-none bg-transparent text-[var(--editor-text)] p-6"
@@ -245,6 +256,7 @@ export function EditorCore({
         style={{
           "--editor-font-size": `${15 * (textZoom / 100) * docScale}px`,
           "--doc-scale": docScale,
+          ...containerStyle,
         } as React.CSSProperties}
       >
         <div ref={editorRef} className="h-full w-full" />

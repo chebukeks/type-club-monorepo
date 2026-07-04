@@ -1,4 +1,6 @@
 import type { EditorView } from 'prosemirror-view'
+import type { Plugin } from 'prosemirror-state'
+import type React from 'react'
 
 export type EditorMode = 'raw' | 'seamless' | 'preview'
 
@@ -22,4 +24,6 @@ export interface EditorProps {
   className?: string
   focusMode?: FocusMode
   onTocUpdate?: (toc: TocItem[]) => void
+  extraPlugins?: Plugin[]
+  containerStyle?: React.CSSProperties
 }
