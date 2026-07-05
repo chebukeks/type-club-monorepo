@@ -611,129 +611,53 @@ export function getEditorStyles(): string {
 }
 
 /* ── Table editing mode ── */
-.table-edit-wrapper {
-  position: relative;
-}
-.table-edit-inner {
-  display: contents;
-}
-.table-edit-overlay {
-  position: absolute;
-  pointer-events: none;
-  z-index: 10;
-}
-.table-edit-overlay > * {
-  pointer-events: auto;
-}
+.te-col-drag { background: transparent; border-radius: 4px; transition: background 0.12s; }
+.te-col-drag:hover { background: rgba(99,123,229,0.12); }
+.te-col-drag.te-dragging { background: rgba(99,123,229,0.28); cursor: grabbing; }
+.te-col-drag.te-drop-target { background: rgba(99,123,229,0.35); }
 
-.te-col-drag-container,
-.te-row-drag-container {
-  position: absolute;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  pointer-events: none;
-}
-.te-col-drag {
-  position: absolute;
-  height: 20px;
-  cursor: grab;
-  pointer-events: auto;
-  z-index: 2;
-  border-radius: 4px;
-  background: transparent;
-  transition: background 0.15s;
-}
-.te-col-drag:hover, .te-col-drag.te-dragging {
-  background: var(--accent);
-  opacity: 0.5;
-}
-.te-col-drag.te-drop-target {
-  border-left: 2px solid var(--accent);
-  background: rgba(99, 123, 229, 0.15);
-}
-.te-row-drag {
-  position: absolute;
-  width: 20px;
-  cursor: grab;
-  pointer-events: auto;
-  z-index: 2;
-  border-radius: 4px;
-  background: transparent;
-  transition: background 0.15s;
-}
-.te-row-drag:hover, .te-row-drag.te-dragging {
-  background: var(--accent);
-  opacity: 0.5;
-}
-.te-row-drag.te-drop-target {
-  border-top: 2px solid var(--accent);
-  background: rgba(99, 123, 229, 0.15);
-}
+.te-row-drag { background: transparent; border-radius: 4px; transition: background 0.12s; }
+.te-row-drag:hover { background: rgba(99,123,229,0.12); }
+.te-row-drag.te-dragging { background: rgba(99,123,229,0.28); cursor: grabbing; }
+.te-row-drag.te-drop-target { background: rgba(99,123,229,0.35); }
 
-.te-col-del-container,
-.te-row-del-container {
-  position: absolute;
-}
-.te-col-del {
-  position: absolute;
-  width: 18px; height: 16px;
+.te-col-del, .te-row-del {
   border: none; border-radius: 3px;
-  background: transparent;
+  background: rgba(255,255,255,0.06);
   color: var(--text-dim);
-  font-size: 12px; line-height: 1;
-  cursor: pointer;
+  font-size: 13px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  z-index: 3;
-  transition: all 0.15s;
+  transition: all 0.12s;
 }
-.te-col-del:hover { background: rgba(232, 17, 35, 0.2); color: #e81123; }
-.te-row-del {
-  position: absolute;
-  left: 0;
-  width: 16px; height: 18px;
-  border: none; border-radius: 3px;
-  background: transparent;
-  color: var(--text-dim);
-  font-size: 12px; line-height: 1;
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  z-index: 3;
-  transition: all 0.15s;
+.te-col-del:hover, .te-row-del:hover {
+  background: rgba(232,17,35,0.25);
+  color: #e81123;
 }
-.te-row-del:hover { background: rgba(232, 17, 35, 0.2); color: #e81123; }
 
 .te-col-add, .te-row-add {
   width: 18px; height: 18px;
   border: none; border-radius: 50%;
   background: var(--accent);
   color: #fff;
-  font-size: 13px; font-weight: bold; line-height: 1;
+  font-size: 13px; font-weight: bold;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  z-index: 3;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-.table-edit-overlay:hover .te-col-add,
-.table-edit-overlay:hover .te-row-add {
-  opacity: 0.85;
+  opacity: 0.65;
+  transition: opacity 0.12s, transform 0.12s;
 }
 .te-col-add:hover, .te-row-add:hover {
-  opacity: 1 !important;
-  transform: scale(1.1);
+  opacity: 1;
+  transform: scale(1.15);
 }
 
 .te-done-btn {
-  position: absolute;
-  transform: translateX(-50%);
-  padding: 4px 16px;
+  padding: 4px 20px;
   border: none; border-radius: 6px;
   background: var(--accent);
   color: #fff;
   font-size: 13px; font-weight: 600;
   cursor: pointer;
-  z-index: 4;
-  transition: opacity 0.15s;
+  transition: opacity 0.12s;
 }
 .te-done-btn:hover { opacity: 0.85; }
 `
