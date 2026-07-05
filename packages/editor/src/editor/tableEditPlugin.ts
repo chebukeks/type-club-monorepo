@@ -16,32 +16,35 @@ export const tableEditPluginKey = new PluginKey<number | null>('tableEditPlugin'
 let dragColIdx = -1
 let dragRowIdx = -1
 let currentOverlay: HTMLElement | null = null
-let currentWrapper: HTMLElement | null = null
 let doneBtn: HTMLElement | null = null
 
 function hideAll() {
   if (currentOverlay) { currentOverlay.remove(); currentOverlay = null }
   if (doneBtn) { doneBtn.remove(); doneBtn = null }
-  if (currentWrapper) { currentWrapper = null }
   dragColIdx = -1
   dragRowIdx = -1
 }
 
 function showEditUI(view: EditorView, pos: number) {
+  console.log('[tableEdit] showEditUI called, pos:', pos)
   hideAll()
 
   const tableDom = view.nodeDOM(pos) as HTMLElement
+  console.log('[tableEdit] nodeDOM result:', tableDom, 'tagName:', tableDom?.tagName)
   if (!tableDom) return
   const table = (tableDom.tagName === 'TABLE' ? tableDom : tableDom.querySelector('table')) as HTMLTableElement | null
+  console.log('[tableEdit] table found:', !!table, 'cols:', table?.rows[0]?.cells?.length, 'rows:', table?.rows?.length)
   if (!table) return
 
   const wrapper = table.parentElement || table as HTMLElement
-  currentWrapper = wrapper
+  const wrapperRect = wrapper.getBoundingClientRect()
+  const editorRect = view.dom.getBoundingClientRect()
 
   const rect = table.getBoundingClientRect()
-  const wrapperRect = wrapper.getBoundingClientRect()
-  const ox = rect.left - wrapperRect.left
-  const oy = rect.top - wrapperRect.top
+  const ox = rect.left - editorRect.left
+  const oy = rect.top - editorRect.top
+  const wrapperOx = rect.left - wrapperRect.left
+  const wrapperOy = rect.top - wrapperRect.top
   const cols = (table.rows[0]?.cells.length) || 0
   const rows = table.rows.length
 
@@ -140,7 +143,9 @@ function showEditUI(view: EditorView, pos: number) {
   }
 
   wrapper.style.position = 'relative'
-  wrapper.appendChild(overlay)
+  view.dom.style.position = 'relative'
+  view.dom.appendChild(overlay)
+  console.log('[tableEdit] overlay appended to view.dom, children:', overlay.children.length)
 
   // ── Done button ──
   const done = document.createElement('button')
@@ -152,8 +157,9 @@ function showEditUI(view: EditorView, pos: number) {
     view.dispatch(view.state.tr.setMeta(tableEditPluginKey, null))
     view.focus()
   })
-  wrapper.appendChild(done)
+  view.dom.appendChild(done)
   doneBtn = done
+  console.log('[tableEdit] UI fully created — overlay:', !!currentOverlay, 'doneBtn:', !!done, 'total overlay children:', currentOverlay?.children.length)
 }
 
 // ── Table mutation helpers ──
@@ -213,6 +219,7 @@ export function tableEditPlugin(): Plugin {
       init() { return null },
       apply(tr, prev) {
         const meta = tr.getMeta(tableEditPluginKey)
+        if (meta !== undefined) console.log('[tableEdit] state.apply meta:', meta)
         if (meta !== undefined) return meta
         return prev
       },
@@ -222,12 +229,15 @@ export function tableEditPlugin(): Plugin {
         update(view, prevState) {
           const editPos = tableEditPluginKey.getState(view.state)
           const prevPos = tableEditPluginKey.getState(prevState)
+          console.log('[tableEdit] update — editPos:', editPos, 'prevPos:', prevPos, 'docChanged:', !view.state.doc.eq(prevState.doc))
           if (editPos !== prevPos) {
+            console.log('[tableEdit] pos changed, calling hideAll+showEditUI. editPos:', editPos)
             hideAll()
             if (editPos != null) {
               requestAnimationFrame(() => showEditUI(view, editPos))
             }
           } else if (editPos != null && !view.state.doc.eq(prevState.doc)) {
+            console.log('[tableEdit] doc changed while editing, repositioning')
             hideAll()
             requestAnimationFrame(() => showEditUI(view, editPos))
           }
