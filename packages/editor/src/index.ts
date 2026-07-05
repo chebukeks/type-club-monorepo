@@ -20,7 +20,6 @@ export { HeadingView } from "./editor/headingView";
 export { ImageView } from "./editor/imageView";
 export { MathBlockView } from "./editor/mathBlockView";
 export { MathInlineView } from "./editor/mathInlineView";
-export { TableEditNodeView } from "./editor/tableEditView";
 export { tableEditPlugin, tableEditPluginKey } from "./editor/tableEditPlugin";
 
 export type { EditorMode, EditorProps, FocusMode, TocItem } from "./types";

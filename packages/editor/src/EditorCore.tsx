@@ -28,7 +28,6 @@ import { interactivePlugin } from "./editor/interactivePlugin";
 import { typographyPlugin } from "./editor/typographyPlugin";
 import { focusModePlugin } from "./editor/focusModePlugin";
 import { tocPlugin } from "./editor/tocPlugin";
-import { TableEditNodeView } from "./editor/tableEditView";
 import { tableEditPlugin } from "./editor/tableEditPlugin";
 
 import type { EditorProps } from "./types";
@@ -177,7 +176,6 @@ export function EditorCore({
         math_inline: isPreview
           ? (node: PMNode) => new MathInlinePreviewView(node)
           : (node, view, getPos) => new MathInlineView(node, view, getPos),
-        table: (node, view, getPos) => new TableEditNodeView(node, view, getPos),
       },
     });
 
@@ -229,7 +227,7 @@ export function EditorCore({
       <div className="flex-1 overflow-auto bg-[var(--bg-base)]" style={containerStyle}>
         <textarea
           ref={textareaRef}
-          className="w-full h-full resize-none outline-none bg-transparent text-[var(--editor-text)] p-6"
+          className="w-full min-h-full resize-none outline-none bg-transparent text-[var(--editor-text)] p-6"
           style={{
             fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
             fontSize: `${14 * (textZoom / 100)}px`,
