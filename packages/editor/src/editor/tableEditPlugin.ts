@@ -53,13 +53,13 @@ function showEditUI(view: EditorView, pos: number) {
     el.addEventListener('dragstart', () => { dragColIdx = idx; el.classList.add('te-dragging') })
     el.addEventListener('dragover', (e) => { e.preventDefault(); if (dragColIdx >= 0 && dragColIdx !== idx) el.classList.add('te-drop-target') })
     el.addEventListener('dragleave', () => el.classList.remove('te-drop-target'))
-    el.addEventListener('drop', (e) => { e.preventDefault(); el.classList.remove('te-drop-target'); if (dragColIdx >= 0 && dragColIdx !== idx) { moveTableColumn({ from: dragColIdx, to: idx, pos, select: false })(view.state, view.dispatch); view.focus() } })
+    el.addEventListener('drop', (e) => { e.preventDefault(); el.classList.remove('te-drop-target'); if (dragColIdx >= 0 && dragColIdx !== idx) { moveTableColumn({ from: dragColIdx, to: idx, pos: pos + 1, select: false })(view.state, view.dispatch); view.focus() } })
     el.addEventListener('dragend', () => { dragColIdx = -1; el.classList.remove('te-dragging', 'te-drop-target') })
     overlay.appendChild(el)
   }
 
-  // ── Row drag handles ──
-  for (let i = 0; i < rows; i++) {
+  // ── Row drag handles (skip row 0 — it's covered by column headers) ──
+  for (let i = 1; i < rows; i++) {
     const cr = table.rows[i].cells[0].getBoundingClientRect()
     const el = document.createElement('div')
     el.className = 'te-row-drag'
@@ -69,7 +69,7 @@ function showEditUI(view: EditorView, pos: number) {
     el.addEventListener('dragstart', () => { dragRowIdx = idx; el.classList.add('te-dragging') })
     el.addEventListener('dragover', (e) => { e.preventDefault(); if (dragRowIdx >= 0 && dragRowIdx !== idx) el.classList.add('te-drop-target') })
     el.addEventListener('dragleave', () => el.classList.remove('te-drop-target'))
-    el.addEventListener('drop', (e) => { e.preventDefault(); el.classList.remove('te-drop-target'); if (dragRowIdx >= 0 && dragRowIdx !== idx) { moveTableRow({ from: dragRowIdx, to: idx, pos, select: false })(view.state, view.dispatch); view.focus() } })
+    el.addEventListener('drop', (e) => { e.preventDefault(); el.classList.remove('te-drop-target'); if (dragRowIdx >= 0 && dragRowIdx !== idx) { moveTableRow({ from: dragRowIdx, to: idx, pos: pos + 1, select: false })(view.state, view.dispatch); view.focus() } })
     el.addEventListener('dragend', () => { dragRowIdx = -1; el.classList.remove('te-dragging', 'te-drop-target') })
     overlay.appendChild(el)
   }
