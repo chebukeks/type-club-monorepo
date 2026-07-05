@@ -26,31 +26,20 @@ function hideAll() {
 }
 
 function showEditUI(view: EditorView, pos: number) {
-  console.log('[tableEdit] showEditUI called, pos:', pos)
   hideAll()
 
   const tableDom = view.nodeDOM(pos) as HTMLElement
-  console.log('[tableEdit] nodeDOM result:', tableDom, 'tagName:', tableDom?.tagName)
   if (!tableDom) return
   const table = (tableDom.tagName === 'TABLE' ? tableDom : tableDom.querySelector('table')) as HTMLTableElement | null
-  console.log('[tableEdit] table found:', !!table, 'cols:', table?.rows[0]?.cells?.length, 'rows:', table?.rows?.length)
   if (!table) return
 
-  const wrapper = table.parentElement || table as HTMLElement
-  const wrapperRect = wrapper.getBoundingClientRect()
-  const editorRect = view.dom.getBoundingClientRect()
-
   const rect = table.getBoundingClientRect()
-  const ox = rect.left - editorRect.left
-  const oy = rect.top - editorRect.top
-  const wrapperOx = rect.left - wrapperRect.left
-  const wrapperOy = rect.top - wrapperRect.top
   const cols = (table.rows[0]?.cells.length) || 0
   const rows = table.rows.length
 
   const overlay = document.createElement('div')
   overlay.className = 'table-edit-overlay'
-  overlay.style.cssText = `position:absolute;pointer-events:none;z-index:10;left:${ox}px;top:${oy}px;width:${rect.width}px;height:${rect.height}px;`
+  overlay.style.cssText = `position:fixed;pointer-events:none;z-index:1000;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;`
   currentOverlay = overlay
 
   // ── Column drag handles ──
@@ -90,7 +79,7 @@ function showEditUI(view: EditorView, pos: number) {
     const cr = table.rows[0].cells[i].getBoundingClientRect()
     const b = document.createElement('button')
     b.className = 'te-col-del'
-    b.style.cssText = `position:absolute;left:${cr.left - rect.left}px;top:-28px;width:${cr.width}px;height:20px;z-index:3;pointer-events:auto;`
+    b.style.cssText = `position:absolute;left:${cr.left - rect.left}px;top:-20px;width:${cr.width}px;height:18px;z-index:3;pointer-events:auto;`
     b.textContent = '×'
     b.title = 'Удалить столбец'
     const idx = i
@@ -103,7 +92,7 @@ function showEditUI(view: EditorView, pos: number) {
     const cr = table.rows[i].cells[0].getBoundingClientRect()
     const b = document.createElement('button')
     b.className = 'te-row-del'
-    b.style.cssText = `position:absolute;top:${cr.top - rect.top}px;left:-28px;width:20px;height:${cr.height}px;z-index:3;pointer-events:auto;`
+    b.style.cssText = `position:absolute;top:${cr.top - rect.top}px;left:-20px;width:18px;height:${cr.height}px;z-index:3;pointer-events:auto;`
     b.textContent = '×'
     b.title = 'Удалить строку'
     const idx = i
@@ -142,24 +131,20 @@ function showEditUI(view: EditorView, pos: number) {
     overlay.appendChild(b)
   }
 
-  wrapper.style.position = 'relative'
-  view.dom.style.position = 'relative'
-  view.dom.appendChild(overlay)
-  console.log('[tableEdit] overlay appended to view.dom, children:', overlay.children.length)
+  document.body.appendChild(overlay)
 
   // ── Done button ──
   const done = document.createElement('button')
   done.className = 'te-done-btn'
-  done.style.cssText = `position:absolute;left:${ox}px;top:${oy + rect.height + 8}px;z-index:4;`
+  done.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.bottom + 6}px;z-index:1000;`
   done.textContent = 'Готово'
   done.addEventListener('click', (e) => {
     e.stopPropagation()
     view.dispatch(view.state.tr.setMeta(tableEditPluginKey, null))
     view.focus()
   })
-  view.dom.appendChild(done)
+  document.body.appendChild(done)
   doneBtn = done
-  console.log('[tableEdit] UI fully created — overlay:', !!currentOverlay, 'doneBtn:', !!done, 'total overlay children:', currentOverlay?.children.length)
 }
 
 // ── Table mutation helpers ──
@@ -219,7 +204,6 @@ export function tableEditPlugin(): Plugin {
       init() { return null },
       apply(tr, prev) {
         const meta = tr.getMeta(tableEditPluginKey)
-        if (meta !== undefined) console.log('[tableEdit] state.apply meta:', meta)
         if (meta !== undefined) return meta
         return prev
       },
@@ -229,15 +213,12 @@ export function tableEditPlugin(): Plugin {
         update(view, prevState) {
           const editPos = tableEditPluginKey.getState(view.state)
           const prevPos = tableEditPluginKey.getState(prevState)
-          console.log('[tableEdit] update — editPos:', editPos, 'prevPos:', prevPos, 'docChanged:', !view.state.doc.eq(prevState.doc))
           if (editPos !== prevPos) {
-            console.log('[tableEdit] pos changed, calling hideAll+showEditUI. editPos:', editPos)
             hideAll()
             if (editPos != null) {
               requestAnimationFrame(() => showEditUI(view, editPos))
             }
           } else if (editPos != null && !view.state.doc.eq(prevState.doc)) {
-            console.log('[tableEdit] doc changed while editing, repositioning')
             hideAll()
             requestAnimationFrame(() => showEditUI(view, editPos))
           }
@@ -256,8 +237,6 @@ export function tableEditPlugin(): Plugin {
               view.dispatch(view.state.tr.setMeta(tableEditPluginKey, null))
               return true
             }
-            if (event.key.length === 1 && !event.ctrlKey && !event.metaKey) return true
-            if (event.key === 'Backspace' || event.key === 'Delete' || event.key === 'Enter') return true
             return true
           }
           return false
