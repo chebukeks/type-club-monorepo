@@ -13,16 +13,12 @@ import {
 
 export const tableEditPluginKey = new PluginKey<number | null>('tableEditPlugin')
 
-let dragColIdx = -1
-let dragRowIdx = -1
 let currentOverlay: HTMLElement | null = null
 let doneBtn: HTMLElement | null = null
 
 function hideAll() {
   if (currentOverlay) { currentOverlay.remove(); currentOverlay = null }
   if (doneBtn) { doneBtn.remove(); doneBtn = null }
-  dragColIdx = -1
-  dragRowIdx = -1
 }
 
 function showEditUI(view: EditorView, pos: number) {
@@ -50,11 +46,11 @@ function showEditUI(view: EditorView, pos: number) {
     el.style.cssText = `position:absolute;left:${cr.left - rect.left}px;top:0;width:${cr.width}px;height:${cr.height}px;cursor:grab;pointer-events:auto;z-index:2;`
     el.draggable = true
     const idx = i
-    el.addEventListener('dragstart', () => { dragColIdx = idx; el.classList.add('te-dragging') })
-    el.addEventListener('dragover', (e) => { e.preventDefault(); if (dragColIdx >= 0 && dragColIdx !== idx) el.classList.add('te-drop-target') })
+    el.addEventListener('dragstart', (e) => { e.dataTransfer!.setData('text/col-idx', String(idx)); el.classList.add('te-dragging') })
+    el.addEventListener('dragover', (e) => { e.preventDefault(); el.classList.add('te-drop-target') })
     el.addEventListener('dragleave', () => el.classList.remove('te-drop-target'))
-    el.addEventListener('drop', (e) => { e.preventDefault(); el.classList.remove('te-drop-target'); if (dragColIdx >= 0 && dragColIdx !== idx) { moveTableColumn({ from: dragColIdx, to: idx, pos: pos + 1, select: false })(view.state, view.dispatch); view.focus() } })
-    el.addEventListener('dragend', () => { dragColIdx = -1; el.classList.remove('te-dragging', 'te-drop-target') })
+    el.addEventListener('drop', (e) => { e.preventDefault(); el.classList.remove('te-drop-target'); const from = parseInt(e.dataTransfer!.getData('text/col-idx')); if (!isNaN(from) && from !== idx) { moveTableColumn({ from, to: idx, pos: pos + 1, select: false })(view.state, view.dispatch); view.focus() } })
+    el.addEventListener('dragend', () => { el.classList.remove('te-dragging', 'te-drop-target') })
     overlay.appendChild(el)
   }
 
@@ -66,11 +62,11 @@ function showEditUI(view: EditorView, pos: number) {
     el.style.cssText = `position:absolute;top:${cr.top - rect.top}px;left:0;width:${cr.width}px;height:${cr.height}px;cursor:grab;pointer-events:auto;z-index:2;`
     el.draggable = true
     const idx = i
-    el.addEventListener('dragstart', () => { dragRowIdx = idx; el.classList.add('te-dragging') })
-    el.addEventListener('dragover', (e) => { e.preventDefault(); if (dragRowIdx >= 0 && dragRowIdx !== idx) el.classList.add('te-drop-target') })
+    el.addEventListener('dragstart', (e) => { e.dataTransfer!.setData('text/row-idx', String(idx)); el.classList.add('te-dragging') })
+    el.addEventListener('dragover', (e) => { e.preventDefault(); el.classList.add('te-drop-target') })
     el.addEventListener('dragleave', () => el.classList.remove('te-drop-target'))
-    el.addEventListener('drop', (e) => { e.preventDefault(); el.classList.remove('te-drop-target'); if (dragRowIdx >= 0 && dragRowIdx !== idx) { moveTableRow({ from: dragRowIdx, to: idx, pos: pos + 1, select: false })(view.state, view.dispatch); view.focus() } })
-    el.addEventListener('dragend', () => { dragRowIdx = -1; el.classList.remove('te-dragging', 'te-drop-target') })
+    el.addEventListener('drop', (e) => { e.preventDefault(); el.classList.remove('te-drop-target'); const from = parseInt(e.dataTransfer!.getData('text/row-idx')); if (!isNaN(from) && from !== idx) { moveTableRow({ from, to: idx, pos: pos + 1, select: false })(view.state, view.dispatch); view.focus() } })
+    el.addEventListener('dragend', () => { el.classList.remove('te-dragging', 'te-drop-target') })
     overlay.appendChild(el)
   }
 
