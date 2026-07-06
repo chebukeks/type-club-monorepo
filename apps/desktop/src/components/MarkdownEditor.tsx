@@ -5,7 +5,7 @@
  */
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { toggleMark } from 'prosemirror-commands'
-import { Plugin, TextSelection } from 'prosemirror-state'
+import { Plugin, TextSelection, NodeSelection } from 'prosemirror-state'
 import { deleteTable } from 'prosemirror-tables'
 import type { EditorView } from 'prosemirror-view'
 
@@ -351,14 +351,18 @@ export function MarkdownEditor() {
   }
 
   const handleTableCopy = () => {
-    if (!editorView) return
+    if (!editorView || ctxTable == null) return
+    const tr = editorView.state.tr.setSelection(NodeSelection.create(editorView.state.doc, ctxTable))
+    editorView.dispatch(tr)
     editorView.dom.focus()
     document.execCommand('copy')
     closeCtxMenu()
   }
 
   const handleTableCut = () => {
-    if (!editorView) return
+    if (!editorView || ctxTable == null) return
+    const tr = editorView.state.tr.setSelection(NodeSelection.create(editorView.state.doc, ctxTable))
+    editorView.dispatch(tr)
     editorView.dom.focus()
     document.execCommand('cut')
     closeCtxMenu()
