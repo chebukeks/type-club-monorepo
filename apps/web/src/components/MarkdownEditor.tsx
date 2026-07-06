@@ -122,7 +122,9 @@ export function MarkdownEditor({
     const tr = view.state.tr.setSelection(NodeSelection.create(view.state.doc, ctxTable));
     view.dispatch(tr);
     view.dom.focus();
-    document.execCommand("cut");
+    document.execCommand("copy");
+    deleteTable(view.state, view.dispatch);
+    view.focus();
     closeCtxMenu();
   };
 

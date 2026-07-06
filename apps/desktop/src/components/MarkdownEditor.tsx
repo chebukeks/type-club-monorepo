@@ -364,7 +364,9 @@ export function MarkdownEditor() {
     const tr = editorView.state.tr.setSelection(NodeSelection.create(editorView.state.doc, ctxTable))
     editorView.dispatch(tr)
     editorView.dom.focus()
-    document.execCommand('cut')
+    document.execCommand('copy')
+    deleteTable(editorView.state, editorView.dispatch)
+    editorView.focus()
     closeCtxMenu()
   }
 
