@@ -1,4 +1,4 @@
-import { Plugin, PluginKey } from 'prosemirror-state'
+import { Plugin, PluginKey, TextSelection } from 'prosemirror-state'
 import { EditorView } from 'prosemirror-view'
 import {
   addColumnAfter,
@@ -50,7 +50,7 @@ function showEditUI(view: EditorView, pos: number) {
     el.addEventListener('dragstart', (e) => { e.dataTransfer!.setData('text/col-idx', String(idx)); el.classList.add('te-dragging'); console.log('[te] col dragstart idx:', idx) })
     el.addEventListener('dragover', (e) => { e.preventDefault(); el.classList.add('te-drop-target') })
     el.addEventListener('dragleave', () => el.classList.remove('te-drop-target'))
-    el.addEventListener('drop', (e) => { e.preventDefault(); el.classList.remove('te-drop-target'); const from = parseInt(e.dataTransfer!.getData('text/col-idx')); console.log('[te] col drop from:', from, 'to:', idx, 'valid:', !isNaN(from) && from !== idx); if (!isNaN(from) && from !== idx) { console.log('[te] calling moveTableColumn, pos:', pos + 1); const ok = moveTableColumn({ from, to: idx, pos: pos + 1, select: false })(view.state, view.dispatch); console.log('[te] moveTableColumn result:', ok); if (ok) view.focus() } })
+    el.addEventListener('drop', (e) => { e.preventDefault(); el.classList.remove('te-drop-target'); const from = parseInt(e.dataTransfer!.getData('text/col-idx')); console.log('[te] col drop from:', from, 'to:', idx, 'pos+1:', pos + 1, 'table at pos:', view.state.doc.nodeAt(pos)?.type?.name, '$resolve depth:', view.state.doc.resolve(pos + 1)?.depth); if (!isNaN(from) && from !== idx) { const ok = moveTableColumn({ from, to: idx, pos: pos + 1, select: false })(view.state, view.dispatch); console.log('[te] moveTableColumn result:', ok); if (ok) view.focus() } })
     el.addEventListener('dragend', () => { el.classList.remove('te-dragging', 'te-drop-target'); console.log('[te] col dragend idx:', idx) })
     overlay.appendChild(el)
   }
@@ -143,6 +143,13 @@ function showEditUI(view: EditorView, pos: number) {
   document.body.appendChild(done)
   doneBtn = done
   console.log('[te] showEditUI done, overlay children:', overlay.children.length)
+
+  // Place selection inside the table so moveColumn/moveRow can find cells via tr.selection
+  try {
+    const $cell = view.state.doc.resolve(pos + 3)
+    const tr = view.state.tr.setSelection(TextSelection.create(view.state.doc, pos + 3))
+    view.dispatch(tr)
+  } catch { /* ignore */ }
 }
 
 // ── Table mutation helpers ──
