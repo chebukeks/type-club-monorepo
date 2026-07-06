@@ -216,11 +216,11 @@ export function tableEditPlugin(): Plugin {
           if (editPos !== prevPos) {
             hideAll()
             if (editPos != null) {
-              setTimeout(() => showEditUI(view, editPos), 0)
+              setTimeout(() => showEditUI(view, editPos), 20)
             }
           } else if (editPos != null && !view.state.doc.eq(prevState.doc)) {
             hideAll()
-            setTimeout(() => showEditUI(view, editPos), 0)
+            setTimeout(() => showEditUI(view, editPos), 50)
           }
         },
         destroy() { hideAll() },
