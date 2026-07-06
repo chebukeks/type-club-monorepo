@@ -1,5 +1,4 @@
 import { Plugin, PluginKey, TextSelection } from 'prosemirror-state'
-import { EditorView } from 'prosemirror-view'
 import {
   addColumnAfter,
   addRowAfter,
@@ -22,7 +21,6 @@ function hideAll() {
 }
 
 function showEditUI(view: EditorView, pos: number) {
-  console.log('[te] showEditUI start, pos:', pos)
   hideAll()
 
   const tableDom = view.nodeDOM(pos) as HTMLElement
@@ -39,7 +37,6 @@ function showEditUI(view: EditorView, pos: number) {
   overlay.style.cssText = `position:fixed;pointer-events:none;z-index:1000;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;`
   currentOverlay = overlay
 
-  // ── Column drag handles ──
   for (let i = 0; i < cols; i++) {
     const cr = table.rows[0].cells[i].getBoundingClientRect()
     const el = document.createElement('div')
@@ -47,15 +44,14 @@ function showEditUI(view: EditorView, pos: number) {
     el.style.cssText = `position:absolute;left:${cr.left - rect.left}px;top:0;width:${cr.width}px;height:${cr.height}px;cursor:grab;pointer-events:auto;z-index:2;`
     el.draggable = true
     const idx = i
-    el.addEventListener('dragstart', (e) => { e.dataTransfer!.setData('text/col-idx', String(idx)); el.classList.add('te-dragging'); console.log('[te] col dragstart idx:', idx) })
+    el.addEventListener('dragstart', (e) => { e.dataTransfer!.setData('text/col-idx', String(idx)); el.classList.add('te-dragging') })
     el.addEventListener('dragover', (e) => { e.preventDefault(); el.classList.add('te-drop-target') })
     el.addEventListener('dragleave', () => el.classList.remove('te-drop-target'))
-    el.addEventListener('drop', (e) => { e.preventDefault(); el.classList.remove('te-drop-target'); const from = parseInt(e.dataTransfer!.getData('text/col-idx')); console.log('[te] col drop from:', from, 'to:', idx, 'pos+1:', pos + 1, 'table at pos:', view.state.doc.nodeAt(pos)?.type?.name, '$resolve depth:', view.state.doc.resolve(pos + 1)?.depth); if (!isNaN(from) && from !== idx) { const ok = moveTableColumn({ from, to: idx, pos: pos + 1, select: false })(view.state, view.dispatch); console.log('[te] moveTableColumn result:', ok); if (ok) view.focus() } })
-    el.addEventListener('dragend', () => { el.classList.remove('te-dragging', 'te-drop-target'); console.log('[te] col dragend idx:', idx) })
+    el.addEventListener('drop', (e) => { e.preventDefault(); el.classList.remove('te-drop-target'); const from = parseInt(e.dataTransfer!.getData('text/col-idx')); if (!isNaN(from) && from !== idx) { const ok = moveTableColumn({ from, to: idx, pos: pos + 1, select: false })(view.state, view.dispatch); if (ok) view.focus() } })
+    el.addEventListener('dragend', () => { el.classList.remove('te-dragging', 'te-drop-target') })
     overlay.appendChild(el)
   }
 
-  // ── Row drag handles (skip row 0 — it's covered by column headers) ──
   for (let i = 1; i < rows; i++) {
     const cr = table.rows[i].cells[0].getBoundingClientRect()
     const el = document.createElement('div')
@@ -63,15 +59,14 @@ function showEditUI(view: EditorView, pos: number) {
     el.style.cssText = `position:absolute;top:${cr.top - rect.top}px;left:0;width:${cr.width}px;height:${cr.height}px;cursor:grab;pointer-events:auto;z-index:2;`
     el.draggable = true
     const idx = i
-    el.addEventListener('dragstart', (e) => { e.dataTransfer!.setData('text/row-idx', String(idx)); el.classList.add('te-dragging'); console.log('[te] row dragstart idx:', idx) })
+    el.addEventListener('dragstart', (e) => { e.dataTransfer!.setData('text/row-idx', String(idx)); el.classList.add('te-dragging') })
     el.addEventListener('dragover', (e) => { e.preventDefault(); el.classList.add('te-drop-target') })
     el.addEventListener('dragleave', () => el.classList.remove('te-drop-target'))
-    el.addEventListener('drop', (e) => { e.preventDefault(); el.classList.remove('te-drop-target'); const from = parseInt(e.dataTransfer!.getData('text/row-idx')); console.log('[te] row drop from:', from, 'to:', idx, 'valid:', !isNaN(from) && from !== idx); if (!isNaN(from) && from !== idx) { console.log('[te] calling moveTableRow, pos:', pos + 1); const ok = moveTableRow({ from, to: idx, pos: pos + 1, select: false })(view.state, view.dispatch); console.log('[te] moveTableRow result:', ok); if (ok) view.focus() } })
-    el.addEventListener('dragend', () => { el.classList.remove('te-dragging', 'te-drop-target'); console.log('[te] row dragend idx:', idx) })
+    el.addEventListener('drop', (e) => { e.preventDefault(); el.classList.remove('te-drop-target'); const from = parseInt(e.dataTransfer!.getData('text/row-idx')); if (!isNaN(from) && from !== idx) { const ok = moveTableRow({ from, to: idx, pos: pos + 1, select: false })(view.state, view.dispatch); if (ok) view.focus() } })
+    el.addEventListener('dragend', () => { el.classList.remove('te-dragging', 'te-drop-target') })
     overlay.appendChild(el)
   }
 
-  // ── Column × buttons ──
   for (let i = 0; i < cols; i++) {
     const cr = table.rows[0].cells[i].getBoundingClientRect()
     const b = document.createElement('button')
@@ -84,7 +79,6 @@ function showEditUI(view: EditorView, pos: number) {
     overlay.appendChild(b)
   }
 
-  // ── Row × buttons ──
   for (let i = 0; i < rows; i++) {
     const cr = table.rows[i].cells[0].getBoundingClientRect()
     const b = document.createElement('button')
@@ -97,7 +91,6 @@ function showEditUI(view: EditorView, pos: number) {
     overlay.appendChild(b)
   }
 
-  // ── Column + buttons ──
   for (let i = 0; i <= cols; i++) {
     const cx = i < cols
       ? (i === cols - 1 ? table.rows[0].cells[i].getBoundingClientRect().right - rect.left + 3
@@ -113,7 +106,6 @@ function showEditUI(view: EditorView, pos: number) {
     overlay.appendChild(b)
   }
 
-  // ── Row + buttons ──
   for (let i = 0; i <= rows; i++) {
     const cy = i < rows
       ? table.rows[i].getBoundingClientRect().bottom - rect.top - 9
@@ -130,7 +122,6 @@ function showEditUI(view: EditorView, pos: number) {
 
   document.body.appendChild(overlay)
 
-  // ── Done button ──
   const done = document.createElement('button')
   done.className = 'te-done-btn'
   done.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.bottom + 6}px;z-index:1000;`
@@ -142,17 +133,12 @@ function showEditUI(view: EditorView, pos: number) {
   })
   document.body.appendChild(done)
   doneBtn = done
-  console.log('[te] showEditUI done, overlay children:', overlay.children.length)
 
-  // Place selection inside the table so moveColumn/moveRow can find cells via tr.selection
   try {
-    const $cell = view.state.doc.resolve(pos + 3)
     const tr = view.state.tr.setSelection(TextSelection.create(view.state.doc, pos + 3))
     view.dispatch(tr)
   } catch { /* ignore */ }
 }
-
-// ── Table mutation helpers ──
 
 function addColumnAt(view: EditorView, pos: number, colIdx: number, totalCols: number) {
   const table = view.state.doc.nodeAt(pos)
@@ -200,8 +186,6 @@ function deleteRowAt(view: EditorView, pos: number, rowIdx: number) {
   view.focus()
 }
 
-// ── Plugin ──
-
 export function tableEditPlugin(): Plugin {
   return new Plugin<number | null>({
     key: tableEditPluginKey,
@@ -219,13 +203,11 @@ export function tableEditPlugin(): Plugin {
           const editPos = tableEditPluginKey.getState(view.state)
           const prevPos = tableEditPluginKey.getState(prevState)
           if (editPos !== prevPos) {
-            console.log('[te] update pos changed:', prevPos, '->', editPos)
             hideAll()
             if (editPos != null) {
               setTimeout(() => showEditUI(view, editPos), 20)
             }
           } else if (editPos != null && !view.state.doc.eq(prevState.doc)) {
-            console.log('[te] update doc changed, recreating overlay')
             hideAll()
             showEditUI(view, editPos)
           }
