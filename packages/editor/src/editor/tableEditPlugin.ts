@@ -50,7 +50,7 @@ function showEditUI(view: EditorView, pos: number) {
     el.addEventListener('dragstart', (e) => { e.dataTransfer!.setData('text/col-idx', String(idx)); el.classList.add('te-dragging'); console.log('[te] col dragstart idx:', idx) })
     el.addEventListener('dragover', (e) => { e.preventDefault(); el.classList.add('te-drop-target') })
     el.addEventListener('dragleave', () => el.classList.remove('te-drop-target'))
-    el.addEventListener('drop', (e) => { e.preventDefault(); el.classList.remove('te-drop-target'); const from = parseInt(e.dataTransfer!.getData('text/col-idx')); console.log('[te] col drop from:', from, 'to:', idx, 'valid:', !isNaN(from) && from !== idx); if (!isNaN(from) && from !== idx) { console.log('[te] calling moveTableColumn'); moveTableColumn({ from, to: idx, pos: pos + 1, select: false })(view.state, view.dispatch); view.focus() } })
+    el.addEventListener('drop', (e) => { e.preventDefault(); el.classList.remove('te-drop-target'); const from = parseInt(e.dataTransfer!.getData('text/col-idx')); console.log('[te] col drop from:', from, 'to:', idx, 'valid:', !isNaN(from) && from !== idx); if (!isNaN(from) && from !== idx) { console.log('[te] calling moveTableColumn, pos:', pos + 1); const ok = moveTableColumn({ from, to: idx, pos: pos + 1, select: false })(view.state, view.dispatch); console.log('[te] moveTableColumn result:', ok); if (ok) view.focus() } })
     el.addEventListener('dragend', () => { el.classList.remove('te-dragging', 'te-drop-target'); console.log('[te] col dragend idx:', idx) })
     overlay.appendChild(el)
   }
@@ -66,7 +66,7 @@ function showEditUI(view: EditorView, pos: number) {
     el.addEventListener('dragstart', (e) => { e.dataTransfer!.setData('text/row-idx', String(idx)); el.classList.add('te-dragging'); console.log('[te] row dragstart idx:', idx) })
     el.addEventListener('dragover', (e) => { e.preventDefault(); el.classList.add('te-drop-target') })
     el.addEventListener('dragleave', () => el.classList.remove('te-drop-target'))
-    el.addEventListener('drop', (e) => { e.preventDefault(); el.classList.remove('te-drop-target'); const from = parseInt(e.dataTransfer!.getData('text/row-idx')); console.log('[te] row drop from:', from, 'to:', idx, 'valid:', !isNaN(from) && from !== idx); if (!isNaN(from) && from !== idx) { console.log('[te] calling moveTableRow'); moveTableRow({ from, to: idx, pos: pos + 1, select: false })(view.state, view.dispatch); view.focus() } })
+    el.addEventListener('drop', (e) => { e.preventDefault(); el.classList.remove('te-drop-target'); const from = parseInt(e.dataTransfer!.getData('text/row-idx')); console.log('[te] row drop from:', from, 'to:', idx, 'valid:', !isNaN(from) && from !== idx); if (!isNaN(from) && from !== idx) { console.log('[te] calling moveTableRow, pos:', pos + 1); const ok = moveTableRow({ from, to: idx, pos: pos + 1, select: false })(view.state, view.dispatch); console.log('[te] moveTableRow result:', ok); if (ok) view.focus() } })
     el.addEventListener('dragend', () => { el.classList.remove('te-dragging', 'te-drop-target'); console.log('[te] row dragend idx:', idx) })
     overlay.appendChild(el)
   }
