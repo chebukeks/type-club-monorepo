@@ -220,7 +220,7 @@ export function tableEditPlugin(): Plugin {
             }
           } else if (editPos != null && !view.state.doc.eq(prevState.doc)) {
             hideAll()
-            setTimeout(() => showEditUI(view, editPos), 50)
+            showEditUI(view, editPos)
           }
         },
         destroy() { hideAll() },
