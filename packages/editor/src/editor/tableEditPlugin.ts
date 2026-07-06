@@ -22,6 +22,7 @@ function hideAll() {
 }
 
 function showEditUI(view: EditorView, pos: number) {
+  console.log('[te] showEditUI start, pos:', pos)
   hideAll()
 
   const tableDom = view.nodeDOM(pos) as HTMLElement
@@ -46,11 +47,11 @@ function showEditUI(view: EditorView, pos: number) {
     el.style.cssText = `position:absolute;left:${cr.left - rect.left}px;top:0;width:${cr.width}px;height:${cr.height}px;cursor:grab;pointer-events:auto;z-index:2;`
     el.draggable = true
     const idx = i
-    el.addEventListener('dragstart', (e) => { e.dataTransfer!.setData('text/col-idx', String(idx)); el.classList.add('te-dragging') })
+    el.addEventListener('dragstart', (e) => { e.dataTransfer!.setData('text/col-idx', String(idx)); el.classList.add('te-dragging'); console.log('[te] col dragstart idx:', idx) })
     el.addEventListener('dragover', (e) => { e.preventDefault(); el.classList.add('te-drop-target') })
     el.addEventListener('dragleave', () => el.classList.remove('te-drop-target'))
-    el.addEventListener('drop', (e) => { e.preventDefault(); el.classList.remove('te-drop-target'); const from = parseInt(e.dataTransfer!.getData('text/col-idx')); if (!isNaN(from) && from !== idx) { moveTableColumn({ from, to: idx, pos: pos + 1, select: false })(view.state, view.dispatch); view.focus() } })
-    el.addEventListener('dragend', () => { el.classList.remove('te-dragging', 'te-drop-target') })
+    el.addEventListener('drop', (e) => { e.preventDefault(); el.classList.remove('te-drop-target'); const from = parseInt(e.dataTransfer!.getData('text/col-idx')); console.log('[te] col drop from:', from, 'to:', idx, 'valid:', !isNaN(from) && from !== idx); if (!isNaN(from) && from !== idx) { console.log('[te] calling moveTableColumn'); moveTableColumn({ from, to: idx, pos: pos + 1, select: false })(view.state, view.dispatch); view.focus() } })
+    el.addEventListener('dragend', () => { el.classList.remove('te-dragging', 'te-drop-target'); console.log('[te] col dragend idx:', idx) })
     overlay.appendChild(el)
   }
 
@@ -62,11 +63,11 @@ function showEditUI(view: EditorView, pos: number) {
     el.style.cssText = `position:absolute;top:${cr.top - rect.top}px;left:0;width:${cr.width}px;height:${cr.height}px;cursor:grab;pointer-events:auto;z-index:2;`
     el.draggable = true
     const idx = i
-    el.addEventListener('dragstart', (e) => { e.dataTransfer!.setData('text/row-idx', String(idx)); el.classList.add('te-dragging') })
+    el.addEventListener('dragstart', (e) => { e.dataTransfer!.setData('text/row-idx', String(idx)); el.classList.add('te-dragging'); console.log('[te] row dragstart idx:', idx) })
     el.addEventListener('dragover', (e) => { e.preventDefault(); el.classList.add('te-drop-target') })
     el.addEventListener('dragleave', () => el.classList.remove('te-drop-target'))
-    el.addEventListener('drop', (e) => { e.preventDefault(); el.classList.remove('te-drop-target'); const from = parseInt(e.dataTransfer!.getData('text/row-idx')); if (!isNaN(from) && from !== idx) { moveTableRow({ from, to: idx, pos: pos + 1, select: false })(view.state, view.dispatch); view.focus() } })
-    el.addEventListener('dragend', () => { el.classList.remove('te-dragging', 'te-drop-target') })
+    el.addEventListener('drop', (e) => { e.preventDefault(); el.classList.remove('te-drop-target'); const from = parseInt(e.dataTransfer!.getData('text/row-idx')); console.log('[te] row drop from:', from, 'to:', idx, 'valid:', !isNaN(from) && from !== idx); if (!isNaN(from) && from !== idx) { console.log('[te] calling moveTableRow'); moveTableRow({ from, to: idx, pos: pos + 1, select: false })(view.state, view.dispatch); view.focus() } })
+    el.addEventListener('dragend', () => { el.classList.remove('te-dragging', 'te-drop-target'); console.log('[te] row dragend idx:', idx) })
     overlay.appendChild(el)
   }
 
@@ -141,6 +142,7 @@ function showEditUI(view: EditorView, pos: number) {
   })
   document.body.appendChild(done)
   doneBtn = done
+  console.log('[te] showEditUI done, overlay children:', overlay.children.length)
 }
 
 // ── Table mutation helpers ──
@@ -210,11 +212,13 @@ export function tableEditPlugin(): Plugin {
           const editPos = tableEditPluginKey.getState(view.state)
           const prevPos = tableEditPluginKey.getState(prevState)
           if (editPos !== prevPos) {
+            console.log('[te] update pos changed:', prevPos, '->', editPos)
             hideAll()
             if (editPos != null) {
               setTimeout(() => showEditUI(view, editPos), 20)
             }
           } else if (editPos != null && !view.state.doc.eq(prevState.doc)) {
+            console.log('[te] update doc changed, recreating overlay')
             hideAll()
             showEditUI(view, editPos)
           }
