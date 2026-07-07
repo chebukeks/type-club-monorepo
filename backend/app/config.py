@@ -35,5 +35,8 @@ class Settings(BaseSettings):
     # Moderation
     moderator_email: str = ""
 
+    # Internal: shared secret for collab-server ↔ backend
+    service_token: str = ""
+
 
 settings = Settings()

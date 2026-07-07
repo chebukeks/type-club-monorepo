@@ -157,3 +157,45 @@ class ModerateRequest(BaseModel):
 
 class ModerateResponse(BaseModel):
     message: str
+
+
+# ── Collaboration ──
+
+VALID_ROLES = ("editor", "co_author")
+
+
+class InviteCollaboratorRequest(BaseModel):
+    nickname: str
+    role: str
+
+    @field_validator("role")
+    @classmethod
+    def valid_role(cls, v: str) -> str:
+        if v not in VALID_ROLES:
+            raise ValueError("Role must be 'editor' or 'co_author'")
+        return v
+
+
+class CollaboratorResponse(BaseModel):
+    id: int
+    user_id: int
+    nickname: str
+    role: str
+    source: str
+    invited_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ShareLinkResponse(BaseModel):
+    token: str
+    url: str
+
+
+class CheckAccessResponse(BaseModel):
+    has_access: bool
+    role: str
+
+
+class SyncStateRequest(BaseModel):
+    content: str
