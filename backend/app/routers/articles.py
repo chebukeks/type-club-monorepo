@@ -15,6 +15,7 @@ from app.schemas import (
     ArticleUpdateRequest,
     CheckAccessResponse,
     CollaboratorResponse,
+    GenerateShareLinkRequest,
     InviteCollaboratorRequest,
     ModerateRequest,
     ModerateResponse,
@@ -366,6 +367,7 @@ async def remove_collaborator(
 @router.post("/{article_id}/share-link", response_model=ShareLinkResponse)
 async def generate_share_link(
     article_id: int,
+    data: GenerateShareLinkRequest,
     current_user: User = Depends(get_verified_user),
     session: AsyncSession = Depends(get_session),
 ):
@@ -376,10 +378,11 @@ async def generate_share_link(
         raise HTTPException(status_code=403, detail="Not your article")
 
     article.share_token = secrets.token_urlsafe(32)
+    article.share_role = data.role
     await session.commit()
 
     url = f"https://type-club.ru/join/{article.share_token}"
-    return ShareLinkResponse(token=article.share_token, url=url)
+    return ShareLinkResponse(token=article.share_token, url=url, role=data.role)
 
 
 @router.get("/shared/{token}", response_model=ArticleResponse)
@@ -431,7 +434,7 @@ async def join_via_share_link(
     member = CollaborationMember(
         article_id=article.id,
         user_id=current_user.id,
-        role="editor",
+        role=article.share_role or "editor",
         source="link",
     )
     session.add(member)

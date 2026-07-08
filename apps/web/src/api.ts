@@ -129,6 +129,7 @@ export interface Collaborator {
 export interface ShareLink {
   token: string;
   url: string;
+  role: string;
 }
 
 export const collaborationApi = {
@@ -137,8 +138,8 @@ export const collaborationApi = {
     api.post<Collaborator>(`/articles/${articleId}/collaborators`, { nickname, role }),
   remove: (articleId: number, userId: number) =>
     api.delete<void>(`/articles/${articleId}/collaborators/${userId}`),
-  generateLink: (articleId: number) =>
-    api.post<ShareLink>(`/articles/${articleId}/share-link`),
+  generateLink: (articleId: number, role: "editor" | "co_author") =>
+    api.post<ShareLink>(`/articles/${articleId}/share-link`, { role }),
   getByToken: (token: string) => api.get<Article>(`/articles/shared/${token}`),
   joinByToken: (token: string) =>
     api.post<Collaborator>(`/articles/shared/${token}/join`),

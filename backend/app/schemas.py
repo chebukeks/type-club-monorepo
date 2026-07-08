@@ -190,6 +190,18 @@ class CollaboratorResponse(BaseModel):
 class ShareLinkResponse(BaseModel):
     token: str
     url: str
+    role: str
+
+
+class GenerateShareLinkRequest(BaseModel):
+    role: str
+
+    @field_validator("role")
+    @classmethod
+    def valid_role(cls, v: str) -> str:
+        if v not in VALID_ROLES:
+            raise ValueError("Role must be 'editor' or 'co_author'")
+        return v
 
 
 class CheckAccessResponse(BaseModel):

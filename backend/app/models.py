@@ -33,6 +33,7 @@ class Article(Base):
     access_state: Mapped[str] = mapped_column(String(20), nullable=False, default="private")
     slug: Mapped[str] = mapped_column(String(255), nullable=False)
     share_token: Mapped[Optional[str]] = mapped_column(String(64), unique=True, nullable=True)
+    share_role: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
