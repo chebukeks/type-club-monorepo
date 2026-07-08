@@ -7,6 +7,8 @@ import type { EditorView } from "prosemirror-view";
 import { EditorCore, schema, tableEditPluginKey } from "@type-club/editor";
 import type { EditorMode } from "@type-club/editor";
 
+import { useCollaboration } from "../hooks/useCollaboration";
+
 export type { EditorMode } from "@type-club/editor";
 
 const LANGUAGES = [
@@ -41,6 +43,7 @@ interface MarkdownEditorProps {
   textZoom?: number;
   documentZoom?: number;
   readOnly?: boolean;
+  articleId?: number | null;
 }
 
 export function MarkdownEditor({
@@ -50,6 +53,7 @@ export function MarkdownEditor({
   textZoom,
   documentZoom,
   readOnly,
+  articleId,
 }: MarkdownEditorProps) {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
   const [ctxSubmenu, setCtxSubmenu] = useState<"table" | "code" | null>(null);
@@ -59,6 +63,7 @@ export function MarkdownEditor({
   const [codeLang, setCodeLang] = useState("");
   const [showLangDropdown, setShowLangDropdown] = useState(false);
   const viewRef = useRef<EditorView | null>(null);
+  const collab = useCollaboration(articleId ?? null);
 
   const closeCtxMenu = () => {
     setCtxMenu(null);
@@ -286,6 +291,7 @@ export function MarkdownEditor({
         documentZoom={documentZoom}
         readOnly={readOnly}
         onEditorView={(v) => { viewRef.current = v; }}
+        collaboration={collab.config ?? undefined}
       />
 
       {ctxMenu && ctxTable !== null && (

@@ -1,6 +1,7 @@
 import type { EditorView } from 'prosemirror-view'
 import type { Plugin } from 'prosemirror-state'
 import type React from 'react'
+import type { CollaborationConfig } from './editor/collaborationPlugin'
 
 export type EditorMode = 'raw' | 'seamless' | 'preview'
 
@@ -26,4 +27,7 @@ export interface EditorProps {
   onTocUpdate?: (toc: TocItem[]) => void
   extraPlugins?: Plugin[]
   containerStyle?: React.CSSProperties
+  collaboration?: CollaborationConfig
 }
+
+export type { CollaborationConfig }

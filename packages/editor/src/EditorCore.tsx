@@ -29,6 +29,7 @@ import { typographyPlugin } from "./editor/typographyPlugin";
 import { focusModePlugin } from "./editor/focusModePlugin";
 import { tocPlugin } from "./editor/tocPlugin";
 import { tableEditPlugin } from "./editor/tableEditPlugin";
+import { createCollaborationPlugins } from "./editor/collaborationPlugin";
 
 import type { EditorProps } from "./types";
 
@@ -93,6 +94,7 @@ export function EditorCore({
   onTocUpdate,
   extraPlugins,
   containerStyle,
+  collaboration,
 }: EditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -125,22 +127,30 @@ export function EditorCore({
       "Shift-Tab": goToNextCell(-1),
     });
 
-    const syncPlugin = new Plugin({
-      view() {
-        return {
-          update(view, prevState) {
-            if (!view.state.doc.eq(prevState.doc)) {
-              const md = serializeMarkdown(view.state.doc);
-              lastEmittedRef.current = md;
-              onChangeRef.current(md);
-            }
+    const collabPlugins = collaboration
+      ? createCollaborationPlugins(collaboration)
+      : [];
+
+    const syncPlugin = collaboration
+      ? null
+      : new Plugin({
+          view() {
+            return {
+              update(view, prevState) {
+                if (!view.state.doc.eq(prevState.doc)) {
+                  const md = serializeMarkdown(view.state.doc);
+                  lastEmittedRef.current = md;
+                  onChangeRef.current(md);
+                }
+              },
+            };
           },
-        };
-      },
-    });
+        });
+
+    const historyPlugins = collaboration ? [] : [history(), syncPlugin!];
 
     const plugins: Plugin[] = isPreview
-      ? [history(), dropCursor(), gapCursor(), syncPlugin, foldingPlugin, interactivePlugin, syntaxHighlightPlugin, typographyPlugin(), focusModePlugin(() => focusModeRef.current || 'none'), ...(extraPlugins || [])]
+      ? [...historyPlugins, dropCursor(), gapCursor(), foldingPlugin, interactivePlugin, syntaxHighlightPlugin, typographyPlugin(), focusModePlugin(() => focusModeRef.current || 'none'), ...collabPlugins, ...(extraPlugins || [])]
       : [
           ...getKeymapPlugins(),
           getInputRulesPlugin(),
@@ -151,15 +161,15 @@ export function EditorCore({
           syntaxHighlightPlugin,
           linkTooltipPlugin(),
           mathActivePlugin,
-          history(),
+          ...historyPlugins,
           dropCursor(),
-          syncPlugin,
           foldingPlugin,
           interactivePlugin,
           typographyPlugin(),
           tableEditPlugin(),
           focusModePlugin(() => focusModeRef.current || 'none'),
           ...(onTocUpdateRef.current ? [tocPlugin((toc) => onTocUpdateRef.current?.(toc))] : []),
+          ...collabPlugins,
           ...(extraPlugins || []),
         ];
 
@@ -194,10 +204,10 @@ export function EditorCore({
       view.destroy();
       viewRef.current = null;
     };
-  }, [editorMode, readOnly]);
+  }, [editorMode, readOnly, collaboration]);
 
   useEffect(() => {
-    if (!viewRef.current || editorMode === "raw") return;
+    if (!viewRef.current || editorMode === "raw" || collaboration) return;
     if (content === lastEmittedRef.current) return;
     const newDoc = parseMarkdown(content);
     if (!viewRef.current.state.doc.eq(newDoc)) {
@@ -206,7 +216,7 @@ export function EditorCore({
         viewRef.current.state.tr.replaceWith(0, viewRef.current.state.doc.content.size, newDoc.content)
       );
     }
-  }, [content, editorMode]);
+  }, [content, editorMode, collaboration]);
 
   useEffect(() => {
     if (viewRef.current && !viewRef.current.isDestroyed) {

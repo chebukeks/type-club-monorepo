@@ -6,6 +6,8 @@ import EditorHeader from "../components/EditorHeader";
 import SiteHeader from "../components/SiteHeader";
 import PublishModal from "../components/PublishModal";
 
+const COLLAB_AUTOSAVE_MS = 30000;
+
 export default function Editor() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -126,6 +128,7 @@ export default function Editor() {
         onChange={setContent}
         textZoom={100}
         documentZoom={100}
+        articleId={articleId}
       />
 
       {showPublish && (
