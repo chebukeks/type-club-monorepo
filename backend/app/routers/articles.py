@@ -378,7 +378,7 @@ async def generate_share_link(
     article.share_token = secrets.token_urlsafe(32)
     await session.commit()
 
-    url = f"https://type-club.ru/collab/{article.share_token}"
+    url = f"https://type-club.ru/join/{article.share_token}"
     return ShareLinkResponse(token=article.share_token, url=url)
 
 
