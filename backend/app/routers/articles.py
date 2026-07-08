@@ -270,19 +270,23 @@ async def list_collaborators(
     if article.author_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not your article")
 
-    result = []
-    for m in article.collaborators:
-        result.append(
-            CollaboratorResponse(
-                id=m.id,
-                user_id=m.user_id,
-                nickname=m.user.nickname,
-                role=m.role,
-                source=m.source,
-                invited_at=m.invited_at,
-            )
+    result_set = await session.execute(
+        select(CollaborationMember, User.nickname)
+        .join(User, CollaborationMember.user_id == User.id)
+        .where(CollaborationMember.article_id == article_id)
+    )
+    rows = result_set.all()
+    return [
+        CollaboratorResponse(
+            id=member.id,
+            user_id=member.user_id,
+            nickname=nickname,
+            role=member.role,
+            source=member.source,
+            invited_at=member.invited_at,
         )
-    return result
+        for member, nickname in rows
+    ]
 
 
 @router.post("/{article_id}/collaborators", response_model=CollaboratorResponse, status_code=201)
