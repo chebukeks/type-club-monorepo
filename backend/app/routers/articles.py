@@ -439,6 +439,13 @@ async def join_via_share_link(
 # ── Internal: for collab-server ──
 
 
+def _verify_service_token(authorization: str | None = Header(None)) -> None:
+    if not settings.service_token:
+        return
+    if not authorization or authorization.replace("Bearer ", "") != settings.service_token:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+
 @router.get("/{article_id}/check-access", response_model=CheckAccessResponse)
 async def check_access(
     article_id: int,
@@ -511,10 +518,3 @@ def _user_can_edit(article: Article, user: User) -> bool:
     if article.author_id == user.id:
         return True
     return any(m.user_id == user.id and m.role == "co_author" for m in article.collaborators)
-
-
-def _verify_service_token(authorization: str | None = Header(None)) -> None:
-    if not settings.service_token:
-        return
-    if not authorization or authorization.replace("Bearer ", "") != settings.service_token:
-        raise HTTPException(status_code=403, detail="Forbidden")

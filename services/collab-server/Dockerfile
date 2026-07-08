@@ -2,10 +2,9 @@ FROM node:22-alpine
 
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev
-
-COPY . .
+COPY node_modules ./node_modules
+COPY services/collab-server/package.json services/collab-server/tsconfig.json ./
+COPY services/collab-server/src ./src
 
 EXPOSE 8001
 

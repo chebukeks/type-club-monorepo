@@ -10,7 +10,9 @@ services:
       - type-club-net
 
   collab-server:
-    build: ./services/collab-server
+    build:
+      context: .
+      dockerfile: services/collab-server/Dockerfile
     container_name: type-club-collab
     restart: unless-stopped
     environment:
@@ -23,4 +25,4 @@ services:
 networks:
   type-club-net:
     external: true
-    name: type-club-net
+    name: eatsmart_bot_eatsmart_net
