@@ -114,3 +114,32 @@ export const articlesApi = {
   moderate: (id: number, action: "block" | "unblock") =>
     api.post<{ message: string }>(`/articles/${id}/moderate`, { action }),
 };
+
+// ── Collaboration ──
+
+export interface Collaborator {
+  id: number;
+  user_id: number;
+  nickname: string;
+  role: "editor" | "co_author";
+  source: "invite" | "link";
+  invited_at: string;
+}
+
+export interface ShareLink {
+  token: string;
+  url: string;
+}
+
+export const collaborationApi = {
+  list: (articleId: number) => api.get<Collaborator[]>(`/articles/${articleId}/collaborators`),
+  invite: (articleId: number, nickname: string, role: "editor" | "co_author") =>
+    api.post<Collaborator>(`/articles/${articleId}/collaborators`, { nickname, role }),
+  remove: (articleId: number, userId: number) =>
+    api.delete<void>(`/articles/${articleId}/collaborators/${userId}`),
+  generateLink: (articleId: number) =>
+    api.post<ShareLink>(`/articles/${articleId}/share-link`),
+  getByToken: (token: string) => api.get<Article>(`/articles/shared/${token}`),
+  joinByToken: (token: string) =>
+    api.post<Collaborator>(`/articles/shared/${token}/join`),
+};

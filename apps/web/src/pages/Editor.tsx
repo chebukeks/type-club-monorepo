@@ -126,12 +126,14 @@ export default function Editor() {
         onChange={setContent}
         textZoom={100}
         documentZoom={100}
+        articleId={articleId}
       />
 
       {showPublish && (
         <PublishModal
           currentState={accessState}
           currentSlug={slug}
+          articleId={articleId}
           onApply={handlePublish}
           onClose={() => setShowPublish(false)}
         />

@@ -2,10 +2,12 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { X, Copy, Check, ExternalLink } from "lucide-react";
+import CollaborationModal from "./CollaborationModal";
 
 interface PublishModalProps {
   currentState: string;
   currentSlug: string;
+  articleId?: number | null;
   onApply: (accessState: string, slug: string) => void;
   onClose: () => void;
 }
@@ -28,6 +30,7 @@ function slugError(s: string): string | null {
 export default function PublishModal({
   currentState,
   currentSlug,
+  articleId,
   onApply,
   onClose,
 }: PublishModalProps) {
@@ -36,6 +39,7 @@ export default function PublishModal({
   const [accessState, setAccessState] = useState(currentState);
   const [slug, setSlug] = useState(currentSlug);
   const [copied, setCopied] = useState(false);
+  const [showCollab, setShowCollab] = useState(false);
 
   const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
@@ -132,7 +136,23 @@ export default function PublishModal({
         >
           Apply
         </button>
+
+        {articleId && (
+          <button
+            onClick={() => setShowCollab(true)}
+            className="w-full mt-2 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          >
+            Совместная работа
+          </button>
+        )}
       </div>
+      {showCollab && articleId && (
+        <CollaborationModal
+          articleId={articleId}
+          onClose={() => setShowCollab(false)}
+          onBack={() => setShowCollab(false)}
+        />
+      )}
     </div>
   );
 }

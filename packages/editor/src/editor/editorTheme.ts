@@ -660,5 +660,33 @@ export function getEditorStyles(): string {
   transition: opacity 0.12s;
 }
 .te-done-btn:hover { opacity: 0.85; }
+
+/* ==========================================
+   Совместная работа — курсоры и выделения
+   ========================================== */
+.ProseMirror-yjs-cursor {
+  position: relative;
+  display: inline;
+  pointer-events: none;
+}
+.ProseMirror-yjs-cursor > div {
+  position: absolute;
+  top: -1.2em;
+  left: -1px;
+  font-size: 10px;
+  font-weight: 500;
+  font-family: Inter, system-ui, sans-serif;
+  color: #fff;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  line-height: 1.3;
+  pointer-events: none;
+  user-select: none;
+}
+.ProseMirror-yjs-selection {
+  pointer-events: none;
+  opacity: 0.3;
+}
 `
 }

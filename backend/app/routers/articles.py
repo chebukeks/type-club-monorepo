@@ -78,9 +78,19 @@ async def list_my_articles(
     session: AsyncSession = Depends(get_session),
 ):
     offset = (page - 1) * size
+    collab_article_ids = (
+        await session.execute(
+            select(CollaborationMember.article_id).where(
+                CollaborationMember.user_id == current_user.id
+            )
+        )
+    ).scalars().all()
+    conditions = [Article.author_id == current_user.id]
+    if collab_article_ids:
+        conditions.append(Article.id.in_(collab_article_ids))
     result = await session.execute(
         select(Article)
-        .where(Article.author_id == current_user.id)
+        .where(or_(*conditions))
         .order_by(Article.updated_at.desc())
         .offset(offset)
         .limit(size)
@@ -137,7 +147,8 @@ async def get_article_by_path(
 
     is_author = current_user and current_user.id == article.author_id
     is_moderator = current_user and current_user.role == "moderator"
-    if not is_author and not is_moderator and article.access_state not in ("public", "link"):
+    is_collab = current_user and _user_can_edit(article, current_user)
+    if not is_author and not is_moderator and not is_collab and article.access_state not in ("public", "link"):
         raise HTTPException(status_code=403, detail="Access denied")
 
     return _article_to_response(article, author)
@@ -155,7 +166,8 @@ async def get_article(
 
     is_author = current_user and current_user.id == article.author_id
     is_moderator = current_user and current_user.role == "moderator"
-    if not is_author and not is_moderator and article.access_state not in ("public", "link"):
+    is_collab = current_user and _user_can_edit(article, current_user)
+    if not is_author and not is_moderator and not is_collab and article.access_state not in ("public", "link"):
         raise HTTPException(status_code=403, detail="Access denied")
 
     author = await session.get(User, article.author_id)
