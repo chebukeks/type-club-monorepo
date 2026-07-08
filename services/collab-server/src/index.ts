@@ -13,6 +13,9 @@ const PORT = parseInt(process.env.PORT || "8001", 10)
 const BACKEND_URL = process.env.BACKEND_URL || "http://type-club-backend:8000"
 const SERVICE_TOKEN = process.env.SERVICE_TOKEN || ""
 
+const messageSync = 0
+const messageAwareness = 1
+
 function serviceHeaders(): Record<string, string> {
   return SERVICE_TOKEN ? { Authorization: `Bearer ${SERVICE_TOKEN}` } : {}
 }
@@ -46,10 +49,7 @@ function getOrCreateDoc(articleId: number): DocState {
       const changed = [...added, ...updated]
       if (changed.length === 0) return
       const s = state!
-      const enc = encoding.createEncoder()
-      encoding.writeVarUint(enc, messageAwareness)
-      encoding.writeVarUint8Array(enc, encodeAwarenessUpdate(s.awareness, changed))
-      const payload = Buffer.from(encoding.toUint8Array(enc))
+      const payload = encodeAwarenessMessage(s.awareness, changed)
       s.clients.forEach((_, ws) => {
         if (ws !== origin && ws.readyState === WebSocket.OPEN) {
           ws.send(payload)
@@ -59,10 +59,7 @@ function getOrCreateDoc(articleId: number): DocState {
 
     doc.on("update", (update: Uint8Array, origin: any) => {
       const s = state!
-      const enc = encoding.createEncoder()
-      encoding.writeVarUint(enc, messageYjsUpdate)
-      encoding.writeVarUint8Array(enc, update)
-      const payload = Buffer.from(encoding.toUint8Array(enc))
+      const payload = encodeSyncMessage(update)
       s.clients.forEach((_, ws) => {
         if (ws !== origin && ws.readyState === WebSocket.OPEN) {
           ws.send(payload)
@@ -73,20 +70,35 @@ function getOrCreateDoc(articleId: number): DocState {
   return state
 }
 
-const messageAwareness = 1
-
-function encodeSyncStep1(doc: Y.Doc): Uint8Array {
+function encodeSyncMessage(update: Uint8Array): Buffer {
   const enc = encoding.createEncoder()
-  encoding.writeVarUint(enc, messageYjsSyncStep1)
-  encoding.writeVarUint8Array(enc, Y.encodeStateVector(doc))
-  return encoding.toUint8Array(enc)
+  encoding.writeVarUint(enc, messageSync)
+  encoding.writeVarUint(enc, messageYjsUpdate)
+  encoding.writeVarUint8Array(enc, update)
+  return Buffer.from(encoding.toUint8Array(enc))
 }
 
-function encodeSyncStep2(update: Uint8Array): Uint8Array {
+function encodeSyncStep1(doc: Y.Doc): Buffer {
   const enc = encoding.createEncoder()
+  encoding.writeVarUint(enc, messageSync)
+  encoding.writeVarUint(enc, messageYjsSyncStep1)
+  encoding.writeVarUint8Array(enc, Y.encodeStateVector(doc))
+  return Buffer.from(encoding.toUint8Array(enc))
+}
+
+function encodeSyncStep2(update: Uint8Array): Buffer {
+  const enc = encoding.createEncoder()
+  encoding.writeVarUint(enc, messageSync)
   encoding.writeVarUint(enc, messageYjsSyncStep2)
   encoding.writeVarUint8Array(enc, update)
-  return encoding.toUint8Array(enc)
+  return Buffer.from(encoding.toUint8Array(enc))
+}
+
+function encodeAwarenessMessage(awareness: Awareness, changed: number[]): Buffer {
+  const enc = encoding.createEncoder()
+  encoding.writeVarUint(enc, messageAwareness)
+  encoding.writeVarUint8Array(enc, encodeAwarenessUpdate(awareness, changed))
+  return Buffer.from(encoding.toUint8Array(enc))
 }
 
 function getQueryParams(url: string | undefined): Record<string, string> {
@@ -135,18 +147,6 @@ async function checkAccess(
   } catch {
     return { hasAccess: false, role: "" }
   }
-}
-
-function userColor(nickname: string): string {
-  let hash = 0
-  for (let i = 0; i < nickname.length; i++) {
-    hash = nickname.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  const colors = [
-    "#e06c75", "#61afef", "#98c379", "#d19a66",
-    "#c678dd", "#56b6c2", "#e5c07b", "#be5046",
-  ]
-  return colors[Math.abs(hash) % colors.length]
 }
 
 async function persistArticle(state: DocState) {
@@ -232,7 +232,7 @@ wss.on("connection", async (ws, req) => {
   startPersistLoop()
   heartbeat(ws)
 
-  ws.send(Buffer.from(encodeSyncStep1(state.doc)))
+  ws.send(encodeSyncStep1(state.doc))
 
   ws.on("message", (data) => {
     try {
@@ -240,21 +240,24 @@ wss.on("connection", async (ws, req) => {
         data instanceof Buffer ? data : Buffer.from(data as ArrayBuffer),
       )
       const dec = decoding.createDecoder(uint8)
-      const type = decoding.readVarUint(dec)
+      const outerType = decoding.readVarUint(dec)
 
-      if (type === messageYjsUpdate) {
-        const update = decoding.readVarUint8Array(dec)
-        Y.applyUpdate(state.doc, update, ws)
-      } else if (type === messageYjsSyncStep1) {
-        const sv = decoding.readVarUint8Array(dec)
-        const missing = Y.encodeStateAsUpdate(state.doc, sv)
-        if (missing.length > 2) {
-          ws.send(Buffer.from(encodeSyncStep2(missing)))
+      if (outerType === messageSync) {
+        const innerType = decoding.readVarUint(dec)
+        if (innerType === messageYjsUpdate) {
+          const update = decoding.readVarUint8Array(dec)
+          Y.applyUpdate(state.doc, update, ws)
+        } else if (innerType === messageYjsSyncStep1) {
+          const sv = decoding.readVarUint8Array(dec)
+          const missing = Y.encodeStateAsUpdate(state.doc, sv)
+          if (missing.length > 2) {
+            ws.send(encodeSyncStep2(missing))
+          }
+        } else if (innerType === messageYjsSyncStep2) {
+          const update = decoding.readVarUint8Array(dec)
+          Y.applyUpdate(state.doc, update, ws)
         }
-      } else if (type === messageYjsSyncStep2) {
-        const update = decoding.readVarUint8Array(dec)
-        Y.applyUpdate(state.doc, update, ws)
-      } else if (type === messageAwareness) {
+      } else if (outerType === messageAwareness) {
         const awarenessUpdate = decoding.readVarUint8Array(dec)
         applyAwarenessUpdate(state.awareness, awarenessUpdate, ws)
       }
