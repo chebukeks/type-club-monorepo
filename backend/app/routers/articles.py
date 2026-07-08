@@ -147,7 +147,7 @@ async def get_article_by_path(
 
     is_author = current_user and current_user.id == article.author_id
     is_moderator = current_user and current_user.role == "moderator"
-    is_collab = current_user and _user_can_edit(article, current_user)
+    is_collab = current_user and _user_can_access(article, current_user)
     if not is_author and not is_moderator and not is_collab and article.access_state not in ("public", "link"):
         raise HTTPException(status_code=403, detail="Access denied")
 
@@ -166,7 +166,7 @@ async def get_article(
 
     is_author = current_user and current_user.id == article.author_id
     is_moderator = current_user and current_user.role == "moderator"
-    is_collab = current_user and _user_can_edit(article, current_user)
+    is_collab = current_user and _user_can_access(article, current_user)
     if not is_author and not is_moderator and not is_collab and article.access_state not in ("public", "link"):
         raise HTTPException(status_code=403, detail="Access denied")
 
@@ -530,3 +530,9 @@ def _user_can_edit(article: Article, user: User) -> bool:
     if article.author_id == user.id:
         return True
     return any(m.user_id == user.id and m.role == "co_author" for m in article.collaborators)
+
+
+def _user_can_access(article: Article, user: User) -> bool:
+    if article.author_id == user.id:
+        return True
+    return any(m.user_id == user.id for m in article.collaborators)

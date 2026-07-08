@@ -38,8 +38,8 @@ export default function App() {
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/:username/:slug" element={<ReadArticle />} />
         <Route path="/join/:token" element={<JoinPage />} />
+        <Route path="/:username/:slug" element={<ReadArticle />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Route>
     </Routes>
