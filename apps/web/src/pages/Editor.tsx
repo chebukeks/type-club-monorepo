@@ -1,10 +1,12 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { articlesApi, collaborationApi, Article } from "../api";
+import { articlesApi, Article } from "../api";
 import { MarkdownEditor, EditorMode } from "../components/MarkdownEditor";
 import EditorHeader from "../components/EditorHeader";
 import SiteHeader from "../components/SiteHeader";
 import PublishModal from "../components/PublishModal";
+import { useAuth } from "../context/AuthContext";
+import { useCollaboration } from "../hooks/useCollaboration";
 
 export default function Editor() {
   const { id } = useParams<{ id: string }>();
@@ -22,12 +24,15 @@ export default function Editor() {
   const [slug, setSlug] = useState("");
   const [showSiteHeader, setShowSiteHeader] = useState(false);
   const [loaded, setLoaded] = useState(id ? false : true);
-  const [hasCollab, setHasCollab] = useState(false);
+
+  const { user } = useAuth();
+  const collab = useCollaboration(articleId, user ?? null);
+  // Collaboration is active for any saved article; the collab-server then owns
+  // content persistence, so the client only manages metadata (title/slug/state).
+  const collabActive = collab.config !== null;
 
   const autosaveRef = useRef(autosave);
   autosaveRef.current = autosave;
-  const hasCollabRef = useRef(hasCollab);
-  hasCollabRef.current = hasCollab;
   const contentRef = useRef(content);
   contentRef.current = content;
   const titleRef = useRef(title);
@@ -43,9 +48,6 @@ export default function Editor() {
       setSlug(a.slug);
       setLoaded(true);
     }).catch(() => navigate("/my-articles"));
-    collaborationApi.list(articleId).then((list) => {
-      setHasCollab(list.length > 0);
-    }).catch(() => {});
   }, [articleId, navigate]);
 
   // Autosave
@@ -58,7 +60,9 @@ export default function Editor() {
       if (!titleRef.current.trim() && !contentRef.current.trim()) return;
       try {
         if (articleId) {
-          await articlesApi.update(articleId, { title: titleRef.current, content: contentRef.current });
+          // Content is owned and persisted by the collab-server. Only sync
+          // metadata (title) from the client to avoid clobbering the live doc.
+          await articlesApi.update(articleId, { title: titleRef.current });
         } else {
           const res = await articlesApi.create({ title: titleRef.current || "Untitled", content: contentRef.current });
           setArticleId(res.id);
@@ -72,15 +76,21 @@ export default function Editor() {
   }, [articleId, navigate]);
 
   const handleSave = useCallback(async () => {
+    if (articleId) {
+      // Collaborative content is saved continuously by the server. Best-effort
+      // flush of the title (metadata); ignore permission errors for editors.
+      try {
+        await articlesApi.update(articleId, { title });
+      } catch {
+        /* ignore — content is persisted server-side */
+      }
+      return;
+    }
     setSaving(true);
     try {
-      if (articleId) {
-        await articlesApi.update(articleId, { title, content });
-      } else {
-        const res = await articlesApi.create({ title: title || "Untitled", content });
-        setArticleId(res.id);
-        navigate(`/editor/${res.id}`, { replace: true });
-      }
+      const res = await articlesApi.create({ title: title || "Untitled", content });
+      setArticleId(res.id);
+      navigate(`/editor/${res.id}`, { replace: true });
     } catch (err: any) {
       alert(err.message || "Save failed");
     } finally {
@@ -123,6 +133,8 @@ export default function Editor() {
           saving={saving}
           isNew={isNew}
           onToggleHeader={() => setShowSiteHeader(!showSiteHeader)}
+          collabActive={collabActive}
+          collabSynced={collab.synced}
         />
       )}
 
@@ -132,7 +144,7 @@ export default function Editor() {
         onChange={setContent}
         textZoom={100}
         documentZoom={100}
-        articleId={articleId}
+        collaboration={collab.config ?? undefined}
       />
 
       {showPublish && (

@@ -8,11 +8,13 @@ import type { CollaborationConfig } from "@type-club/editor"
 interface CollaborationState {
   config: CollaborationConfig | null
   connected: boolean
+  synced: boolean
   peers: number
 }
 
 export function useCollaboration(articleId: number | null, user: { nickname: string } | null): CollaborationState {
   const [connected, setConnected] = useState(false)
+  const [synced, setSynced] = useState(false)
   const [peers, setPeers] = useState(0)
   const [ready, setReady] = useState(false)
   const yFragmentRef = useRef<Y.XmlFragment | null>(null)
@@ -58,6 +60,10 @@ export function useCollaboration(articleId: number | null, user: { nickname: str
       setConnected(event.status === "connected")
     })
 
+    provider.on("sync", (isSynced: boolean) => {
+      setSynced(isSynced)
+    })
+
     const updatePeers = () => {
       const states = awareness.getStates()
       let count = 0
@@ -81,6 +87,7 @@ export function useCollaboration(articleId: number | null, user: { nickname: str
       awarenessRef.current = null
       setReady(false)
       setConnected(false)
+      setSynced(false)
       setPeers(0)
     }
 
@@ -110,5 +117,5 @@ export function useCollaboration(articleId: number | null, user: { nickname: str
     }
   }, [ready])
 
-  return { config, connected, peers }
+  return { config, connected, synced, peers }
 }

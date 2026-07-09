@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Save, Globe, RefreshCw, Menu, X } from "lucide-react";
+import { Save, Globe, RefreshCw, Menu, X, Cloud } from "lucide-react";
 import { EditorMode } from "./MarkdownEditor";
 
 interface EditorHeaderProps {
@@ -14,6 +14,8 @@ interface EditorHeaderProps {
   saving: boolean;
   isNew: boolean;
   onToggleHeader: () => void;
+  collabActive?: boolean;
+  collabSynced?: boolean;
 }
 
 export default function EditorHeader({
@@ -28,6 +30,8 @@ export default function EditorHeader({
   saving,
   isNew,
   onToggleHeader,
+  collabActive,
+  collabSynced,
 }: EditorHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -70,14 +74,28 @@ export default function EditorHeader({
         <span className="hidden sm:inline">Auto</span>
       </button>
 
-      <button
-        onClick={onSave}
-        disabled={saving}
-        className="text-xs px-3 py-1.5 rounded-md bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors shrink-0 flex items-center gap-1 disabled:opacity-50"
-      >
-        <Save size={14} />
-        <span className="hidden sm:inline">{saving ? "Saving..." : "Save"}</span>
-      </button>
+      {collabActive ? (
+        <div
+          className={`text-xs px-3 py-1.5 rounded-md shrink-0 flex items-center gap-1 ${
+            collabSynced
+              ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+              : "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
+          }`}
+          title={collabSynced ? "Changes are saved automatically" : "Connecting to collaboration server…"}
+        >
+          {collabSynced ? <Cloud size={14} /> : <RefreshCw size={14} className="animate-spin" />}
+          <span className="hidden sm:inline">{collabSynced ? "Synced" : "Syncing…"}</span>
+        </div>
+      ) : (
+        <button
+          onClick={onSave}
+          disabled={saving}
+          className="text-xs px-3 py-1.5 rounded-md bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors shrink-0 flex items-center gap-1 disabled:opacity-50"
+        >
+          <Save size={14} />
+          <span className="hidden sm:inline">{saving ? "Saving..." : "Save"}</span>
+        </button>
+      )}
 
       <button
         onClick={onPublish}
