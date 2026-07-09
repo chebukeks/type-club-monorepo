@@ -60,10 +60,10 @@ export function useCollaboration(articleId: number | null): CollaborationState {
 
     return () => {
       awareness.off("change", updatePeers)
-      ydoc.destroy()
       provider.disconnect()
       provider.destroy()
       awareness.destroy()
+      ydoc.destroy()
       yFragmentRef.current = null
       awarenessRef.current = null
       setConnected(false)

@@ -267,7 +267,7 @@ async def list_collaborators(
     article = await session.get(Article, article_id)
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
-    if article.author_id != current_user.id:
+    if not _user_can_access(article, current_user):
         raise HTTPException(status_code=403, detail="Not your article")
 
     result_set = await session.execute(
