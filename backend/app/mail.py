@@ -27,14 +27,26 @@ async def send_email(to: str, subject: str, html: str) -> None:
     message["Subject"] = subject
     message.attach(MIMEText(html, "html", "utf-8"))
 
+    # TLS mode:
+    #   - implicit TLS  -> port 465  (use_tls=True)
+    #   - STARTTLS      -> port 587/2525 (start_tls=True)
+    # Passing both to aiosmtplib is an error, so pick one explicitly.
+    tls_kwargs: dict = {}
+    if settings.smtp_use_tls and not settings.smtp_start_tls:
+        tls_kwargs["use_tls"] = True
+    elif settings.smtp_start_tls:
+        tls_kwargs["use_tls"] = False
+        tls_kwargs["start_tls"] = True
+
     try:
         await aiosmtplib.send(
             message,
             hostname=settings.smtp_host,
             port=settings.smtp_port,
-            username=settings.smtp_user,
-            password=settings.smtp_pass,
-            use_tls=settings.smtp_use_tls,
+            username=settings.smtp_user or None,
+            password=settings.smtp_pass or None,
+            timeout=30,
+            **tls_kwargs,
         )
         logger.info("Email sent to %s", to)
     except Exception as e:

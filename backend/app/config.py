@@ -23,7 +23,8 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_pass: str = ""
     smtp_from: str = ""
-    smtp_use_tls: bool = True
+    smtp_use_tls: bool = True      # implicit TLS (port 465)
+    smtp_start_tls: bool = False   # STARTTLS (port 587/2525)
 
     # Frontend URL for email links
     frontend_url: str = "http://localhost:5173"

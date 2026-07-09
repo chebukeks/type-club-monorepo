@@ -1,4 +1,5 @@
 import datetime
+import logging
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, status
 from sqlalchemy import select, update
@@ -23,6 +24,8 @@ from app.schemas import (
 )
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+logger = logging.getLogger(__name__)
 
 
 async def get_current_user(
@@ -219,7 +222,14 @@ async def resend_verification(
     session.add(token)
     await session.commit()
 
-    await send_verification_email(current_user.email, current_user.nickname, token_str)
+    try:
+        await send_verification_email(current_user.email, current_user.nickname, token_str)
+    except Exception:
+        logger.exception("Failed to send verification email to %s", current_user.email)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not send the verification email right now. Please try again later.",
+        )
     return ResendVerificationResponse(message="Verification email sent")
 
 
