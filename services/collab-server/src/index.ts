@@ -154,6 +154,8 @@ wss.on("connection", async (ws, req) => {
 
   heartbeat(ws)
 
+  await new Promise(r => setTimeout(r, 100))
+
   ws.send(encodeSyncStep1(state.doc))
 
   ws.on("message", (data) => {
