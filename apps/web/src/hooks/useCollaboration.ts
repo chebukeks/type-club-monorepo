@@ -66,7 +66,6 @@ export function useCollaboration(articleId: number | null): CollaborationState {
       destroyed = true
       awareness.off("change", updatePeers)
       provider.disconnect()
-      awareness.destroy()
       ydoc.destroy()
       yFragmentRef.current = null
       awarenessRef.current = null
