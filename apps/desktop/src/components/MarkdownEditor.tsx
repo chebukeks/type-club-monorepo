@@ -11,7 +11,7 @@ import type { EditorView } from 'prosemirror-view'
 
 import { EditorCore, injectEditorStyles, schema, tableEditPluginKey } from '@type-club/editor'
 import { useEditor } from '../context/EditorContext'
-import { SearchBar, RawSearchBar } from './SearchBar'
+import { SearchBar, RawSearchBar, searchPlugin } from './SearchBar'
 
 export function MarkdownEditor() {
   const { state, dispatch, setTextZoom, setDocumentZoom } = useEditor()
@@ -561,7 +561,7 @@ export function MarkdownEditor() {
         className={state.typewriterMode ? 'typewriter-mode' : ''}
         focusMode={state.focusMode}
         onTocUpdate={handleTocUpdate}
-        extraPlugins={[typewriterPlugin]}
+        extraPlugins={[typewriterPlugin, searchPlugin]}
         containerStyle={containerStyle}
       />
 
