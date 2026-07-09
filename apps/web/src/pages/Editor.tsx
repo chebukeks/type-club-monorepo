@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { articlesApi, Article } from "../api";
+import { articlesApi, collaborationApi, Article } from "../api";
 import { MarkdownEditor, EditorMode } from "../components/MarkdownEditor";
 import EditorHeader from "../components/EditorHeader";
 import SiteHeader from "../components/SiteHeader";
@@ -22,9 +22,12 @@ export default function Editor() {
   const [slug, setSlug] = useState("");
   const [showSiteHeader, setShowSiteHeader] = useState(false);
   const [loaded, setLoaded] = useState(id ? false : true);
+  const [hasCollab, setHasCollab] = useState(false);
 
   const autosaveRef = useRef(autosave);
   autosaveRef.current = autosave;
+  const hasCollabRef = useRef(hasCollab);
+  hasCollabRef.current = hasCollab;
   const contentRef = useRef(content);
   contentRef.current = content;
   const titleRef = useRef(title);
@@ -40,6 +43,9 @@ export default function Editor() {
       setSlug(a.slug);
       setLoaded(true);
     }).catch(() => navigate("/my-articles"));
+    collaborationApi.list(articleId).then((list) => {
+      setHasCollab(list.length > 0);
+    }).catch(() => {});
   }, [articleId, navigate]);
 
   // Autosave
@@ -48,6 +54,7 @@ export default function Editor() {
   useEffect(() => {
     const interval = setInterval(async () => {
       if (!autosaveRef.current) return;
+      if (hasCollabRef.current) return;
       if (articleId && !loadedRef.current) return;
       if (!titleRef.current.trim() && !contentRef.current.trim()) return;
       try {
