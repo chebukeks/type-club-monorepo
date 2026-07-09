@@ -6,6 +6,7 @@ import type * as Y from "yjs"
 export interface CollaborationConfig {
   yXmlFragment: Y.XmlFragment
   awareness: Awareness
+  destroy: () => void
 }
 
 export function createCollaborationPlugins(config: CollaborationConfig): Plugin[] {

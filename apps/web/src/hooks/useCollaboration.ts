@@ -18,6 +18,7 @@ export function useCollaboration(articleId: number | null): CollaborationState {
   const awarenessRef = useRef<Awareness | null>(null)
   const providerRef = useRef<WebsocketProvider | null>(null)
   const ydocRef = useRef<Y.Doc | null>(null)
+  const destroyRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
     if (!articleId) return
@@ -58,7 +59,11 @@ export function useCollaboration(articleId: number | null): CollaborationState {
 
     awareness.on("change", updatePeers)
 
-    return () => {
+    let destroyed = false
+
+    const destroyAll = () => {
+      if (destroyed) return
+      destroyed = true
       awareness.off("change", updatePeers)
       provider.disconnect()
       provider.destroy()
@@ -68,6 +73,12 @@ export function useCollaboration(articleId: number | null): CollaborationState {
       awarenessRef.current = null
       setConnected(false)
       setPeers(0)
+    }
+
+    destroyRef.current = destroyAll
+
+    return () => {
+      destroyAll()
     }
   }, [articleId])
 
@@ -79,6 +90,7 @@ export function useCollaboration(articleId: number | null): CollaborationState {
     config: {
       yXmlFragment: yFragmentRef.current,
       awareness: awarenessRef.current,
+      destroy: () => destroyRef.current?.(),
     },
     connected,
     peers,

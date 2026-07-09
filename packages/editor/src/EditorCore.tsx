@@ -131,26 +131,24 @@ export function EditorCore({
       ? createCollaborationPlugins(collaboration)
       : [];
 
-    const syncPlugin = collaboration
-      ? null
-      : new Plugin({
-          view() {
-            return {
-              update(view, prevState) {
-                if (!view.state.doc.eq(prevState.doc)) {
-                  const md = serializeMarkdown(view.state.doc);
-                  lastEmittedRef.current = md;
-                  onChangeRef.current(md);
-                }
-              },
-            };
+    const syncPlugin = new Plugin({
+      view() {
+        return {
+          update(view, prevState) {
+            if (!view.state.doc.eq(prevState.doc)) {
+              const md = serializeMarkdown(view.state.doc);
+              lastEmittedRef.current = md;
+              onChangeRef.current(md);
+            }
           },
-        });
+        };
+      },
+    });
 
-    const historyPlugins = collaboration ? [] : [history(), syncPlugin!];
+    const historyPlugins = collaboration ? [] : [history()];
 
     const plugins: Plugin[] = isPreview
-      ? [...historyPlugins, dropCursor(), gapCursor(), foldingPlugin, interactivePlugin, syntaxHighlightPlugin, typographyPlugin(), focusModePlugin(() => focusModeRef.current || 'none'), ...collabPlugins, ...(extraPlugins || [])]
+      ? [...historyPlugins, dropCursor(), gapCursor(), syncPlugin, foldingPlugin, interactivePlugin, syntaxHighlightPlugin, typographyPlugin(), focusModePlugin(() => focusModeRef.current || 'none'), ...collabPlugins, ...(extraPlugins || [])]
       : [
           ...getKeymapPlugins(),
           getInputRulesPlugin(),
@@ -163,6 +161,7 @@ export function EditorCore({
           mathActivePlugin,
           ...historyPlugins,
           dropCursor(),
+          syncPlugin,
           foldingPlugin,
           interactivePlugin,
           typographyPlugin(),
@@ -201,6 +200,7 @@ export function EditorCore({
     });
 
     return () => {
+      collaboration?.destroy()
       view.destroy();
       viewRef.current = null;
     };
