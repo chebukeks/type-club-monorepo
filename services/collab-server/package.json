@@ -9,9 +9,20 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@type-club/editor": "*",
+    "katex": "^0.16",
     "lib0": "^0.2.93",
+    "markdown-it": "^14",
+    "markdown-it-mark": "^4",
+    "markdown-it-task-lists": "^2",
+    "markdown-it-texmath": "^1",
+    "prosemirror-markdown": "^1",
+    "prosemirror-model": "^1",
+    "prosemirror-schema-list": "^1",
+    "prosemirror-tables": "^1",
     "ws": "^8.18.0",
     "y-protocols": "^1.0.6",
+    "y-prosemirror": "^1.2",
     "yjs": "^13.6.18"
   },
   "devDependencies": {
