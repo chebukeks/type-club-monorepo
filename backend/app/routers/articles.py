@@ -1,3 +1,4 @@
+import logging
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Header, Query
@@ -24,6 +25,8 @@ from app.schemas import (
 )
 
 router = APIRouter(prefix="/api/articles", tags=["articles"])
+
+logger = logging.getLogger(__name__)
 
 
 def _article_to_response(article: Article, author: User | None = None) -> ArticleResponse:
@@ -194,7 +197,17 @@ async def update_article(
     if data.title is not None:
         article.title = data.title
     if data.content is not None:
-        article.content = data.content
+        # Collaborative articles have their content owned by the collab-server
+        # (persisted via /sync-state). Ignore content here so a stray/stale
+        # client autosave can't clobber the live collaborative document.
+        if article.collaborators:
+            logger.info(
+                "Ignoring content update for article %s via PATCH (has collaborators; "
+                "content is managed by collab-server)",
+                article_id,
+            )
+        else:
+            article.content = data.content
     if data.access_state is not None:
         article.access_state = data.access_state
     if data.slug is not None:
