@@ -115,7 +115,22 @@ function heartbeat(ws: WebSocket) {
   ws.on("error", () => clearInterval(pingTimer))
 }
 
-const wss = new WebSocketServer({ port: PORT })
+const wss = new WebSocketServer({
+  port: PORT,
+  perMessageDeflate: {
+    zlibDeflateOptions: {
+      chunkSize: 1024,
+      memLevel: 7,
+      level: 3,
+    },
+    zlibInflateOptions: { chunkSize: 10 * 1024 },
+    clientNoContextTakeover: true,
+    serverNoContextTakeover: true,
+    serverMaxWindowBits: 10,
+    concurrencyLimit: 10,
+    threshold: 1024,
+  },
+})
 
 wss.on("connection", async (ws, req) => {
   const params = getQueryParams(req.url)
@@ -151,12 +166,14 @@ wss.on("connection", async (ws, req) => {
 
       if (outerType === messageSync) {
         const innerType = decoding.readVarUint(dec)
+        console.log(`[ws] msg article=${articleId} type=sync subtype=${innerType}`)
         if (innerType === messageYjsUpdate) {
           const update = decoding.readVarUint8Array(dec)
           Y.applyUpdate(state.doc, update, ws)
         } else if (innerType === messageYjsSyncStep1) {
           const sv = decoding.readVarUint8Array(dec)
           const missing = Y.encodeStateAsUpdate(state.doc, sv)
+          console.log(`[ws] syncStep1 article=${articleId} svLen=${sv.length} missingLen=${missing.length}`)
           if (missing.length > 2) {
             ws.send(encodeSyncStep2(missing))
           }
@@ -165,6 +182,7 @@ wss.on("connection", async (ws, req) => {
           Y.applyUpdate(state.doc, update, ws)
         }
       } else if (outerType === messageAwareness) {
+        console.log(`[ws] msg article=${articleId} type=awareness`)
         const awarenessUpdate = decoding.readVarUint8Array(dec)
         applyAwarenessUpdate(state.awareness, awarenessUpdate, ws)
       }
@@ -173,9 +191,9 @@ wss.on("connection", async (ws, req) => {
     }
   })
 
-  ws.on("close", () => {
+  ws.on("close", (code, reason) => {
     state.clients.delete(ws)
-    console.log(`[ws] disconnect article=${articleId} clients=${state.clients.size}`)
+    console.log(`[ws] disconnect article=${articleId} clients=${state.clients.size} code=${code} reason=${reason}`)
     if (state.clients.size === 0) {
       setTimeout(() => {
         if (state.clients.size === 0) {
