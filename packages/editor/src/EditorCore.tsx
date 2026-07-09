@@ -29,9 +29,7 @@ import { typographyPlugin } from "./editor/typographyPlugin";
 import { focusModePlugin } from "./editor/focusModePlugin";
 import { tocPlugin } from "./editor/tocPlugin";
 import { tableEditPlugin } from "./editor/tableEditPlugin";
-import { prosemirrorJSONToYXmlFragment } from "y-prosemirror";
 import { createCollaborationPlugins } from "./editor/collaborationPlugin";
-import { schema } from "./editor/schema";
 
 import type { EditorProps } from "./types";
 
@@ -128,12 +126,6 @@ export function EditorCore({
       Tab: goToNextCell(1),
       "Shift-Tab": goToNextCell(-1),
     });
-
-    if (collaboration && collaboration.yXmlFragment && content) {
-      if (collaboration.yXmlFragment.length === 0) {
-        prosemirrorJSONToYXmlFragment(schema, doc.toJSON(), collaboration.yXmlFragment)
-      }
-    }
 
     const collabPlugins = collaboration
       ? createCollaborationPlugins(collaboration)
