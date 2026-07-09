@@ -54,7 +54,6 @@ export default function Editor() {
   useEffect(() => {
     const interval = setInterval(async () => {
       if (!autosaveRef.current) return;
-      if (hasCollabRef.current) return;
       if (articleId && !loadedRef.current) return;
       if (!titleRef.current.trim() && !contentRef.current.trim()) return;
       try {

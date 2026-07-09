@@ -129,6 +129,8 @@ wss.on("connection", async (ws, req) => {
 
   const state = getOrCreateDoc(articleId)
 
+  console.log(`[ws] connect article=${articleId} clients=${state.clients.size + 1}`)
+
   state.clients.set(ws, {
     userId: 0,
     nickname: "",
@@ -173,6 +175,7 @@ wss.on("connection", async (ws, req) => {
 
   ws.on("close", () => {
     state.clients.delete(ws)
+    console.log(`[ws] disconnect article=${articleId} clients=${state.clients.size}`)
     if (state.clients.size === 0) {
       setTimeout(() => {
         if (state.clients.size === 0) {

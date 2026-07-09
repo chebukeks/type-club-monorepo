@@ -11,7 +11,7 @@ interface CollaborationState {
   peers: number
 }
 
-export function useCollaboration(articleId: number | null): CollaborationState {
+export function useCollaboration(articleId: number | null, user: { nickname: string } | null): CollaborationState {
   const [connected, setConnected] = useState(false)
   const [peers, setPeers] = useState(0)
   const yFragmentRef = useRef<Y.XmlFragment | null>(null)
@@ -31,6 +31,13 @@ export function useCollaboration(articleId: number | null): CollaborationState {
 
     const awareness = new Awareness(ydoc)
     awarenessRef.current = awareness
+
+    if (user) {
+      awareness.setLocalStateField("user", {
+        name: user.nickname,
+        color: "#" + Math.floor(Math.random() * 16777215).toString(16).padStart(6, "0"),
+      })
+    }
 
     const token = getToken() || ""
     const provider = new WebsocketProvider(

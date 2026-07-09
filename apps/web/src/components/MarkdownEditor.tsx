@@ -8,6 +8,7 @@ import { EditorCore, schema, tableEditPluginKey } from "@type-club/editor";
 import type { EditorMode } from "@type-club/editor";
 
 import { useCollaboration } from "../hooks/useCollaboration";
+import { useAuth } from "../context/AuthContext";
 
 export type { EditorMode } from "@type-club/editor";
 
@@ -63,7 +64,8 @@ export function MarkdownEditor({
   const [codeLang, setCodeLang] = useState("");
   const [showLangDropdown, setShowLangDropdown] = useState(false);
   const viewRef = useRef<EditorView | null>(null);
-  const collab = useCollaboration(articleId ?? null);
+  const { user } = useAuth();
+  const collab = useCollaboration(articleId ?? null, user ?? null);
 
   const closeCtxMenu = () => {
     setCtxMenu(null);
