@@ -87,6 +87,14 @@ export function useCollaboration(articleId: number | null, user: { nickname: str
     }
   }, [articleId])
 
+  useEffect(() => {
+    if (!user || !awarenessRef.current) return
+    awarenessRef.current.setLocalStateField("user", {
+      name: user.nickname,
+      color: "#" + Math.floor(Math.random() * 16777215).toString(16).padStart(6, "0"),
+    })
+  }, [user])
+
   if (!articleId || !yFragmentRef.current || !awarenessRef.current) {
     return { config: null, connected: false, peers: 0 }
   }
