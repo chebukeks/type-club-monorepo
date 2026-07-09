@@ -8,10 +8,7 @@ import {
   messageYjsUpdate,
 } from "y-protocols/sync"
 import { Awareness, encodeAwarenessUpdate, applyAwarenessUpdate } from "y-protocols/awareness"
-import { prosemirrorJSONToYXmlFragment, yXmlFragmentToProsemirrorJSON } from "y-prosemirror"
-import { Node as PMNode } from "prosemirror-model"
-import { parseMarkdown, serializeMarkdown } from "@type-club/editor/src/editor/markdownConfig"
-import { schema } from "@type-club/editor/src/editor/schema"
+import { seedYFragmentFromMarkdown, yFragmentToMarkdown } from "@type-club/editor/src/editor/collabSync"
 
 const PORT = parseInt(process.env.PORT || "8001", 10)
 const BACKEND_URL = (process.env.BACKEND_URL || "http://localhost:8000").replace(/\/$/, "")
@@ -19,6 +16,8 @@ const SERVICE_TOKEN = process.env.SERVICE_TOKEN || ""
 
 // Delay after last edit before persisting to the DB.
 const SAVE_DEBOUNCE_MS = parseInt(process.env.SAVE_DEBOUNCE_MS || "8000", 10)
+// Max consecutive auto-retries of a failed save (avoids hot-looping).
+const MAX_SAVE_RETRIES = 5
 // Keep the in-memory doc alive this long after the last client leaves.
 const DOC_TTL_MS = 60_000
 // Yjs XmlFragment key — MUST match the client (useCollaboration.ts).
@@ -42,6 +41,7 @@ interface DocState {
   seeded: boolean
   dirty: boolean
   saving: boolean
+  saveFailures: number
   saveTimer: NodeJS.Timeout | null
   destroyTimer: NodeJS.Timeout | null
 }
@@ -63,6 +63,7 @@ function getOrCreateDoc(articleId: number): DocState {
     seeded: false,
     dirty: false,
     saving: false,
+    saveFailures: 0,
     saveTimer: null,
     destroyTimer: null,
   }
@@ -112,8 +113,7 @@ async function seedFromBackend(state: DocState): Promise<void> {
     const data = (await res.json()) as { content?: string }
     const fragment = state.doc.getXmlFragment(FRAGMENT_KEY)
     if (fragment.length === 0) {
-      const pmDoc = parseMarkdown(data.content || "")
-      prosemirrorJSONToYXmlFragment(schema, pmDoc.toJSON(), fragment)
+      seedYFragmentFromMarkdown(data.content || "", fragment)
       console.log(`[seed] article=${state.articleId} seeded ${(data.content || "").length} chars`)
     }
   } catch (err) {
@@ -149,9 +149,7 @@ async function persist(state: DocState): Promise<void> {
       // Never clobber a real article with an empty doc (e.g. failed seed).
       return
     }
-    const json = yXmlFragmentToProsemirrorJSON(fragment)
-    const pmDoc = PMNode.fromJSON(schema, json)
-    const content = serializeMarkdown(pmDoc)
+    const content = yFragmentToMarkdown(fragment)
 
     const res = await fetch(`${BACKEND_URL}/api/articles/${state.articleId}/sync-state`, {
       method: "PATCH",
@@ -163,18 +161,28 @@ async function persist(state: DocState): Promise<void> {
     })
     if (!res.ok) {
       console.error(`[persist] article=${state.articleId} backend responded ${res.status}`)
-      state.dirty = true
-      scheduleSave(state)
+      retryPersist(state)
     } else {
+      state.saveFailures = 0
       console.log(`[persist] article=${state.articleId} saved ${content.length} chars`)
     }
   } catch (err) {
     console.error(`[persist] article=${state.articleId} error:`, err)
-    state.dirty = true
-    scheduleSave(state)
+    retryPersist(state)
   } finally {
     state.saving = false
   }
+}
+
+// Re-arm a failed save with a cap, so a persistent error can't hot-loop.
+function retryPersist(state: DocState): void {
+  state.saveFailures += 1
+  if (state.saveFailures > MAX_SAVE_RETRIES) {
+    console.error(`[persist] article=${state.articleId} giving up after ${state.saveFailures} failures`)
+    return
+  }
+  state.dirty = true
+  scheduleSave(state)
 }
 
 async function flush(state: DocState): Promise<void> {

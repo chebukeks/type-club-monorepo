@@ -10,6 +10,15 @@ COPY packages ./packages
 COPY services/collab-server/package.json services/collab-server/tsconfig.json ./
 COPY services/collab-server/src ./src
 
+# Bundle into a single CJS file. This is REQUIRED: running the sources directly
+# under tsx loads yjs / prosemirror-model / y-prosemirror as BOTH esm and cjs
+# (dual-package hazard) which breaks Yjs constructor checks and Node.fromJSON.
+# Bundling collapses every dependency to exactly one instance.
+RUN node_modules/.bin/esbuild src/index.ts \
+    --bundle --platform=node --format=cjs --target=node22 \
+    --outfile=dist/index.cjs \
+    --external:bufferutil --external:utf-8-validate
+
 EXPOSE 8001
 
-CMD ["node", "--import", "tsx", "src/index.ts"]
+CMD ["node", "dist/index.cjs"]
