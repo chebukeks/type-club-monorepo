@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import * as Y from "yjs"
 import { WebsocketProvider } from "y-websocket"
 import { Awareness } from "y-protocols/awareness"
@@ -14,6 +14,7 @@ interface CollaborationState {
 export function useCollaboration(articleId: number | null, user: { nickname: string } | null): CollaborationState {
   const [connected, setConnected] = useState(false)
   const [peers, setPeers] = useState(0)
+  const [ready, setReady] = useState(false)
   const yFragmentRef = useRef<Y.XmlFragment | null>(null)
   const awarenessRef = useRef<Awareness | null>(null)
   const providerRef = useRef<WebsocketProvider | null>(null)
@@ -22,6 +23,8 @@ export function useCollaboration(articleId: number | null, user: { nickname: str
 
   useEffect(() => {
     if (!articleId) return
+
+    setReady(false)
 
     const ydoc = new Y.Doc()
     ydocRef.current = ydoc
@@ -76,11 +79,14 @@ export function useCollaboration(articleId: number | null, user: { nickname: str
       ydoc.destroy()
       yFragmentRef.current = null
       awarenessRef.current = null
+      setReady(false)
       setConnected(false)
       setPeers(0)
     }
 
     destroyRef.current = destroyAll
+
+    setReady(true)
 
     return () => {
       destroyAll()
@@ -95,17 +101,14 @@ export function useCollaboration(articleId: number | null, user: { nickname: str
     })
   }, [user])
 
-  if (!articleId || !yFragmentRef.current || !awarenessRef.current) {
-    return { config: null, connected: false, peers: 0 }
-  }
-
-  return {
-    config: {
+  const config = useMemo<CollaborationConfig | null>(() => {
+    if (!ready || !yFragmentRef.current || !awarenessRef.current) return null
+    return {
       yXmlFragment: yFragmentRef.current,
       awareness: awarenessRef.current,
       destroy: () => destroyRef.current?.(),
-    },
-    connected,
-    peers,
-  }
+    }
+  }, [ready])
+
+  return { config, connected, peers }
 }
