@@ -235,7 +235,7 @@ export function EditorCore({
 
   if (editorMode === "raw") {
     return (
-      <div className="flex-1 flex flex-col overflow-auto bg-[var(--bg-base)]" style={containerStyle}>
+      <div className="flex-1 h-full flex flex-col overflow-auto bg-[var(--bg-base)]" style={containerStyle}>
         <textarea
           ref={textareaRef}
           className="w-full flex-1 resize-none outline-none bg-transparent text-[var(--editor-text)] p-6"
