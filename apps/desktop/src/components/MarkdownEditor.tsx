@@ -283,6 +283,23 @@ export function MarkdownEditor() {
     return () => window.removeEventListener('editor-open-search', handler)
   }, [])
 
+  // ── TOC scroll-to event ──
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { pos } = (e as CustomEvent<{ pos: number }>).detail
+      if (!editorView || editorView.isDestroyed) return
+      try {
+        const domNode = editorView.domAtPos(pos)
+        if (domNode.node) {
+          const el = domNode.node instanceof Element ? domNode.node : domNode.node.parentElement
+          el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      } catch { /* ignore */ }
+    }
+    window.addEventListener('editor-scroll-to', handler)
+    return () => window.removeEventListener('editor-scroll-to', handler)
+  }, [editorView])
+
   // ── Context menu ──
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
   const [ctxSubmenu, setCtxSubmenu] = useState<'table' | 'code' | null>(null)
