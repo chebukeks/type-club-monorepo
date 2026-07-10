@@ -276,7 +276,7 @@ export function MarkdownEditor({
 
   return (
     <div
-      className="flex-1 overflow-auto bg-[var(--bg-base)]"
+      className="flex-1 flex flex-col overflow-auto bg-[var(--bg-base)]"
       onContextMenu={handleContextMenu}
       onClick={() => closeCtxMenu()}
     >
