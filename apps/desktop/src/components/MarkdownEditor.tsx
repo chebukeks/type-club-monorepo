@@ -289,10 +289,9 @@ export function MarkdownEditor() {
       const { pos } = (e as CustomEvent<{ pos: number }>).detail
       if (!editorView || editorView.isDestroyed) return
       try {
-        const domNode = editorView.domAtPos(pos)
-        if (domNode.node) {
-          const el = domNode.node instanceof Element ? domNode.node : domNode.node.parentElement
-          el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        const domNode = editorView.nodeDOM(pos)
+        if (domNode instanceof Element) {
+          domNode.scrollIntoView({ behavior: 'smooth', block: 'start' })
         }
       } catch { /* ignore */ }
     }
