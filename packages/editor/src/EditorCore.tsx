@@ -235,10 +235,10 @@ export function EditorCore({
 
   if (editorMode === "raw") {
     return (
-      <div className="flex-1 flex flex-col bg-[var(--bg-base)]" style={containerStyle}>
+      <div className="flex-1 overflow-auto bg-[var(--bg-base)]" style={containerStyle}>
         <textarea
           ref={textareaRef}
-          className="flex-1 resize-none outline-none bg-transparent text-[var(--editor-text)] p-6"
+          className="w-full min-h-full resize-none outline-none bg-transparent text-[var(--editor-text)] p-6"
           style={{
             fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
             fontSize: `${14 * (textZoom / 100)}px`,
