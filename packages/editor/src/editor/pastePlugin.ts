@@ -14,7 +14,7 @@
  * Чтобы новый блочный элемент вставлялся «как таблица» — добавь имя его
  * ноды в BLOCK_PASTE_NODES.
  */
-import { Plugin, PluginKey, TextSelection, NodeSelection } from 'prosemirror-state'
+import { Plugin, PluginKey, TextSelection } from 'prosemirror-state'
 import { Slice } from 'prosemirror-model'
 import type { EditorView } from 'prosemirror-view'
 
@@ -51,11 +51,9 @@ function isClosedTextSlice(slice: Slice): boolean {
 
 function handleBlockPaste(view: EditorView, slice: Slice): boolean {
   const { state } = view
-  if (state.selection instanceof NodeSelection) return false
+  if (!state.selection.empty) return false
 
   const tr = state.tr
-  if (!state.selection.empty) tr.deleteSelection()
-
   const { $head } = tr.selection
   let blockDepth = -1
   for (let d = $head.depth; d >= 1; d--) {
