@@ -15,8 +15,8 @@
  * ноды в BLOCK_PASTE_NODES.
  */
 import { Plugin, PluginKey, TextSelection } from 'prosemirror-state'
-import { Slice } from 'prosemirror-model'
-import type { EditorView } from 'prosemirror-view'
+import { Slice, Fragment } from 'prosemirror-model'
+import type { Node as PMNode } from 'prosemirror-model'
 
 export const pastePluginKey = new PluginKey('smartPaste')
 
@@ -39,14 +39,31 @@ function isBlockSlice(slice: Slice): boolean {
   return all
 }
 
-/** Закрытый slice из обычных текстовых блоков — вставляем как текст */
+/** Закрытый slice из текста и ОДНОГО текстового блока — схлопываем в инлайн */
 function isClosedTextSlice(slice: Slice): boolean {
   if (slice.openStart !== 0 || slice.openEnd !== 0 || slice.content.childCount === 0) return false
-  let all = true
+  let textblockCount = 0
+  let nonMatching = false
   slice.content.forEach((child) => {
-    if (!child.isTextblock || BLOCK_PASTE_NODES.has(child.type.name)) all = false
+    if (BLOCK_PASTE_NODES.has(child.type.name)) nonMatching = true
+    else if (child.isTextblock) textblockCount++
+    else if (!child.isText) nonMatching = true
   })
-  return all
+  return !nonMatching && textblockCount === 1
+}
+
+import type { EditorView } from 'prosemirror-view'
+
+/** Собрать весь текст из слайса в открытый параграф (1,1), сохраняя марки */
+function flattenToOpenSlice(slice: Slice, view: EditorView): Slice {
+  const nodes: PMNode[] = []
+  slice.content.forEach((child) => {
+    if (child.isText) nodes.push(child)
+    else if (child.isTextblock) child.content.forEach((c: PMNode) => nodes.push(c))
+  })
+  const schema = view.state.schema
+  const para = schema.node('paragraph', null, nodes)
+  return Slice.maxOpen(Fragment.from(para))
 }
 
 function describeSlice(slice: Slice): string {
@@ -98,11 +115,11 @@ export function pastePlugin(): Plugin {
   return new Plugin({
     key: pastePluginKey,
     props: {
-      transformPasted(slice) {
+      transformPasted(slice, view) {
         const before = describeSlice(slice)
         if (isClosedTextSlice(slice)) {
-          const opened = Slice.maxOpen(slice.content)
-          console.log('[pastePlugin] transformPasted', before, '→ maxOpen', describeSlice(opened))
+          const opened = flattenToOpenSlice(slice, view)
+          console.log('[pastePlugin] transformPasted', before, '→ flattenOpen', describeSlice(opened))
           return opened
         }
         console.log('[pastePlugin] transformPasted', before, '(unchanged)')
