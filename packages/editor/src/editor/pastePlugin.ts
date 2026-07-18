@@ -17,6 +17,7 @@
 import { Plugin, PluginKey, TextSelection } from 'prosemirror-state'
 import { Slice, Fragment } from 'prosemirror-model'
 import type { Node as PMNode } from 'prosemirror-model'
+import type { EditorView } from 'prosemirror-view'
 
 export const pastePluginKey = new PluginKey('smartPaste')
 
@@ -52,16 +53,22 @@ function isClosedTextSlice(slice: Slice): boolean {
   return !nonMatching && textblockCount === 1
 }
 
-import type { EditorView } from 'prosemirror-view'
-
-/** Собрать весь текст из слайса в открытый параграф (1,1), сохраняя марки */
+/** Собрать текст из слайса в открытый параграф (1,1), сохраняя марки.
+ *  Пустые/пробельные text-ноды по краям — артефакты сериализации — отбрасываем. */
 function flattenToOpenSlice(slice: Slice, view: EditorView): Slice {
   const nodes: PMNode[] = []
   slice.content.forEach((child) => {
-    if (child.isText) nodes.push(child)
-    else if (child.isTextblock) child.content.forEach((c: PMNode) => nodes.push(c))
+    if (child.isText) {
+      if (child.text && child.text.trim().length > 0) nodes.push(child)
+    } else if (child.isTextblock) {
+      child.content.forEach((c: PMNode) => nodes.push(c))
+    }
   })
   const schema = view.state.schema
+  if (nodes.length === 0) {
+    const text = slice.content.textBetween(0, slice.content.size).trim()
+    if (text) nodes.push(schema.text(text))
+  }
   const para = schema.node('paragraph', null, nodes)
   return Slice.maxOpen(Fragment.from(para))
 }
