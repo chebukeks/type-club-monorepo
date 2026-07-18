@@ -1,6 +1,7 @@
 import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.utils import formataddr
 from pathlib import Path
 
 import aiosmtplib
@@ -22,7 +23,7 @@ def _render(template_name: str, **kwargs) -> str:
 
 async def send_email(to: str, subject: str, html: str) -> None:
     message = MIMEMultipart("alternative")
-    message["From"] = settings.smtp_from
+    message["From"] = formataddr(("Type Club", settings.smtp_from))
     message["To"] = to
     message["Subject"] = subject
     message.attach(MIMEText(html, "html", "utf-8"))
