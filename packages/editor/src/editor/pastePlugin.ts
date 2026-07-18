@@ -49,6 +49,12 @@ function isClosedTextSlice(slice: Slice): boolean {
   return all
 }
 
+function describeSlice(slice: Slice): string {
+  const names: string[] = []
+  slice.content.forEach((c) => names.push(c.type.name))
+  return `(${slice.openStart},${slice.openEnd}) [${names.join(', ')}]`
+}
+
 function handleBlockPaste(view: EditorView, slice: Slice): boolean {
   const { state } = view
   if (!state.selection.empty) return false
@@ -88,15 +94,27 @@ function handleBlockPaste(view: EditorView, slice: Slice): boolean {
 }
 
 export function pastePlugin(): Plugin {
+  console.log('[pastePlugin] LOADED')
   return new Plugin({
     key: pastePluginKey,
     props: {
       transformPasted(slice) {
-        if (isClosedTextSlice(slice)) return Slice.maxOpen(slice.content)
+        const before = describeSlice(slice)
+        if (isClosedTextSlice(slice)) {
+          const opened = Slice.maxOpen(slice.content)
+          console.log('[pastePlugin] transformPasted', before, '→ maxOpen', describeSlice(opened))
+          return opened
+        }
+        console.log('[pastePlugin] transformPasted', before, '(unchanged)')
         return slice
       },
       handlePaste(view, _event, slice) {
-        if (!isBlockSlice(slice)) return false
+        console.log('[pastePlugin] handlePaste', describeSlice(slice), 'selection:', view.state.selection.empty ? 'empty' : view.state.selection.constructor.name)
+        if (!isBlockSlice(slice)) {
+          console.log('[pastePlugin] handlePaste → false (not block)')
+          return false
+        }
+        console.log('[pastePlugin] handlePaste → handleBlockPaste')
         return handleBlockPaste(view, slice)
       },
     },
