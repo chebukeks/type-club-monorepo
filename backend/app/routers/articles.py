@@ -1,8 +1,8 @@
 import logging
 import secrets
 
-from fastapi import APIRouter, Depends, HTTPException, Header, Query
-from sqlalchemy import select, or_
+from fastapi import APIRouter, Depends, HTTPException, Header, Query, Response
+from sqlalchemy import func, select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
@@ -44,7 +44,7 @@ def _article_to_response(article: Article, author: User | None = None) -> Articl
     )
 
 
-def _article_to_list_item(article: Article) -> ArticleListItem:
+def _article_to_list_item(article: Article, my_roles: list[str] | None = None) -> ArticleListItem:
     return ArticleListItem(
         id=article.id,
         title=article.title,
@@ -53,54 +53,119 @@ def _article_to_list_item(article: Article) -> ArticleListItem:
         author_nickname=article.author.nickname,
         created_at=article.created_at,
         updated_at=article.updated_at,
+        my_roles=my_roles,
     )
 
 
 @router.get("", response_model=list[ArticleListItem])
 async def list_articles(
+    response: Response,
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
+    q: str | None = Query(None, max_length=500),
+    author: str | None = Query(None, max_length=255),
     current_user: User | None = Depends(get_optional_user),
     session: AsyncSession = Depends(get_session),
 ):
     offset = (page - 1) * size
-    query = select(Article).order_by(Article.updated_at.desc()).offset(offset).limit(size)
-    if current_user and current_user.role == "moderator":
-        pass  # moderator sees all articles
-    else:
-        query = query.where(Article.access_state == "public")
-    result = await session.execute(query)
+    conditions = []
+    if not (current_user and current_user.role == "moderator"):
+        conditions.append(Article.access_state == "public")
+    if q and q.strip():
+        conditions.append(Article.title.ilike(f"%{q.strip()}%"))
+
+    query = select(Article)
+    count_query = select(func.count(Article.id))
+    if author and author.strip():
+        query = query.join(User, Article.author_id == User.id)
+        count_query = count_query.join(User, Article.author_id == User.id)
+        conditions.append(func.lower(User.nickname) == author.strip().lower())
+
+    if conditions:
+        query = query.where(*conditions)
+        count_query = count_query.where(*conditions)
+
+    total = (await session.execute(count_query)).scalar_one()
+    result = await session.execute(
+        query.order_by(Article.updated_at.desc()).offset(offset).limit(size)
+    )
     articles = result.scalars().all()
+    response.headers["X-Total-Count"] = str(total)
     return [_article_to_list_item(a) for a in articles]
+
+
+VALID_MY_ROLES = ("author", "co_author", "editor")
 
 
 @router.get("/my", response_model=list[ArticleListItem])
 async def list_my_articles(
+    response: Response,
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
+    q: str | None = Query(None, max_length=500),
+    roles: str | None = Query(None, max_length=100),
     current_user: User = Depends(get_verified_user),
     session: AsyncSession = Depends(get_session),
 ):
     offset = (page - 1) * size
-    collab_article_ids = (
+    if roles is None:
+        wanted_roles = list(VALID_MY_ROLES)
+    else:
+        wanted_roles = [r for r in (p.strip() for p in roles.split(",")) if r in VALID_MY_ROLES]
+        if not wanted_roles:
+            response.headers["X-Total-Count"] = "0"
+            return []
+
+    collab_rows = (
         await session.execute(
-            select(CollaborationMember.article_id).where(
+            select(CollaborationMember.article_id, CollaborationMember.role).where(
                 CollaborationMember.user_id == current_user.id
             )
         )
-    ).scalars().all()
-    conditions = [Article.author_id == current_user.id]
-    if collab_article_ids:
-        conditions.append(Article.id.in_(collab_article_ids))
+    ).all()
+    collab_role_by_article: dict[int, str] = {row[0]: row[1] for row in collab_rows}
+
+    conditions = []
+    if "author" in wanted_roles:
+        conditions.append(Article.author_id == current_user.id)
+    collab_ids = [
+        article_id
+        for article_id, role in collab_role_by_article.items()
+        if role in wanted_roles
+    ]
+    if collab_ids:
+        conditions.append(Article.id.in_(collab_ids))
+    if not conditions:
+        response.headers["X-Total-Count"] = "0"
+        return []
+
+    filters = [or_(*conditions)]
+    if q and q.strip():
+        filters.append(Article.title.ilike(f"%{q.strip()}%"))
+
+    total = (
+        await session.execute(select(func.count(Article.id)).where(*filters))
+    ).scalar_one()
     result = await session.execute(
         select(Article)
-        .where(or_(*conditions))
+        .where(*filters)
         .order_by(Article.updated_at.desc())
         .offset(offset)
         .limit(size)
     )
     articles = result.scalars().all()
-    return [_article_to_list_item(a) for a in articles]
+    response.headers["X-Total-Count"] = str(total)
+
+    items = []
+    for a in articles:
+        my_roles = []
+        if a.author_id == current_user.id:
+            my_roles.append("author")
+        collab_role = collab_role_by_article.get(a.id)
+        if collab_role:
+            my_roles.append(collab_role)
+        items.append(_article_to_list_item(a, my_roles))
+    return items
 
 
 @router.post("", response_model=ArticleResponse, status_code=201)

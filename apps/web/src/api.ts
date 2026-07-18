@@ -13,6 +13,12 @@ export function getToken() {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const res = await rawRequest(path, options);
+  if (res.status === 204) return undefined as T;
+  return res.json();
+}
+
+async function rawRequest(path: string, options: RequestInit = {}): Promise<Response> {
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
   };
@@ -22,7 +28,6 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   const res = await fetch(`${BASE}${path}`, { ...options, headers });
-  if (res.status === 204) return undefined as T;
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     const detail = err.detail;
@@ -32,7 +37,19 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     }
     throw new Error(res.statusText || "Request failed");
   }
-  return res.json();
+  return res;
+}
+
+export interface Paged<T> {
+  items: T[];
+  total: number;
+}
+
+async function getPaged<T>(path: string): Promise<Paged<T>> {
+  const res = await rawRequest(path);
+  const items: T[] = await res.json();
+  const total = parseInt(res.headers.get("X-Total-Count") ?? "", 10);
+  return { items, total: Number.isNaN(total) ? items.length : total };
 }
 
 export const api = {
@@ -98,11 +115,34 @@ export interface ArticleListItem {
   author_nickname: string;
   created_at: string;
   updated_at: string;
+  my_roles?: string[] | null;
+}
+
+export interface ArticlesQuery {
+  page?: number;
+  size?: number;
+  q?: string;
+  author?: string;
+  roles?: string[];
+}
+
+function buildQuery(params: ArticlesQuery): string {
+  const sp = new URLSearchParams();
+  sp.set("page", String(params.page ?? 1));
+  sp.set("size", String(params.size ?? 20));
+  if (params.q) sp.set("q", params.q);
+  if (params.author) sp.set("author", params.author);
+  if (params.roles) sp.set("roles", params.roles.join(","));
+  return sp.toString();
 }
 
 export const articlesApi = {
   list: (page = 1, size = 20) => api.get<ArticleListItem[]>(`/articles?page=${page}&size=${size}`),
   myList: (page = 1, size = 20) => api.get<ArticleListItem[]>(`/articles/my?page=${page}&size=${size}`),
+  listPaged: (params: ArticlesQuery) =>
+    getPaged<ArticleListItem>(`/articles?${buildQuery(params)}`),
+  myListPaged: (params: ArticlesQuery) =>
+    getPaged<ArticleListItem>(`/articles/my?${buildQuery(params)}`),
   create: (data: { title: string; content?: string; slug?: string }) =>
     api.post<Article>("/articles", data),
   get: (id: number) => api.get<Article>(`/articles/${id}`),
@@ -113,6 +153,18 @@ export const articlesApi = {
   delete: (id: number) => api.delete<void>(`/articles/${id}`),
   moderate: (id: number, action: "block" | "unblock") =>
     api.post<{ message: string }>(`/articles/${id}/moderate`, { action }),
+};
+
+// ── Users ──
+
+export interface UserSuggestion {
+  id: number;
+  nickname: string;
+}
+
+export const usersApi = {
+  search: (q: string, limit = 10) =>
+    api.get<UserSuggestion[]>(`/users?q=${encodeURIComponent(q)}&limit=${limit}`),
 };
 
 // ── Collaboration ──

@@ -138,6 +138,14 @@ class ArticleListItem(BaseModel):
     author_nickname: str
     created_at: datetime
     updated_at: datetime
+    my_roles: Optional[list[str]] = None
+
+    model_config = {"from_attributes": True}
+
+
+class UserSuggestion(BaseModel):
+    id: int
+    nickname: str
 
     model_config = {"from_attributes": True}
 
