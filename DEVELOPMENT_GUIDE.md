@@ -7,7 +7,7 @@ Type Club — монорепа с общим Markdown-редактором (Pros
 ```
 type-club-monorepo/
 ├── packages/
-│   └── editor/          @type-club/editor — общий редактор (19 плагинов + EditorCore)
+│   └── editor/          @type-club/editor — общий редактор (плагины ProseMirror + EditorCore)
 ├── apps/
 │   ├── desktop/         Electron-приложение (бывший type-club)
 │   └── web/             SPA (бывший type-club-web/frontend)
@@ -157,7 +157,7 @@ packages/editor/
     ├── index.ts              # Публичный API пакета
     ├── types.ts              # EditorMode, EditorProps, FocusMode, TocItem
     ├── EditorCore.tsx         # Базовый компонент редактора (3 режима)
-    └── editor/               # 19 плагинов ProseMirror
+    └── editor/               # Плагины ProseMirror
         ├── schema.ts              # Схема документа (ноды + марки)
         ├── markdownConfig.ts      # Парсер + Сериализатор (MD ↔ PM) + generateExportHtml()
         ├── keymap.ts              # Горячие клавиши редактора
@@ -175,6 +175,8 @@ packages/editor/
         ├── headingView.ts         # NodeView: заголовки
         ├── imageView.ts           # NodeView: изображения + YouTube
         ├── interactivePlugin.ts   # Интерактивные элементы
+        ├── pastePlugin.ts         # Умная вставка (блоки — после абзаца, текст — инлайн)
+        ├── tableEditPlugin.ts     # Режим редактирования таблиц (overlay, DnD)
         ├── tocPlugin.ts           # Оглавление (Table of Contents)
         └── typographyPlugin.ts    # Авто-типографика (-- → —)
 ```
@@ -291,8 +293,9 @@ interface AppState {
 2. Добавить парсинг в `packages/editor/src/editor/markdownConfig.ts`
 3. Добавить сериализацию в `packages/editor/src/editor/markdownConfig.ts`
 4. (Опционально) Создать NodeView в `packages/editor/src/editor/`
-5. Проверить round-trip: `parse(serialize(parse(md))) === parse(md)`
-6. Убедиться что оба приложения (desktop + web) работают после изменений
+5. Если нод должен вставляться из буфера как самостоятельный блок (после абзаца, как таблица/изображение) — добавить имя ноды в `BLOCK_PASTE_NODES` в `packages/editor/src/editor/pastePlugin.ts`
+6. Проверить round-trip: `parse(serialize(parse(md))) === parse(md)`
+7. Убедиться что оба приложения (desktop + web) работают после изменений
 
 ---
 

@@ -21,6 +21,7 @@ export { ImageView } from "./editor/imageView";
 export { MathBlockView } from "./editor/mathBlockView";
 export { MathInlineView } from "./editor/mathInlineView";
 export { tableEditPlugin, tableEditPluginKey } from "./editor/tableEditPlugin";
+export { pastePlugin, pastePluginKey, BLOCK_PASTE_NODES } from "./editor/pastePlugin";
 export { createCollaborationPlugins } from "./editor/collaborationPlugin";
 
 export type { EditorMode, EditorProps, FocusMode, TocItem, CollaborationConfig } from "./types";

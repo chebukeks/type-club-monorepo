@@ -29,6 +29,7 @@ import { typographyPlugin } from "./editor/typographyPlugin";
 import { focusModePlugin } from "./editor/focusModePlugin";
 import { tocPlugin } from "./editor/tocPlugin";
 import { tableEditPlugin } from "./editor/tableEditPlugin";
+import { pastePlugin } from "./editor/pastePlugin";
 import { createCollaborationPlugins } from "./editor/collaborationPlugin";
 
 import type { EditorProps } from "./types";
@@ -154,6 +155,7 @@ export function EditorCore({
           getInputRulesPlugin(),
           columnResizing({}),
           tableEditing(),
+          pastePlugin(),
           tabPlugin,
           seamlessPlugin,
           syntaxHighlightPlugin,
