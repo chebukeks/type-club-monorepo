@@ -10,7 +10,7 @@
 - [x] Переименована Docker-сеть из `eatsmart_bot_eatsmart_net` в `type-club-net` (в коде; на проде — см. ниже)
 - [x] Убрана ссылка на внутреннюю инфраструктуру из `AGENTS.md`
 - [x] Создан `.env.example` с плейсхолдерами
-- [x] `.npmrc` переключён с китайского зеркала на `registry.npmjs.org`
+- [x] `.npmrc` переключён с китайского зеркала на `registry.npmjs.org` (позже возвращён обратно — из РФ npmjs.org недоступен)
 
 ### type-club
 - [x] `log.txt` удалён из git-трекинга
