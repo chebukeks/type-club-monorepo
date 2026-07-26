@@ -1,0 +1,42 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: type-club-postgres
+    environment:
+      POSTGRES_USER: typeclub
+      POSTGRES_PASSWORD: typeclub_pass
+      POSTGRES_DB: typeclub_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  backend:
+    build: .
+    container_name: type-club-backend
+    restart: unless-stopped
+    env_file: .env.local
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - postgres
+
+  collab-server:
+    build:
+      context: .
+      dockerfile: services/collab-server/Dockerfile
+    container_name: type-club-collab
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      - PORT=8001
+      - BACKEND_URL=http://type-club-backend:8000
+      - SERVICE_TOKEN=dev-token
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

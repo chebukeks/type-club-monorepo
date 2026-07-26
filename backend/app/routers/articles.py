@@ -538,7 +538,7 @@ async def join_via_share_link(
 
 def _verify_service_token(authorization: str | None = Header(None)) -> None:
     if not settings.service_token:
-        return
+        raise HTTPException(status_code=500, detail="Server misconfigured")
     if not authorization or authorization.replace("Bearer ", "") != settings.service_token:
         raise HTTPException(status_code=403, detail="Forbidden")
 

@@ -14,6 +14,11 @@ const PORT = parseInt(process.env.PORT || "8001", 10)
 const BACKEND_URL = (process.env.BACKEND_URL || "http://localhost:8000").replace(/\/$/, "")
 const SERVICE_TOKEN = process.env.SERVICE_TOKEN || ""
 
+if (!SERVICE_TOKEN) {
+  console.error("[collab-server] SERVICE_TOKEN is required, exiting")
+  process.exit(1)
+}
+
 // Delay after last edit before persisting to the DB.
 const SAVE_DEBOUNCE_MS = parseInt(process.env.SAVE_DEBOUNCE_MS || "8000", 10)
 // Max consecutive auto-retries of a failed save (avoids hot-looping).

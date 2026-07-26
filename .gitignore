@@ -40,5 +40,17 @@ CLAUDE.md
 GEMINI.md
 QWEN.md
 
+# Keys & certificates
+*.pem
+*.key
+*.pfx
+*.p12
+credentials*
+
+# Database dumps
+*.sql
+*.dump
+*.bak
+
 # Electron
 *.blockmap

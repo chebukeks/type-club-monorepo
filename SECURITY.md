@@ -7,7 +7,7 @@
 ### type-club-web
 - [x] Убраны хардкод-секреты из `config.py` (БД, JWT, SMTP, продакшн URL)
 - [x] Убрана авто-модерация по email-матчингу в `auth.py`
-- [x] Переименована Docker-сеть из `eatsmart_bot_eatsmart_net` в `type-club-net`
+- [x] Переименована Docker-сеть из `eatsmart_bot_eatsmart_net` в `type-club-net` (в коде; на проде — см. ниже)
 - [x] Убрана ссылка на внутреннюю инфраструктуру из `AGENTS.md`
 - [x] Создан `.env.example` с плейсхолдерами
 - [x] `.npmrc` переключён с китайского зеркала на `registry.npmjs.org`
@@ -21,8 +21,8 @@
 ## Нужно сделать вручную на проде
 
 ### Критично — сменить секреты
-- [ ] **SMTP пароль** (`support@type-club.ru` на mail.ru) — сгенерировать новый в ЛК mail.ru
-- [ ] **Пароль БД** (`eatsmart` / `eatsmart_pass`) — сменить в PostgreSQL и обновить `.env`
+- [ ] **SMTP пароль** — сгенерировать новый в ЛК почтового сервиса
+- [ ] **Пароль БД** — сменить в PostgreSQL и обновить `.env`
 - [ ] **JWT secret** — сгенерировать новый (`openssl rand -hex 32`)
 - [ ] **SECRET_KEY** приложения — сгенерировать новый
 
@@ -34,18 +34,26 @@
 
 ## Открытые вопросы
 
-### Git-история
-- [ ] В коммитах type-club-web присутствует email `159796331+chebukeks@users.noreply.github.com` — реврайт истории или оставить?
-
-### Mail.ru verification token
-- [ ] `frontend/index.html:5` — `<meta name="mailru-domain" content="ZKHKvXkMA7e4uGzp" />` — токен публичный, но подтверждает владение доменом на Mail.ru
-
 ### Production domain
-- [ ] Имя домена `type-club.ru` остаётся в комментариях и тексте — это публичное имя проекта, допустимо
-- [ ] Nginx-конфиги содержат `server_name type-club.ru` — допустимо, если репо публичный
+- [x] Имя домена `type-club.ru` остаётся в комментариях и тексте — это публичное имя проекта, допустимо
+- [x] Nginx-конфиги содержат `server_name type-club.ru` — допустимо, если репо публичный
 
-### CORS
-- [ ] `backend/app/main.py:19` — `allow_origins=["*"]` — за nginx допустимо, но при прямом доступе к контейнеру — риск
+## Выполнено (2026-07-26 — подготовка к open-source)
+
+- [x] Email в git-истории заменён на `159796331+chebukeks@users.noreply.github.com` (210 коммитов, filter-branch)
+- [x] Токен Mail.ru удалён из `apps/web/index.html`
+- [x] CORS: `allow_credentials=False` (JWT через Authorization header, куки не используются)
+- [x] `docker-compose.yml`: сеть переименована в `type-club-net`
+- [x] `.npmrc`: зеркало заменено на `registry.npmjs.org`
+- [x] Креды в SECURITY.md обезличены
+- [x] Обход сервисного токена исправлен (`articles.py:540` — теперь 500 вместо пропуска)
+- [x] Валидация SERVICE_TOKEN при старте collab-server (выход с ошибкой если не задан)
+- [x] `.gitignore` дополнен (`*.pem`, `*.key`, `credentials*`, `*.sql`, `*.dump`)
+- [x] Добавлен `LICENSE` (MIT)
+- [x] Добавлен `README.md`
+- [x] `docker-compose.local.yml` + `.env.local` для локальной разработки
+- [x] `vite.config.ts`: WebSocket-прокси `/collab`
+- [x] `useCollaboration.ts`: динамический collab URL (dev/prod автоматически)
 
 ## История изменений
 

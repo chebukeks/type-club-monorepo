@@ -45,8 +45,10 @@ export function useCollaboration(articleId: number | null, user: { nickname: str
     }
 
     const token = getToken() || ""
+    const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:"
+    const wsUrl = `${wsProtocol}//${location.host}/collab`
     const provider = new WebsocketProvider(
-      "wss://type-club.ru/collab",
+      wsUrl,
       "article",
       ydoc,
       {
