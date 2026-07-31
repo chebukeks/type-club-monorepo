@@ -17,13 +17,34 @@ npm install
 
 # Desktop app
 npm run dev:desktop
-
-# Web app (requires backend — see DEVELOPMENT_GUIDE.md)
-npm run dev:web
-
-# Local backend + database
-docker compose -f docker-compose.local.yml up
 ```
+
+## Local web development
+
+Requires [Docker](https://docs.docker.com/get-started/).
+
+```bash
+# 1. Create local env
+cp .env.local.example .env.local
+
+# 2. Start backend, database, and collab server
+docker compose -f docker-compose.local.yml up
+
+# 3. Start web frontend (separate terminal)
+npm run dev:web
+# → http://localhost:5173
+```
+
+### How email verification works locally
+
+Mailpit catches all outgoing emails. After registering:
+1. Open http://localhost:8025
+2. Find the verification email
+3. Click the link inside it
+
+### npm registry note
+
+The `.npmrc` files use `registry.npmmirror.com` (a mirror that works reliably from Russia). Remove or replace if you need the default npmjs.org.
 
 ## Documentation
 

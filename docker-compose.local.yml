@@ -11,6 +11,13 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: type-club-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
   backend:
     build: .
     container_name: type-club-backend
@@ -22,6 +29,7 @@ services:
       - ./backend:/app
     depends_on:
       - postgres
+      - mailpit
 
   collab-server:
     build:
