@@ -12,7 +12,11 @@ interface CollaborationState {
   peers: number
 }
 
-export function useCollaboration(articleId: number | null, user: { nickname: string } | null): CollaborationState {
+export function useCollaboration(
+  articleId: number | null,
+  user: { id?: number; nickname: string } | null,
+  userRole?: string | null
+): CollaborationState {
   const [connected, setConnected] = useState(false)
   const [synced, setSynced] = useState(false)
   const [peers, setPeers] = useState(0)
@@ -40,6 +44,8 @@ export function useCollaboration(articleId: number | null, user: { nickname: str
     if (user) {
       awareness.setLocalStateField("user", {
         name: user.nickname,
+        userId: user.id,
+        role: userRole,
         color: "#" + Math.floor(Math.random() * 16777215).toString(16).padStart(6, "0"),
       })
     }
@@ -106,9 +112,11 @@ export function useCollaboration(articleId: number | null, user: { nickname: str
     if (!user || !awarenessRef.current) return
     awarenessRef.current.setLocalStateField("user", {
       name: user.nickname,
+      userId: user.id,
+      role: userRole,
       color: "#" + Math.floor(Math.random() * 16777215).toString(16).padStart(6, "0"),
     })
-  }, [user])
+  }, [user, userRole])
 
   const config = useMemo<CollaborationConfig | null>(() => {
     if (!ready || !yFragmentRef.current || !awarenessRef.current) return null

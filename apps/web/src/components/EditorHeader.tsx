@@ -17,6 +17,7 @@ interface EditorHeaderProps {
   onToggleHeader: () => void;
   collabActive?: boolean;
   collabSynced?: boolean;
+  userRole?: string | null;
 }
 
 export default function EditorHeader({
@@ -33,6 +34,7 @@ export default function EditorHeader({
   onToggleHeader,
   collabActive,
   collabSynced,
+  userRole,
 }: EditorHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showRawWarning, setShowRawWarning] = useState(false);
@@ -135,7 +137,13 @@ export default function EditorHeader({
 
         {/* Desktop: all buttons inline */}
         <div className="hidden sm:flex items-center gap-2 sm:gap-3">
-          <ModeSwitcher />
+          {userRole === "editor" ? (
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-400 text-xs font-medium border border-amber-200 dark:border-amber-800">
+              <span>💡</span> Режим советчика
+            </div>
+          ) : (
+            <ModeSwitcher />
+          )}
           <ActionButtons />
         </div>
 

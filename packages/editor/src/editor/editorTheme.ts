@@ -35,6 +35,118 @@ export function getEditorStyles(): string {
   padding-bottom: 24px;
 }
 
+/* ==========================================
+   Suggestion Mode Styles
+   ========================================== */
+
+.suggestion-insert {
+  color: var(--sug-color, #3b82f6);
+  text-decoration: underline;
+  text-decoration-color: var(--sug-color, #3b82f6);
+  text-underline-offset: 3px;
+  border-radius: 2px;
+}
+
+.suggestion-delete {
+  color: var(--sug-color, #ef4444);
+  text-decoration: line-through;
+  text-decoration-color: var(--sug-color, #ef4444);
+  opacity: 0.75;
+}
+
+.suggestion-note {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background: var(--sug-color, #f59e0b);
+  color: #ffffff;
+  border-radius: 50%;
+  font-size: 10px;
+  margin: 0 3px;
+  vertical-align: middle;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  transition: transform 0.15s ease;
+}
+
+.suggestion-note:hover {
+  transform: scale(1.15);
+}
+
+figure[data-sug-delete] {
+  position: relative;
+  outline: 2px dashed #ef4444;
+  outline-offset: 4px;
+  opacity: 0.7;
+}
+
+figure[data-sug-delete]::after {
+  content: "Предложено удалить";
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #ef4444;
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.suggestion-action-popup {
+  position: absolute;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--tooltip-bg, #ffffff);
+  border: 1px solid var(--border-default, #e5e7eb);
+  border-radius: 8px;
+  padding: 4px 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.suggestion-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.15s ease;
+}
+
+.suggestion-action-btn.accept {
+  background: #dcfce7;
+  color: #166534;
+}
+.suggestion-action-btn.accept:hover {
+  background: #bbf7d0;
+}
+
+.suggestion-action-btn.reject {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.suggestion-action-btn.reject:hover {
+  background: #fca5a5;
+}
+
+.ProseMirror.preview-mode .suggestion-insert,
+.ProseMirror.preview-mode .suggestion-delete,
+.ProseMirror.preview-mode .suggestion-note,
+.ProseMirror.preview-mode figure[data-sug-delete]::after {
+  display: none !important;
+}
+
 .ProseMirror.is-over-limit {
   caret-color: #ec404eff;
 }

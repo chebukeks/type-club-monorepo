@@ -42,6 +42,8 @@ interface MarkdownEditorProps {
   documentZoom?: number;
   readOnly?: boolean;
   collaboration?: CollaborationConfig;
+  userRole?: "author" | "co_author" | "editor" | null;
+  userId?: number;
 }
 
 export function MarkdownEditor({
@@ -52,6 +54,8 @@ export function MarkdownEditor({
   documentZoom,
   readOnly,
   collaboration,
+  userRole,
+  userId,
 }: MarkdownEditorProps) {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
   const [ctxSubmenu, setCtxSubmenu] = useState<"table" | "code" | null>(null);
@@ -287,8 +291,10 @@ export function MarkdownEditor({
         textZoom={textZoom}
         documentZoom={documentZoom}
         readOnly={readOnly}
-        onEditorView={(v) => { viewRef.current = v; }}
         collaboration={collaboration}
+        userRole={userRole}
+        userId={userId}
+        onEditorView={(v) => { viewRef.current = v; }}
       />
 
       {ctxMenu && ctxTable !== null && (
@@ -355,6 +361,35 @@ export function MarkdownEditor({
           <button className={btnClass} onClick={insertMathBlock}>
             <span>Создать блок математики</span>
           </button>
+          {userRole === "editor" && (
+            <>
+              <div className={sepClass} />
+              <button
+                className={btnClass}
+                onClick={() => {
+                  if (viewRef.current) {
+                    const noteText = prompt("Введите текст примечания:") || "";
+                    if (noteText.trim()) {
+                      const { from } = viewRef.current.state.selection;
+                      const noteNode = viewRef.current.state.schema.nodes.suggestion_note.create({
+                        noteId: crypto.randomUUID(),
+                        sugAuthorId: userId ?? 0,
+                        sugAuthorName: "Советчик",
+                        sugColor: "#f59e0b",
+                        noteText: noteText.trim(),
+                        sugCreatedAt: new Date().toISOString(),
+                      });
+                      viewRef.current.dispatch(viewRef.current.state.tr.insert(from, noteNode));
+                    }
+                  }
+                  closeCtxMenu();
+                }}
+              >
+                <span>📝 Создать примечание</span>
+                <span className="text-xs text-gray-400">Ctrl+Q</span>
+              </button>
+            </>
+          )}
         </div>
       )}
 

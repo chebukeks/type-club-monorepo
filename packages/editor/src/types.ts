@@ -28,6 +28,8 @@ export interface EditorProps {
   extraPlugins?: Plugin[]
   containerStyle?: React.CSSProperties
   collaboration?: CollaborationConfig
+  userRole?: 'author' | 'co_author' | 'editor' | null
+  userId?: number
 }
 
 export type { CollaborationConfig }

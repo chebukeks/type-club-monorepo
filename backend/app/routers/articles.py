@@ -606,6 +606,27 @@ async def sync_state(
     return {"status": "ok"}
 
 
+@router.get("/{article_id}/user-role")
+async def get_user_role(
+    article_id: int,
+    user_id: int = Query(...),
+    _service: None = Depends(_verify_service_token),
+    session: AsyncSession = Depends(get_session),
+):
+    article = await session.get(Article, article_id)
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    if article.author_id == user_id:
+        return {"role": "author", "user_id": user_id}
+
+    for m in article.collaborators:
+        if m.user_id == user_id:
+            return {"role": m.role, "user_id": user_id}
+
+    raise HTTPException(status_code=403, detail="User has no access to this article")
+
+
 def _slugify(text: str) -> str:
     import re
     import unicodedata

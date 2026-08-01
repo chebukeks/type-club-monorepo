@@ -10,6 +10,7 @@
 import { Schema } from 'prosemirror-model'
 import { bulletList, orderedList, listItem } from 'prosemirror-schema-list'
 import { tableNodes } from 'prosemirror-tables'
+import { suggestionInsertMark, suggestionDeleteMark, suggestionNoteNode } from './suggestionSchema'
 
 // ============================================================
 // Таблицы из prosemirror-tables
@@ -200,6 +201,8 @@ export const schema = new Schema({
       toDOM() { return ['div', { class: 'math-block' }, 0] }
     },
 
+    suggestion_note: suggestionNoteNode,
+
     text: {
       group: 'inline',
     },
@@ -257,5 +260,7 @@ export const schema = new Schema({
       parseDOM: [{ tag: 'span.pm-spoiler' }],
       toDOM() { return ['span', { class: 'pm-spoiler' }, 0] },
     },
+    suggestion_insert: suggestionInsertMark,
+    suggestion_delete: suggestionDeleteMark,
   },
 })

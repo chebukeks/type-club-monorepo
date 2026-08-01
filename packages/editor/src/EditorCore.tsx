@@ -33,6 +33,9 @@ import { tocPlugin } from "./editor/tocPlugin";
 import { tableEditPlugin } from "./editor/tableEditPlugin";
 import { pastePlugin } from "./editor/pastePlugin";
 import { createCollaborationPlugins } from "./editor/collaborationPlugin";
+import { createSuggestionPlugin } from "./editor/suggestionPlugin";
+import { createSuggestionActionPlugin } from "./editor/suggestionActionPlugin";
+import { SuggestionNoteView } from "./editor/suggestionNoteView";
 
 import type { EditorProps } from "./types";
 
@@ -98,6 +101,8 @@ export function EditorCore({
   extraPlugins,
   containerStyle,
   collaboration,
+  userRole,
+  userId,
 }: EditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -137,6 +142,21 @@ export function EditorCore({
       ? createCollaborationPlugins(collaboration)
       : [];
 
+    const isEditorRole = userRole === "editor";
+    const suggestionPlugins: Plugin[] = [];
+
+    if (isEditorRole) {
+      suggestionPlugins.push(
+        createSuggestionPlugin({
+          active: true,
+          authorId: userId ?? 0,
+          authorName: "Советчик",
+          color: "#3b82f6",
+        })
+      );
+    }
+    suggestionPlugins.push(createSuggestionActionPlugin());
+
     const syncPlugin = new Plugin({
       view() {
         return {
@@ -154,7 +174,7 @@ export function EditorCore({
     const historyPlugins = collaboration ? [] : [history()];
 
     const plugins: Plugin[] = isPreview
-      ? [...historyPlugins, dropCursor(), gapCursor(), syncPlugin, foldingPlugin, interactivePlugin, syntaxHighlightPlugin, typographyPlugin(), focusModePlugin(() => focusModeRef.current || 'none'), ...collabPlugins, ...(extraPlugins || [])]
+      ? [...historyPlugins, dropCursor(), gapCursor(), syncPlugin, foldingPlugin, interactivePlugin, syntaxHighlightPlugin, typographyPlugin(), focusModePlugin(() => focusModeRef.current || 'none'), ...collabPlugins, ...suggestionPlugins, ...(extraPlugins || [])]
       : [
           ...getKeymapPlugins(),
           getInputRulesPlugin(),
@@ -176,6 +196,7 @@ export function EditorCore({
           focusModePlugin(() => focusModeRef.current || 'none'),
           ...(onTocUpdateRef.current ? [tocPlugin((toc) => onTocUpdateRef.current?.(toc))] : []),
           ...collabPlugins,
+          ...suggestionPlugins,
           ...(extraPlugins || []),
         ];
 
@@ -189,6 +210,7 @@ export function EditorCore({
         code_block: (node, view, getPos) => new CodeBlockView(node, view, getPos),
         math_block: (node, view, getPos) => new MathBlockView(node, view, getPos),
         image: (node, view, getPos) => new ImageView(node, view, getPos),
+        suggestion_note: (node) => new SuggestionNoteView(node),
         math_inline: isPreview
           ? (node: PMNode) => new MathInlinePreviewView(node)
           : (node, view, getPos) => new MathInlineView(node, view, getPos),

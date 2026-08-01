@@ -311,15 +311,56 @@ wss.on("connection", async (ws, req) => {
     return
   }
 
+  // Verify JWT token & user role against backend
+  let verifiedUserId = 0
+  let verifiedNickname = ""
+  let verifiedRole = "editor"
+
+  try {
+    const meRes = await fetch(`${BACKEND_URL}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!meRes.ok) {
+      ws.close(4003, "Invalid authentication token")
+      return
+    }
+    const meData = (await meRes.json()) as { id: number; nickname: string }
+    verifiedUserId = meData.id
+    verifiedNickname = meData.nickname
+
+    const roleRes = await fetch(
+      `${BACKEND_URL}/api/articles/${articleId}/user-role?user_id=${verifiedUserId}`,
+      {
+        headers: { Authorization: `Bearer ${SERVICE_TOKEN}` },
+      }
+    )
+    if (!roleRes.ok) {
+      ws.close(4003, "Access denied for this article")
+      return
+    }
+    const roleData = (await roleRes.json()) as { role: string }
+    verifiedRole = roleData.role
+  } catch (err) {
+    console.error(`[ws] auth error for article=${articleId}:`, err)
+    ws.close(4003, "Authentication verification failed")
+    return
+  }
+
   const state = getOrCreateDoc(articleId)
   if (state.destroyTimer) {
     clearTimeout(state.destroyTimer)
     state.destroyTimer = null
   }
 
-  console.log(`[ws] connect article=${articleId} clients=${state.clients.size + 1}`)
+  console.log(
+    `[ws] connect article=${articleId} user=${verifiedNickname}(id=${verifiedUserId}, role=${verifiedRole}) clients=${state.clients.size + 1}`
+  )
 
-  state.clients.set(ws, { userId: 0, nickname: "", role: "editor" })
+  state.clients.set(ws, {
+    userId: verifiedUserId,
+    nickname: verifiedNickname,
+    role: verifiedRole,
+  })
   heartbeat(ws)
 
   // Buffer messages until the doc is seeded, so the client's initial

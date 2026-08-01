@@ -501,6 +501,27 @@ const customKeymap = keymap({
   'Mod-z': chainCommands(pmUndo, yUndo),
   'Mod-Shift-z': chainCommands(pmRedo, yRedo),
   'Mod-y': chainCommands(pmRedo, yRedo),
+
+  // Suggestion Note (Ctrl+Q)
+  'Mod-q': (state, dispatch) => {
+    if (!state.schema.nodes.suggestion_note) return false;
+    if (dispatch) {
+      const noteText = prompt("Введите текст примечания:") || "";
+      if (!noteText.trim()) return true;
+
+      const { from } = state.selection;
+      const noteNode = state.schema.nodes.suggestion_note.create({
+        noteId: crypto.randomUUID(),
+        sugAuthorId: 0,
+        sugAuthorName: "Советчик",
+        sugColor: "#f59e0b",
+        noteText: noteText.trim(),
+        sugCreatedAt: new Date().toISOString(),
+      });
+      dispatch(state.tr.insert(from, noteNode));
+    }
+    return true;
+  },
 })
 
 // Команда: оборачивание выделенного текста в пару скобок/кавычек (#38)

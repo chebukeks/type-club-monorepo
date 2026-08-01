@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { articlesApi, Article } from "../api";
+import { articlesApi, collaborationApi, Article } from "../api";
 import { MarkdownEditor, EditorMode } from "../components/MarkdownEditor";
 import EditorHeader from "../components/EditorHeader";
 import SiteHeader from "../components/SiteHeader";
@@ -24,9 +24,10 @@ export default function Editor() {
   const [slug, setSlug] = useState("");
   const [showSiteHeader, setShowSiteHeader] = useState(false);
   const [loaded, setLoaded] = useState(id ? false : true);
+  const [userRole, setUserRole] = useState<"author" | "co_author" | "editor" | null>(null);
 
   const { user } = useAuth();
-  const collab = useCollaboration(articleId, user ?? null);
+  const collab = useCollaboration(articleId, user ?? null, userRole);
   // Collaboration is active for any saved article; the collab-server then owns
   // content persistence, so the client only manages metadata (title/slug/state).
   const collabActive = collab.config !== null;
@@ -38,17 +39,26 @@ export default function Editor() {
   const titleRef = useRef(title);
   titleRef.current = title;
 
-  // Load existing article
+  // Load existing article & determine user role
   useEffect(() => {
-    if (!articleId) return;
+    if (!articleId || !user) return;
     articlesApi.get(articleId).then((a) => {
       setTitle(a.title);
       setContent(a.content);
       setAccessState(a.access_state);
       setSlug(a.slug);
       setLoaded(true);
+
+      if (a.author_id === user.id) {
+        setUserRole("author");
+      } else {
+        collaborationApi.list(articleId).then((list) => {
+          const me = list.find((c) => c.user_id === user.id);
+          setUserRole((me?.role as any) ?? null);
+        }).catch(() => {});
+      }
     }).catch(() => navigate("/my-articles"));
-  }, [articleId, navigate]);
+  }, [articleId, user, navigate]);
 
   // Autosave
   const loadedRef = useRef(loaded);
@@ -135,6 +145,7 @@ export default function Editor() {
           onToggleHeader={() => setShowSiteHeader(!showSiteHeader)}
           collabActive={collabActive}
           collabSynced={collab.synced}
+          userRole={userRole}
         />
       )}
 
@@ -145,6 +156,8 @@ export default function Editor() {
         textZoom={100}
         documentZoom={100}
         collaboration={collab.config ?? undefined}
+        userRole={userRole}
+        userId={user?.id}
       />
 
       {showPublish && (
