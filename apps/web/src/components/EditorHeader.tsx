@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Save, Globe, RefreshCw, Menu, X, Cloud } from "lucide-react";
 import { EditorMode } from "./MarkdownEditor";
+import RawModeWarningModal, { STORAGE_KEY_HIDE_RAW_WARNING } from "./RawModeWarningModal";
 
 interface EditorHeaderProps {
   title: string;
@@ -34,6 +35,7 @@ export default function EditorHeader({
   collabSynced,
 }: EditorHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showRawWarning, setShowRawWarning] = useState(false);
 
   const modes: { mode: EditorMode; label: string }[] = [
     { mode: "seamless", label: "Seamless" },
@@ -41,12 +43,20 @@ export default function EditorHeader({
     { mode: "preview", label: "Preview" },
   ];
 
+  const handleModeChange = (mode: EditorMode) => {
+    if (mode === "raw" && collabActive && localStorage.getItem(STORAGE_KEY_HIDE_RAW_WARNING) !== "true") {
+      setShowRawWarning(true);
+      return;
+    }
+    setEditorMode(mode);
+  };
+
   const ModeSwitcher = ({ className }: { className?: string }) => (
     <div className={`flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 ${className || ""}`}>
       {modes.map((m) => (
         <button
           key={m.mode}
-          onClick={() => setEditorMode(m.mode)}
+          onClick={() => handleModeChange(m.mode)}
           className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
             editorMode === m.mode
               ? "bg-white dark:bg-gray-700 shadow-sm"
@@ -144,6 +154,16 @@ export default function EditorHeader({
           <ModeSwitcher />
           <ActionButtons />
         </div>
+      )}
+
+      {showRawWarning && (
+        <RawModeWarningModal
+          onConfirm={() => {
+            setShowRawWarning(false);
+            setEditorMode("raw");
+          }}
+          onCancel={() => setShowRawWarning(false)}
+        />
       )}
     </header>
   );

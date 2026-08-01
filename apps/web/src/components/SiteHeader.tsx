@@ -67,8 +67,9 @@ export default function SiteHeader({ onLogoClick }: SiteHeaderProps) {
                   New Article
                 </Link>
                 <Link
-                  to="/profile"
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${location.pathname === "/profile" ? "bg-gray-100 dark:bg-gray-800" : "hover:bg-gray-100 dark:hover:bg-gray-800"}`}
+                  to={`/${user.nickname}`}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${location.pathname === `/${user.nickname}` ? "bg-gray-100 dark:bg-gray-800" : "hover:bg-gray-100 dark:hover:bg-gray-800"}`}
+                  title="Profile"
                 >
                   <User size={18} />
                 </Link>
@@ -107,7 +108,7 @@ export default function SiteHeader({ onLogoClick }: SiteHeaderProps) {
                 className="block px-3 py-2 mt-1 rounded-lg bg-blue-600 text-white text-sm font-medium">
                 New Article
               </Link>
-              <Link to="/profile" onClick={() => setMenuOpen(false)}
+              <Link to={`/${user.nickname}`} onClick={() => setMenuOpen(false)}
                 className="block px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800">
                 Profile
               </Link>

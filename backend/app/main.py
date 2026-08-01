@@ -1,13 +1,16 @@
 import logging
+import os
 
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
+from sqlalchemy import text
 from app.config import settings
 from app.models import Base
 from app.database import engine
-from app.routers import auth, articles, users
+from app.routers import auth, articles, users, comments, stats
 
 logging.basicConfig(level=settings.log_level.upper())
 logger = logging.getLogger(__name__)
@@ -26,13 +29,24 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(articles.router)
 app.include_router(users.router)
+app.include_router(comments.router)
+app.include_router(stats.router)
+
+uploads_dir = settings.uploads_dir
+os.makedirs(uploads_dir, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 
 @app.on_event("startup")
 async def startup():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    logger.info("Database tables created")
+        await conn.execute(text("ALTER TABLE typeclub_users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(500);"))
+        await conn.execute(text("ALTER TABLE typeclub_users ADD COLUMN IF NOT EXISTS bio TEXT;"))
+        await conn.execute(text("ALTER TABLE typeclub_users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();"))
+        await conn.execute(text("ALTER TABLE typeclub_articles ADD COLUMN IF NOT EXISTS share_token VARCHAR(64);"))
+        await conn.execute(text("ALTER TABLE typeclub_articles ADD COLUMN IF NOT EXISTS share_role VARCHAR(20);"))
+    logger.info("Database tables and schema migrations completed")
 
 
 @app.get("/api/health")

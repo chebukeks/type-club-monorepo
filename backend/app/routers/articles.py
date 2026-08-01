@@ -6,7 +6,7 @@ from sqlalchemy import func, select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
-from app.models import Article, CollaborationMember, User
+from app.models import Article, ArticleLike, CollaborationMember, User
 from app.config import settings
 from app.routers.auth import get_current_user, get_moderator_user, get_optional_user, get_verified_user
 from app.schemas import (
@@ -29,8 +29,15 @@ router = APIRouter(prefix="/api/articles", tags=["articles"])
 logger = logging.getLogger(__name__)
 
 
-def _article_to_response(article: Article, author: User | None = None) -> ArticleResponse:
+def _article_to_response(
+    article: Article,
+    author: User | None = None,
+    current_user: User | None = None,
+) -> ArticleResponse:
     nick = author.nickname if author else None
+    liked = False
+    if current_user:
+        liked = any(l.user_id == current_user.id for l in article.likes)
     return ArticleResponse(
         id=article.id,
         author_id=article.author_id,
@@ -38,6 +45,10 @@ def _article_to_response(article: Article, author: User | None = None) -> Articl
         content=article.content,
         access_state=article.access_state,
         slug=article.slug,
+        view_count=len(article.views),
+        like_count=len(article.likes),
+        comment_count=len(article.comments),
+        liked_by_user=liked,
         created_at=article.created_at,
         updated_at=article.updated_at,
         author_nickname=nick,
@@ -51,6 +62,9 @@ def _article_to_list_item(article: Article, my_roles: list[str] | None = None) -
         access_state=article.access_state,
         slug=article.slug,
         author_nickname=article.author.nickname,
+        view_count=len(article.views),
+        like_count=len(article.likes),
+        comment_count=len(article.comments),
         created_at=article.created_at,
         updated_at=article.updated_at,
         my_roles=my_roles,
@@ -220,7 +234,7 @@ async def get_article_by_path(
     if not is_author and not is_moderator and not is_collab and article.access_state not in ("public", "link"):
         raise HTTPException(status_code=403, detail="Access denied")
 
-    return _article_to_response(article, author)
+    return _article_to_response(article, author, current_user)
 
 
 @router.get("/{article_id}", response_model=ArticleResponse)
@@ -240,7 +254,7 @@ async def get_article(
         raise HTTPException(status_code=403, detail="Access denied")
 
     author = await session.get(User, article.author_id)
-    return _article_to_response(article, author)
+    return _article_to_response(article, author, current_user)
 
 
 @router.patch("/{article_id}", response_model=ArticleResponse)
@@ -262,9 +276,6 @@ async def update_article(
     if data.title is not None:
         article.title = data.title
     if data.content is not None:
-        # Collaborative articles have their content owned by the collab-server
-        # (persisted via /sync-state). Ignore content here so a stray/stale
-        # client autosave can't clobber the live collaborative document.
         if article.collaborators:
             logger.info(
                 "Ignoring content update for article %s via PATCH (has collaborators; "
@@ -482,7 +493,7 @@ async def get_shared_article(
         raise HTTPException(status_code=404, detail="Invalid or expired link")
 
     author = await session.get(User, article.author_id)
-    return _article_to_response(article, author)
+    return _article_to_response(article, author, current_user)
 
 
 @router.post("/shared/{token}/join", response_model=CollaboratorResponse)

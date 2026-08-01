@@ -4,11 +4,12 @@ import Layout from "./components/Layout";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import Profile from "./pages/Profile";
+import Settings from "./pages/Settings";
 import Articles from "./pages/Articles";
 import MyArticles from "./pages/MyArticles";
 import Editor from "./pages/Editor";
 import ReadArticle from "./pages/ReadArticle";
+import UserProfile from "./pages/UserProfile";
 import Download from "./pages/Download";
 import VerifyEmail from "./pages/VerifyEmail";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -29,7 +30,7 @@ export default function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/profile" element={<Protected><Profile /></Protected>} />
+        <Route path="/settings" element={<Protected><Settings /></Protected>} />
         <Route path="/articles" element={<Articles />} />
         <Route path="/my-articles" element={<Protected><MyArticles /></Protected>} />
         <Route path="/editor" element={<Protected><Editor /></Protected>} />
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/join/:token" element={<JoinPage />} />
+        <Route path="/:username" element={<UserProfile />} />
         <Route path="/:username/:slug" element={<ReadArticle />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Route>

@@ -3,6 +3,8 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { articlesApi, Article } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { MarkdownEditor } from "../components/MarkdownEditor";
+import ArticleStats from "../components/ArticleStats";
+import CommentSection from "../components/CommentSection";
 import { Edit, Shield } from "lucide-react";
 
 export default function ReadArticle() {
@@ -41,14 +43,14 @@ export default function ReadArticle() {
 
   const handleBlock = async () => {
     try {
-      const updated = await articlesApi.moderate(article.id, "block");
+      await articlesApi.moderate(article.id, "block");
       setArticle({ ...article, access_state: "blocked" });
     } catch {}
   };
 
   const handleUnblock = async () => {
     try {
-      const updated = await articlesApi.moderate(article.id, "unblock");
+      await articlesApi.moderate(article.id, "unblock");
       setArticle({ ...article, access_state: "private" });
     } catch {}
   };
@@ -126,6 +128,15 @@ export default function ReadArticle() {
           readOnly
         />
       </div>
+
+      <ArticleStats
+        articleId={article.id}
+        initialViews={article.view_count}
+        initialLikes={article.like_count}
+        initialLiked={article.liked_by_user}
+      />
+
+      <CommentSection articleId={article.id} />
     </div>
   );
 }

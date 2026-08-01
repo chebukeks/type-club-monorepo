@@ -68,6 +68,8 @@ export interface User {
   email: string;
   email_verified: boolean;
   role: string;
+  avatar_url?: string | null;
+  bio?: string | null;
   created_at: string;
 }
 
@@ -82,8 +84,13 @@ export const authApi = {
   login: (data: { email: string; password: string }) =>
     api.post<TokenResponse>("/auth/login", data),
   me: () => api.get<User>("/auth/me"),
-  updateMe: (data: { nickname?: string; password?: string; confirm_password?: string }) =>
-    api.patch<User>("/auth/me", data),
+  updateMe: (data: {
+    nickname?: string;
+    avatar_url?: string;
+    bio?: string;
+    password?: string;
+    confirm_password?: string;
+  }) => api.patch<User>("/auth/me", data),
   verifyEmail: (token: string) =>
     api.post<{ message: string }>("/auth/verify-email", { token }),
   resendVerification: () =>
@@ -102,6 +109,10 @@ export interface Article {
   content: string;
   access_state: "private" | "link" | "public" | "blocked";
   slug: string;
+  view_count: number;
+  like_count: number;
+  comment_count: number;
+  liked_by_user: boolean;
   created_at: string;
   updated_at: string;
   author_nickname?: string;
@@ -113,6 +124,9 @@ export interface ArticleListItem {
   access_state: string;
   slug: string;
   author_nickname: string;
+  view_count: number;
+  like_count: number;
+  comment_count: number;
   created_at: string;
   updated_at: string;
   my_roles?: string[] | null;
@@ -155,6 +169,46 @@ export const articlesApi = {
     api.post<{ message: string }>(`/articles/${id}/moderate`, { action }),
 };
 
+// ── Comments ──
+
+export interface Comment {
+  id: number;
+  article_id: number;
+  user_id: number;
+  author_nickname: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export const commentsApi = {
+  list: (articleId: number, sort: "newest" | "oldest" = "newest", page = 1, size = 20) =>
+    getPaged<Comment>(`/articles/${articleId}/comments?sort=${sort}&page=${page}&size=${size}`),
+  create: (articleId: number, content: string) =>
+    api.post<Comment>(`/articles/${articleId}/comments`, { content }),
+  update: (commentId: number, content: string) =>
+    api.patch<Comment>(`/comments/${commentId}`, { content }),
+  delete: (commentId: number) => api.delete<void>(`/comments/${commentId}`),
+};
+
+// ── Stats ──
+
+export interface LikeResponse {
+  liked: boolean;
+  count: number;
+}
+
+export interface ViewResponse {
+  count: number;
+}
+
+export const statsApi = {
+  view: (articleId: number) => api.post<ViewResponse>(`/articles/${articleId}/view`),
+  getViews: (articleId: number) => api.get<ViewResponse>(`/articles/${articleId}/views`),
+  like: (articleId: number) => api.post<LikeResponse>(`/articles/${articleId}/like`),
+  getLikes: (articleId: number) => api.get<LikeResponse>(`/articles/${articleId}/likes`),
+};
+
 // ── Users ──
 
 export interface UserSuggestion {
@@ -162,9 +216,30 @@ export interface UserSuggestion {
   nickname: string;
 }
 
+export interface UserProfile {
+  id: number;
+  nickname: string;
+  avatar_url: string | null;
+  bio: string | null;
+  role: string;
+  article_count: number;
+  total_views: number;
+  total_likes: number;
+  created_at: string;
+}
+
 export const usersApi = {
   search: (q: string, limit = 10) =>
     api.get<UserSuggestion[]>(`/users?q=${encodeURIComponent(q)}&limit=${limit}`),
+  getProfile: (nickname: string) => api.get<UserProfile>(`/users/${nickname}`),
+  getProfileArticles: (nickname: string, page = 1, size = 20) =>
+    getPaged<ArticleListItem>(`/users/${nickname}/articles?page=${page}&size=${size}`),
+  uploadAvatar: async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await rawRequest("/users/avatar", { method: "POST", body: formData });
+    return res.json();
+  },
 };
 
 // ── Collaboration ──

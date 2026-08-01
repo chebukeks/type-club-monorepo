@@ -9,8 +9,10 @@ import { dropCursor } from "prosemirror-dropcursor";
 import { gapCursor } from "prosemirror-gapcursor";
 import { columnResizing, tableEditing, goToNextCell } from "prosemirror-tables";
 import { keymap } from "prosemirror-keymap";
+import { prosemirrorToYXmlFragment, yXmlFragmentToProsemirrorJSON } from "y-prosemirror";
 
 import { parseMarkdown, serializeMarkdown } from "./editor/markdownConfig";
+import { schema } from "./editor/schema";
 import { getKeymapPlugins } from "./editor/keymap";
 import { getInputRulesPlugin } from "./editor/inputRules";
 import { seamlessPlugin } from "./editor/seamlessPlugin";
@@ -108,6 +110,9 @@ export function EditorCore({
   const focusModeRef = useRef(focusMode);
   focusModeRef.current = focusMode;
 
+  const collaborationRef = useRef(collaboration);
+  collaborationRef.current = collaboration;
+
   const docScale = documentZoom / 100;
 
   useEffect(() => {
@@ -203,7 +208,6 @@ export function EditorCore({
 
     return () => {
       view.dispatch = () => {}
-      collaboration?.destroy()
       view.destroy();
       viewRef.current = null;
     };
@@ -235,6 +239,47 @@ export function EditorCore({
     }
   }, [editorMode]);
 
+  // ── Raw-mode buffer for collaboration ──
+  const rawBufferRef = useRef<string | null>(null);
+  const prevModeRef = useRef(editorMode);
+
+  useEffect(() => {
+    const prevMode = prevModeRef.current;
+    prevModeRef.current = editorMode;
+    const collab = collaborationRef.current;
+
+    // Entering raw mode while collaboration is active:
+    // serialize the current Yjs document to markdown for the textarea.
+    if (editorMode === 'raw' && collab) {
+      const fragment = collab.yXmlFragment;
+      const json = yXmlFragmentToProsemirrorJSON(fragment);
+      const doc = schema.nodeFromJSON(json);
+      const md = serializeMarkdown(doc);
+      rawBufferRef.current = md;
+      lastEmittedRef.current = md;
+      onChangeRef.current(md);
+    }
+
+    // Leaving raw mode back to seamless/preview while collaboration is active:
+    // apply the buffered textarea edits back into the Yjs document.
+    if (prevMode === 'raw' && editorMode !== 'raw' && collab && rawBufferRef.current !== null) {
+      const fragment = collab.yXmlFragment;
+      const ydoc = fragment.doc;
+      if (ydoc) {
+        ydoc.transact(() => {
+          // Clear the existing Yjs fragment
+          while (fragment.length > 0) {
+            fragment.delete(0, 1);
+          }
+          // Parse the edited markdown and populate the fragment
+          const newDoc = parseMarkdown(rawBufferRef.current!);
+          prosemirrorToYXmlFragment(newDoc, fragment);
+        });
+      }
+      rawBufferRef.current = null;
+    }
+  }, [editorMode]);
+
   if (editorMode === "raw") {
     return (
       <div className="flex-1 h-full flex flex-col overflow-auto bg-[var(--bg-base)]" style={containerStyle}>
@@ -250,8 +295,13 @@ export function EditorCore({
             display: "block",
             tabSize: 2,
           }}
-          value={content}
-          onChange={(e) => onChange(e.target.value)}
+          value={collaboration ? (rawBufferRef.current ?? content) : content}
+          onChange={(e) => {
+            if (collaboration) {
+              rawBufferRef.current = e.target.value;
+            }
+            onChange(e.target.value);
+          }}
           spellCheck={false}
           readOnly={readOnly}
         />

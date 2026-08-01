@@ -44,6 +44,8 @@ class UserResponse(BaseModel):
     email: str
     email_verified: bool
     role: str
+    avatar_url: Optional[str] = None
+    bio: Optional[str] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -51,6 +53,8 @@ class UserResponse(BaseModel):
 
 class UpdateProfileRequest(BaseModel):
     nickname: Optional[str] = None
+    avatar_url: Optional[str] = None
+    bio: Optional[str] = None
     old_password: Optional[str] = None
     password: Optional[str] = None
     confirm_password: Optional[str] = None
@@ -123,6 +127,10 @@ class ArticleResponse(BaseModel):
     content: str
     access_state: str
     slug: str
+    view_count: int = 0
+    like_count: int = 0
+    comment_count: int = 0
+    liked_by_user: bool = False
     created_at: datetime
     updated_at: datetime
     author_nickname: Optional[str] = None
@@ -136,6 +144,9 @@ class ArticleListItem(BaseModel):
     access_state: str
     slug: str
     author_nickname: str
+    view_count: int = 0
+    like_count: int = 0
+    comment_count: int = 0
     created_at: datetime
     updated_at: datetime
     my_roles: Optional[list[str]] = None
@@ -165,6 +176,77 @@ class ModerateRequest(BaseModel):
 
 class ModerateResponse(BaseModel):
     message: str
+
+
+# ── Comments ──
+
+class CommentCreateRequest(BaseModel):
+    content: str
+
+    @field_validator("content")
+    @classmethod
+    def content_not_empty(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Comment cannot be empty")
+        if len(v) > 5000:
+            raise ValueError("Comment is too long (max 5000 characters)")
+        return v
+
+
+class CommentUpdateRequest(BaseModel):
+    content: str
+
+    @field_validator("content")
+    @classmethod
+    def content_not_empty(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Comment cannot be empty")
+        if len(v) > 5000:
+            raise ValueError("Comment is too long (max 5000 characters)")
+        return v
+
+
+class CommentResponse(BaseModel):
+    id: int
+    article_id: int
+    user_id: int
+    author_nickname: str
+    content: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ── Likes ──
+
+class LikeResponse(BaseModel):
+    liked: bool
+    count: int
+
+
+# ── Views ──
+
+class ViewResponse(BaseModel):
+    count: int
+
+
+# ── User Profile ──
+
+class UserProfileResponse(BaseModel):
+    id: int
+    nickname: str
+    avatar_url: Optional[str] = None
+    bio: Optional[str] = None
+    role: str
+    article_count: int = 0
+    total_views: int = 0
+    total_likes: int = 0
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 # ── Collaboration ──

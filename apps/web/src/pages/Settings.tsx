@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useRef } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { authApi } from "../api";
+import { authApi, usersApi } from "../api";
 
 function nickError(n: string): string | null {
   const t = n.trim();
@@ -18,9 +18,13 @@ function passError(p: string): string | null {
   return null;
 }
 
-export default function Profile() {
+export default function Settings() {
   const { user, refresh } = useAuth();
+  const navigate = useNavigate();
   const [nickname, setNickname] = useState(user?.nickname || "");
+  const [bio, setBio] = useState(user?.bio || "");
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url || "");
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [oldPassword, setOldPassword] = useState("");
   const [password, setPassword] = useState("");
@@ -29,13 +33,18 @@ export default function Profile() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!user) return null;
 
   const ne = nickError(nickname);
   const pe = showPassword ? passError(password) : null;
   const ce = showPassword && password && password !== confirm ? "Passwords do not match" : null;
-  const canSubmit = !ne && !pe && !ce && (nickname !== user.nickname || (showPassword && password));
+  const canSubmit =
+    !ne &&
+    !pe &&
+    !ce &&
+    (nickname !== user.nickname || bio !== (user.bio || "") || avatarUrl !== (user.avatar_url || "") || (showPassword && password));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,6 +55,8 @@ export default function Profile() {
     try {
       const data: any = {};
       if (nickname.trim() !== user.nickname) data.nickname = nickname.trim();
+      if (bio.trim() !== (user.bio || "")) data.bio = bio.trim();
+      if (avatarUrl !== (user.avatar_url || "")) data.avatar_url = avatarUrl;
       if (showPassword && password) {
         data.old_password = oldPassword;
         data.password = password;
@@ -65,6 +76,21 @@ export default function Profile() {
     }
   };
 
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarUploading(true);
+    setError("");
+    try {
+      const result = await usersApi.uploadAvatar(file);
+      setAvatarUrl(result.avatar_url);
+    } catch (err: any) {
+      setError(err.message || "Upload failed");
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
   const handleResend = async () => {
     setResending(true);
     setMsg("");
@@ -80,11 +106,52 @@ export default function Profile() {
   };
 
   return (
-    <div className="max-w-md mx-auto px-4 py-20">
-      <h1 className="text-3xl font-bold mb-8 text-center">Profile</h1>
+    <div className="max-w-md mx-auto px-4 py-12">
+      <div className="flex items-center gap-2 mb-8">
+        <button
+          onClick={() => navigate(`/${user.nickname}`)}
+          className="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+        >
+          &larr; Back to profile
+        </button>
+        <h1 className="text-2xl font-bold">Settings</h1>
+      </div>
+
       <form onSubmit={handleSubmit} className="space-y-4">
         {msg && <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950 text-green-600 text-sm">{msg}</div>}
         {error && <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950 text-red-600 text-sm">{error}</div>}
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Avatar</label>
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden flex-shrink-0">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray-400 text-xl font-bold">
+                  {user.nickname[0].toUpperCase()}
+                </div>
+              )}
+            </div>
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleAvatarUpload}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={avatarUploading}
+                className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+              >
+                {avatarUploading ? "Uploading..." : "Upload new"}
+              </button>
+            </div>
+          </div>
+        </div>
 
         <div>
           <label className="block text-sm font-medium mb-1">Nickname</label>
@@ -100,11 +167,24 @@ export default function Profile() {
         </div>
 
         <div>
+          <label className="block text-sm font-medium mb-1">Bio</label>
+          <textarea
+            value={bio}
+            onChange={(e) => setBio(e.target.value)}
+            rows={3}
+            maxLength={1000}
+            placeholder="Tell readers about yourself..."
+            className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+          />
+          <p className="text-xs text-gray-400 mt-1">{bio.length}/1000</p>
+        </div>
+
+        <div>
           <label className="block text-sm font-medium mb-1">Email</label>
           <input type="email" value={user.email} disabled
             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 text-gray-400 cursor-not-allowed" />
           <p className="text-xs text-gray-400 mt-1">
-            {user.email_verified ? "✓ Verified" : "Email not verified"}
+            {user.email_verified ? "Verified" : "Email not verified"}
           </p>
           {!user.email_verified && (
             <button

@@ -55,3 +55,7 @@ credentials*
 
 # Electron
 *.blockmap
+
+# Uploads
+uploads/
+backend/uploads/

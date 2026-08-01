@@ -39,5 +39,9 @@ class Settings(BaseSettings):
     # Internal: shared secret for collab-server ↔ backend
     service_token: str = ""
 
+    # Uploads
+    uploads_dir: str = "uploads"
+    max_avatar_size: int = 2 * 1024 * 1024  # 2 MB
+
 
 settings = Settings()

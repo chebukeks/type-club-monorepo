@@ -153,6 +153,14 @@ async def update_me(
             raise HTTPException(status_code=409, detail="Nickname already taken")
         current_user.nickname = data.nickname
 
+    if data.avatar_url is not None:
+        current_user.avatar_url = data.avatar_url
+
+    if data.bio is not None:
+        if len(data.bio) > 1000:
+            raise HTTPException(status_code=400, detail="Bio is too long (max 1000 characters)")
+        current_user.bio = data.bio
+
     if data.password is not None:
         if not data.old_password or not verify_password(data.old_password, current_user.password_hash):
             raise HTTPException(status_code=403, detail="Current password is incorrect")

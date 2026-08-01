@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -18,9 +18,13 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     email_verified: Mapped[bool] = mapped_column(default=False)
     role: Mapped[str] = mapped_column(String(20), nullable=False, default="user", server_default="user")
+    avatar_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    bio: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     articles: Mapped[list["Article"]] = relationship(back_populates="author", lazy="selectin")
+    likes: Mapped[list["ArticleLike"]] = relationship(back_populates="user", lazy="selectin", cascade="all, delete-orphan")
+    comments: Mapped[list["Comment"]] = relationship(back_populates="user", lazy="selectin", cascade="all, delete-orphan")
 
 
 class Article(Base):
@@ -43,6 +47,9 @@ class Article(Base):
     collaborators: Mapped[list["CollaborationMember"]] = relationship(
         back_populates="article", lazy="selectin", cascade="all, delete-orphan"
     )
+    views: Mapped[list["ArticleView"]] = relationship(back_populates="article", lazy="selectin", cascade="all, delete-orphan")
+    likes: Mapped[list["ArticleLike"]] = relationship(back_populates="article", lazy="selectin", cascade="all, delete-orphan")
+    comments: Mapped[list["Comment"]] = relationship(back_populates="article", lazy="selectin", cascade="all, delete-orphan")
 
 
 class CollaborationMember(Base):
@@ -73,3 +80,54 @@ class VerificationToken(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ArticleView(Base):
+    __tablename__ = "article_views"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    article_id: Mapped[int] = mapped_column(
+        ForeignKey("typeclub_articles.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    viewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    article: Mapped["Article"] = relationship(back_populates="views")
+
+
+class ArticleLike(Base):
+    __tablename__ = "article_likes"
+    __table_args__ = (
+        UniqueConstraint("article_id", "user_id", name="uq_article_like"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    article_id: Mapped[int] = mapped_column(
+        ForeignKey("typeclub_articles.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("typeclub_users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    article: Mapped["Article"] = relationship(back_populates="likes")
+    user: Mapped["User"] = relationship(back_populates="likes")
+
+
+class Comment(Base):
+    __tablename__ = "comments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    article_id: Mapped[int] = mapped_column(
+        ForeignKey("typeclub_articles.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("typeclub_users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    article: Mapped["Article"] = relationship(back_populates="comments")
+    user: Mapped["User"] = relationship(back_populates="comments")
