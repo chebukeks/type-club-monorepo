@@ -4,7 +4,8 @@
 import { keymap } from 'prosemirror-keymap'
 import { toggleMark, wrapIn, chainCommands } from 'prosemirror-commands'
 import { baseKeymap } from 'prosemirror-commands'
-import { undo, redo } from 'prosemirror-history'
+import { undo as pmUndo, redo as pmRedo } from 'prosemirror-history'
+import { undo as yUndo, redo as yRedo } from 'y-prosemirror'
 import { splitListItem, sinkListItem, liftListItem } from 'prosemirror-schema-list'
 import { addRowAfter, deleteRow, CellSelection } from 'prosemirror-tables'
 import { Command, TextSelection } from 'prosemirror-state'
@@ -497,9 +498,9 @@ const customKeymap = keymap({
   'Shift-Tab': liftListItem(schema.nodes.list_item),
 
   // Undo/Redo
-  'Mod-z': undo,
-  'Mod-Shift-z': redo,
-  'Mod-y': redo,
+  'Mod-z': chainCommands(pmUndo, yUndo),
+  'Mod-Shift-z': chainCommands(pmRedo, yRedo),
+  'Mod-y': chainCommands(pmRedo, yRedo),
 })
 
 // Команда: оборачивание выделенного текста в пару скобок/кавычек (#38)
