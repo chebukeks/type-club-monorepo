@@ -413,6 +413,11 @@ export const markdownSerializer = new MarkdownSerializer(
       state.write('$$\n' + node.textContent.trim() + '\n$$')
       state.closeBlock(node)
     },
+    suggestion_note(state, node) {
+      const a = node.attrs
+      const attrStr = `data-note-id="${a.noteId || ''}" data-sug-author-id="${a.sugAuthorId || 0}" data-sug-author-name="${a.sugAuthorName || ''}" data-sug-color="${a.sugColor || '#f59e0b'}" data-note-text="${(a.noteText || '').replace(/"/g, '&quot;')}" data-sug-created-at="${a.sugCreatedAt || ''}"`
+      state.write(`<span class="suggestion-note" ${attrStr}>💬</span>`)
+    },
     image(state, node) {
       let cached = imageSerializeCache.get(node)
       if (!cached) {
@@ -470,6 +475,20 @@ export const markdownSerializer = new MarkdownSerializer(
       close: '||',
       mixable: true,
       expelEnclosingWhitespace: true,
+    },
+    suggestion_insert: {
+      open(_state, mark) {
+        const a = mark.attrs
+        return `<span class="suggestion-insert" data-od-id="${a.odId || ''}" data-sug-author-id="${a.sugAuthorId || 0}" data-sug-author-name="${a.sugAuthorName || ''}" data-sug-created-at="${a.sugCreatedAt || ''}" style="--sug-color: ${a.sugColor || '#3b82f6'}">`
+      },
+      close: '</span>',
+    },
+    suggestion_delete: {
+      open(_state, mark) {
+        const a = mark.attrs
+        return `<span class="suggestion-delete" data-od-id="${a.odId || ''}" data-sug-author-id="${a.sugAuthorId || 0}" data-sug-author-name="${a.sugAuthorName || ''}" data-sug-created-at="${a.sugCreatedAt || ''}" style="--sug-color: ${a.sugColor || '#ef4444'}">`
+      },
+      close: '</span>',
     },
   }
 )
