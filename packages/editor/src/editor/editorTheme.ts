@@ -30,6 +30,11 @@ export function getEditorStyles(): string {
   padding-bottom: 70vh;
 }
 
+.ProseMirror.preview-mode {
+  padding-top: 24px;
+  padding-bottom: 24px;
+}
+
 .ProseMirror.is-over-limit {
   caret-color: #ec404eff;
 }
