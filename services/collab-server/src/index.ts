@@ -311,6 +311,51 @@ wss.on("connection", async (ws, req) => {
     return
   }
 
+  // Buffer messages immediately so that incoming client frames (like initial syncStep1)
+  // are captured even while authentication and document initialization are in flight.
+  let initialized = false
+  const pending: Uint8Array[] = []
+  let docState: DocState | null = null
+
+  heartbeat(ws)
+
+  ws.on("message", (data) => {
+    try {
+      const uint8 = new Uint8Array(
+        data instanceof Buffer ? data : Buffer.from(data as ArrayBuffer),
+      )
+      if (!initialized || !docState) {
+        pending.push(uint8)
+        return
+      }
+      handleMessage(docState, ws, uint8)
+    } catch (err) {
+      console.error("[ws] message error:", err)
+    }
+  })
+
+  ws.on("close", (code, reason) => {
+    if (docState) {
+      docState.clients.delete(ws)
+      console.log(`[ws] disconnect article=${articleId} clients=${docState.clients.size} code=${code} reason=${reason}`)
+      if (docState.clients.size === 0) {
+        void flush(docState)
+        docState.destroyTimer = setTimeout(() => {
+          if (docState && docState.clients.size === 0) {
+            states.delete(articleId)
+            docState.doc.destroy()
+          }
+        }, DOC_TTL_MS)
+      }
+    } else {
+      console.log(`[ws] disconnect before auth article=${articleId} code=${code} reason=${reason}`)
+    }
+  })
+
+  ws.on("error", (err) => {
+    console.error(`[ws] error article=${articleId}:`, err.message)
+  })
+
   // Verify JWT token & user role against backend
   let verifiedUserId = 0
   let verifiedNickname = ""
@@ -347,6 +392,7 @@ wss.on("connection", async (ws, req) => {
   }
 
   const state = getOrCreateDoc(articleId)
+  docState = state
   if (state.destroyTimer) {
     clearTimeout(state.destroyTimer)
     state.destroyTimer = null
@@ -360,45 +406,6 @@ wss.on("connection", async (ws, req) => {
     userId: verifiedUserId,
     nickname: verifiedNickname,
     role: verifiedRole,
-  })
-  heartbeat(ws)
-
-  // Buffer messages until the doc is seeded, so the client's initial
-  // syncStep1 is never dropped while we fetch content from the backend.
-  let initialized = false
-  const pending: Uint8Array[] = []
-
-  ws.on("message", (data) => {
-    try {
-      const uint8 = new Uint8Array(
-        data instanceof Buffer ? data : Buffer.from(data as ArrayBuffer),
-      )
-      if (!initialized) {
-        pending.push(uint8)
-        return
-      }
-      handleMessage(state, ws, uint8)
-    } catch (err) {
-      console.error("[ws] message error:", err)
-    }
-  })
-
-  ws.on("close", (code, reason) => {
-    state.clients.delete(ws)
-    console.log(`[ws] disconnect article=${articleId} clients=${state.clients.size} code=${code} reason=${reason}`)
-    if (state.clients.size === 0) {
-      void flush(state)
-      state.destroyTimer = setTimeout(() => {
-        if (state.clients.size === 0) {
-          states.delete(articleId)
-          state.doc.destroy()
-        }
-      }, DOC_TTL_MS)
-    }
-  })
-
-  ws.on("error", (err) => {
-    console.error(`[ws] error article=${articleId}:`, err.message)
   })
 
   await state.initPromise

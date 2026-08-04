@@ -37,42 +37,131 @@ export function getEditorStyles(): string {
 
 /* ==========================================
    Suggestion Mode Styles
+/* ==========================================
+   Режим предложений (Suggestion Mode)
    ========================================== */
 
 .suggestion-insert {
+  background-color: rgba(59, 130, 246, 0.15);
   color: var(--sug-color, #3b82f6);
-  text-decoration: underline;
-  text-decoration-color: var(--sug-color, #3b82f6);
-  text-underline-offset: 3px;
+  border-bottom: 2px solid var(--sug-color, #3b82f6);
+  text-decoration: none;
+  padding: 1px 2px;
   border-radius: 2px;
 }
 
 .suggestion-delete {
+  background-color: rgba(239, 68, 68, 0.15);
   color: var(--sug-color, #ef4444);
   text-decoration: line-through;
   text-decoration-color: var(--sug-color, #ef4444);
-  opacity: 0.75;
+  padding: 1px 2px;
+  border-radius: 2px;
+  opacity: 0.8;
 }
 
-.suggestion-note {
+.suggestion-note,
+.suggestion-note-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
-  background: var(--sug-color, #f59e0b);
-  color: #ffffff;
+  width: 20px;
+  height: 20px;
+  background: #fef3c7;
+  color: #d97706;
+  border: 1px solid #fde68a;
   border-radius: 50%;
-  font-size: 10px;
-  margin: 0 3px;
+  margin: 0 4px;
   vertical-align: middle;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-  transition: transform 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.suggestion-note:hover {
+.dark .suggestion-note,
+.dark .suggestion-note-badge {
+  background: rgba(120, 53, 15, 0.4);
+  color: #fbbf24;
+  border-color: rgba(180, 83, 9, 0.5);
+}
+
+.suggestion-note:hover,
+.suggestion-note-badge:hover {
   transform: scale(1.15);
+  background: #fde68a;
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.25);
+}
+
+/* Custom Speech Bubble Popover for Notes */
+.suggestion-note-bubble {
+  position: fixed;
+  z-index: 99999;
+  display: none;
+  background: var(--bg-elevated, #ffffff);
+  color: var(--text-primary, #111827);
+  border: 1px solid var(--border-default, #e5e7eb);
+  border-radius: 12px;
+  padding: 8px 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+  max-width: 280px;
+  min-width: 180px;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  animation: fadeInPop 0.12s ease-out;
+}
+
+.dark .suggestion-note-bubble {
+  background: #1f2937;
+  color: #f9fafb;
+  border-color: #374151;
+}
+
+.suggestion-note-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-subtle, #f3f4f6);
+}
+
+.dark .suggestion-note-header {
+  border-bottom-color: #374151;
+}
+
+.suggestion-note-author {
+  font-size: 11px;
+  font-weight: 600;
+  color: #d97706;
+}
+
+.dark .suggestion-note-author {
+  color: #fbbf24;
+}
+
+.suggestion-note-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border-radius: 4px;
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.suggestion-note-delete-btn:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.suggestion-note-text {
+  font-size: 12px;
+  line-height: 1.45;
+  color: inherit;
+  word-break: break-word;
 }
 
 figure[data-sug-delete] {
@@ -97,54 +186,112 @@ figure[data-sug-delete]::after {
 }
 
 .suggestion-action-popup {
-  position: absolute;
-  z-index: 1000;
+  position: fixed;
+  z-index: 99999;
   display: flex;
   align-items: center;
-  gap: 4px;
-  background: var(--tooltip-bg, #ffffff);
+  gap: 6px;
+  background: var(--bg-elevated, #ffffff);
   border: 1px solid var(--border-default, #e5e7eb);
-  border-radius: 8px;
-  padding: 4px 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  font-family: inherit;
+  border-radius: 10px;
+  padding: 5px 8px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   font-size: 12px;
+  user-select: none;
+  animation: fadeInPop 0.12s ease-out;
+}
+
+.dark .suggestion-action-popup {
+  background: #1f2937;
+  border-color: #374151;
+}
+
+@keyframes fadeInPop {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.suggestion-action-info {
+  color: var(--text-muted, #6b7280);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+.dark .suggestion-action-info {
+  color: #9ca3af;
 }
 
 .suggestion-action-btn {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
+  gap: 4px;
+  padding: 4px 10px;
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  font-weight: bold;
-  transition: background 0.15s ease;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
 .suggestion-action-btn.accept {
-  background: #dcfce7;
-  color: #166534;
+  background: #2563eb;
+  color: #ffffff;
 }
 .suggestion-action-btn.accept:hover {
-  background: #bbf7d0;
+  background: #1d4ed8;
 }
 
 .suggestion-action-btn.reject {
-  background: #fee2e2;
-  color: #991b1b;
+  background: #f3f4f6;
+  color: #374151;
+}
+.dark .suggestion-action-btn.reject {
+  background: #374151;
+  color: #e5e7eb;
 }
 .suggestion-action-btn.reject:hover {
-  background: #fca5a5;
+  background: #e5e7eb;
+}
+.dark .suggestion-action-btn.reject:hover {
+  background: #4b5563;
 }
 
+/* ==========================================
+   Preview Mode / Reader View
+   - Unaccepted insertions are completely HIDDEN from reader
+   - Unaccepted deletions are rendered as NORMAL UNTOUCHED TEXT
+   - Suggestion notes are completely HIDDEN from reader
+   ========================================== */
 .ProseMirror.preview-mode .suggestion-insert,
-.ProseMirror.preview-mode .suggestion-delete,
-.ProseMirror.preview-mode .suggestion-note,
-.ProseMirror.preview-mode figure[data-sug-delete]::after {
+.preview-mode .suggestion-insert {
   display: none !important;
+}
+
+.ProseMirror.preview-mode .suggestion-delete,
+.preview-mode .suggestion-delete {
+  color: inherit !important;
+  text-decoration: none !important;
+  background: transparent !important;
+  opacity: 1 !important;
+  padding: 0 !important;
+}
+
+.ProseMirror.preview-mode .suggestion-note,
+.preview-mode .suggestion-note,
+.ProseMirror.preview-mode figure[data-sug-delete]::after,
+.preview-mode figure[data-sug-delete]::after {
+  display: none !important;
+}
+
+.ProseMirror.preview-mode figure[data-sug-delete],
+.preview-mode figure[data-sug-delete] {
+  outline: none !important;
+  opacity: 1 !important;
 }
 
 .ProseMirror.is-over-limit {

@@ -147,8 +147,123 @@ function spoilerInlinePlugin(md: MarkdownIt) {
 // Парсер: Markdown → ProseMirror doc
 // ============================================================
 
+// Кастомный плагин для парсинга suggestion HTML spans.
+// Превращает html_inline токены вида <span class="suggestion-insert|delete|note" ...>
+// в пары suggestion_insert_open/close (и т.д.), чтобы MarkdownParser мог их обработать.
+function suggestionHtmlPlugin(md: MarkdownIt) {
+  md.core.ruler.after('inline', 'suggestion_html', (state: any) => {
+    for (let i = 0; i < state.tokens.length; i++) {
+      if (state.tokens[i].type !== 'inline' || !state.tokens[i].children) continue
+
+      const children = state.tokens[i].children as any[]
+      const newChildren: any[] = []
+      const openSuggestionStack: string[] = []
+
+      for (let j = 0; j < children.length; j++) {
+        const tok = children[j]
+
+        if (tok.type !== 'html_inline') {
+          newChildren.push(tok)
+          continue
+        }
+
+        const content = tok.content as string
+
+        // --- suggestion_note (self-closing atom node) ---
+        const noteMatch = content.match(/^<span\s+class="suggestion-note"([^>]*)>(.*)$/)
+        if (noteMatch) {
+          const attrStr = noteMatch[1]
+          const rest = noteMatch[2]
+          const noteTok = new state.Token('suggestion_note', 'span', 0)
+          noteTok.attrs = [
+            ['noteId', extractAttr(attrStr, 'data-note-id')],
+            ['sugAuthorId', extractAttr(attrStr, 'data-sug-author-id')],
+            ['sugAuthorName', extractAttr(attrStr, 'data-sug-author-name')],
+            ['sugColor', extractAttr(attrStr, 'data-sug-color')],
+            ['noteText', extractAttr(attrStr, 'data-note-text')],
+            ['sugCreatedAt', extractAttr(attrStr, 'data-sug-created-at')],
+          ]
+          newChildren.push(noteTok)
+
+          // If the rest of this token didn't contain </span>, advance j until closing </span> is consumed
+          if (!rest.includes('</span>')) {
+            while (j + 1 < children.length) {
+              j++
+              const nextTok = children[j]
+              if (nextTok.type === 'html_inline' && nextTok.content.includes('</span>')) {
+                break
+              }
+            }
+          }
+          continue
+        }
+
+        // --- suggestion_insert open ---
+        const insertOpenMatch = content.match(/^<span\s+class="suggestion-insert"([^>]*)>$/)
+        if (insertOpenMatch) {
+          const attrStr = insertOpenMatch[1]
+          const insTok = new state.Token('suggestion_insert_open', 'span', 1)
+          insTok.attrs = [
+            ['odId', extractAttr(attrStr, 'data-od-id')],
+            ['sugAuthorId', extractAttr(attrStr, 'data-sug-author-id')],
+            ['sugAuthorName', extractAttr(attrStr, 'data-sug-author-name')],
+            ['sugCreatedAt', extractAttr(attrStr, 'data-sug-created-at')],
+            ['sugColor', extractStyleVar(attrStr, '--sug-color') || extractAttr(attrStr, 'data-sug-color')],
+          ]
+          newChildren.push(insTok)
+          openSuggestionStack.push('suggestion_insert')
+          continue
+        }
+
+        // --- suggestion_delete open ---
+        const deleteOpenMatch = content.match(/^<span\s+class="suggestion-delete"([^>]*)>$/)
+        if (deleteOpenMatch) {
+          const attrStr = deleteOpenMatch[1]
+          const delTok = new state.Token('suggestion_delete_open', 'span', 1)
+          delTok.attrs = [
+            ['odId', extractAttr(attrStr, 'data-od-id')],
+            ['sugAuthorId', extractAttr(attrStr, 'data-sug-author-id')],
+            ['sugAuthorName', extractAttr(attrStr, 'data-sug-author-name')],
+            ['sugCreatedAt', extractAttr(attrStr, 'data-sug-created-at')],
+            ['sugColor', extractStyleVar(attrStr, '--sug-color') || extractAttr(attrStr, 'data-sug-color')],
+          ]
+          newChildren.push(delTok)
+          openSuggestionStack.push('suggestion_delete')
+          continue
+        }
+
+        // --- closing </span> for suggestion_insert or suggestion_delete ---
+        if (content.trim() === '</span>' && openSuggestionStack.length > 0) {
+          const top = openSuggestionStack.pop()
+          const matchType = top === 'suggestion_insert' ? 'suggestion_insert_close' : 'suggestion_delete_close'
+          const closeTok = new state.Token(matchType, 'span', -1)
+          newChildren.push(closeTok)
+          continue
+        }
+
+        // Not a suggestion span — keep as is
+        newChildren.push(tok)
+      }
+
+      state.tokens[i].children = newChildren
+    }
+  })
+}
+
+function extractAttr(str: string, name: string): string {
+  const re = new RegExp(`${name}="([^"]*)"`, 'i')
+  const m = str.match(re)
+  return m ? m[1].replace(/&quot;/g, '"') : ''
+}
+
+function extractStyleVar(str: string, varName: string): string {
+  const re = new RegExp(`${varName.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}:\s*([^;"]+)`, 'i')
+  const m = str.match(re)
+  return m ? m[1].trim() : ''
+}
+
 // Создаём markdown-it экземпляр с поддержкой таблиц, strikethrough, mark и нашего taskListPlugin
-const md = new MarkdownIt('default', { html: false })
+const md = new MarkdownIt('default', { html: true })
   .enable('table')
   .enable('strikethrough')
   .use(markPlugin)
@@ -156,11 +271,27 @@ const md = new MarkdownIt('default', { html: false })
   .use(texmath, { engine: katex, delimiters: 'dollars' })
   .use(texmathFixPlugin)
   .use(spoilerInlinePlugin)
+  .use(suggestionHtmlPlugin)
 
 /**
  * Парсер.
  * Маппинг markdown-it токенов → ProseMirror nodes/marks.
  */
+function getTokenAttr(tok: any, name: string): string {
+  if (!tok) return ''
+  if (typeof tok.attrGet === 'function') {
+    return tok.attrGet(name) || ''
+  }
+  if (Array.isArray(tok.attrs)) {
+    const found = tok.attrs.find((pair: any) => pair[0] === name)
+    return found ? String(found[1] ?? '') : ''
+  }
+  if (tok.attrs && typeof tok.attrs === 'object') {
+    return String(tok.attrs[name] ?? '')
+  }
+  return ''
+}
+
 export const markdownParser = new MarkdownParser(schema, md, {
   // Блочные ноды
   blockquote: { block: 'blockquote' },
@@ -174,11 +305,11 @@ export const markdownParser = new MarkdownParser(schema, md, {
 
   // Списки
   bullet_list: { block: 'bullet_list' },
-  ordered_list: { block: 'ordered_list', getAttrs: tok => ({ order: Number(tok.attrGet('start')) || 1 }) },
+  ordered_list: { block: 'ordered_list', getAttrs: tok => ({ order: Number(getTokenAttr(tok, 'start')) || 1 }) },
   list_item: { 
     block: 'list_item',
     getAttrs: (tok) => {
-      const checked = tok.attrGet('checked')
+      const checked = getTokenAttr(tok, 'checked')
       return { checked: checked === 'true' ? true : checked === 'false' ? false : null }
     }
   },
@@ -210,22 +341,38 @@ export const markdownParser = new MarkdownParser(schema, md, {
   image: { 
     node: 'image', 
     getAttrs: tok => ({ 
-      src: tok.attrGet('src'), 
-      alt: tok.children?.[0]?.content || tok.attrGet('alt') || null, 
-      title: tok.attrGet('title') || null 
+      src: getTokenAttr(tok, 'src'), 
+      alt: tok.children?.[0]?.content || getTokenAttr(tok, 'alt') || null, 
+      title: getTokenAttr(tok, 'title') || null 
     }) 
   },
   link: { 
     mark: 'link', 
     getAttrs: tok => ({ 
-      href: tok.attrGet('href'), 
-      title: tok.attrGet('title') || null 
+      href: getTokenAttr(tok, 'href'), 
+      title: getTokenAttr(tok, 'title') || null 
     }) 
   },
   softbreak: { node: 'hard_break' },
   hardbreak: { node: 'hard_break' },
   html_inline: { ignore: true },
   html_block: { ignore: true },
+
+  // Suggestion marks & nodes (parsed from HTML by suggestionHtmlPlugin)
+  suggestion_insert: { mark: 'suggestion_insert', getAttrs: (tok: any) => ({
+    odId: getTokenAttr(tok, 'odId'),
+    sugAuthorId: Number(getTokenAttr(tok, 'sugAuthorId')) || 0,
+    sugAuthorName: getTokenAttr(tok, 'sugAuthorName'),
+    sugColor: getTokenAttr(tok, 'sugColor') || '#3b82f6',
+    sugCreatedAt: getTokenAttr(tok, 'sugCreatedAt'),
+  })},
+  suggestion_delete: { mark: 'suggestion_delete', getAttrs: (tok: any) => ({
+    odId: getTokenAttr(tok, 'odId'),
+    sugAuthorId: Number(getTokenAttr(tok, 'sugAuthorId')) || 0,
+    sugAuthorName: getTokenAttr(tok, 'sugAuthorName'),
+    sugColor: getTokenAttr(tok, 'sugColor') || '#ef4444',
+    sugCreatedAt: getTokenAttr(tok, 'sugCreatedAt'),
+  })},
 })
 
 // Кастомные обработчики для ячеек таблицы
@@ -256,9 +403,9 @@ if (handlers) {
   // Markdown-it помещает image как inline-токен внутри paragraph.
   // Мы закрываем текущий paragraph, вставляем image как блок, и открываем новый paragraph.
   handlers.image = (state: any, tok: any) => {
-    const src = tok.attrGet('src') || ''
-    const alt = tok.children?.[0]?.content || tok.attrGet('alt') || null
-    const title = tok.attrGet('title') || null
+    const src = getTokenAttr(tok, 'src')
+    const alt = tok.children?.[0]?.content || getTokenAttr(tok, 'alt') || null
+    const title = getTokenAttr(tok, 'title') || null
 
     // Закрываем открытый paragraph
     state.closeNode()
@@ -266,6 +413,19 @@ if (handlers) {
     state.addNode(schema.nodes.image, { src, alt, title })
     // Открываем новый paragraph для оставшихся inline-токенов
     state.openNode(schema.nodes.paragraph)
+  }
+
+  // Suggestion note: inline atom node parsed from HTML by suggestionHtmlPlugin.
+  // The token has type 'suggestion_note' with nesting=0 and attrs as key-value pairs.
+  handlers.suggestion_note = (state: any, tok: any) => {
+    state.addNode(schema.nodes.suggestion_note, {
+      noteId: getTokenAttr(tok, 'noteId'),
+      sugAuthorId: Number(getTokenAttr(tok, 'sugAuthorId')) || 0,
+      sugAuthorName: getTokenAttr(tok, 'sugAuthorName'),
+      sugColor: getTokenAttr(tok, 'sugColor') || '#f59e0b',
+      noteText: getTokenAttr(tok, 'noteText'),
+      sugCreatedAt: getTokenAttr(tok, 'sugCreatedAt'),
+    })
   }
 }
 
@@ -416,7 +576,7 @@ export const markdownSerializer = new MarkdownSerializer(
     suggestion_note(state, node) {
       const a = node.attrs
       const attrStr = `data-note-id="${a.noteId || ''}" data-sug-author-id="${a.sugAuthorId || 0}" data-sug-author-name="${a.sugAuthorName || ''}" data-sug-color="${a.sugColor || '#f59e0b'}" data-note-text="${(a.noteText || '').replace(/"/g, '&quot;')}" data-sug-created-at="${a.sugCreatedAt || ''}"`
-      state.write(`<span class="suggestion-note" ${attrStr}>💬</span>`)
+      state.write(`<span class="suggestion-note" ${attrStr}></span>`)
     },
     image(state, node) {
       let cached = imageSerializeCache.get(node)
@@ -518,19 +678,37 @@ function cellText(_state: unknown, cell: PMNode): string {
           text = `[${text}](${href}${title})`
           break
         }
+        case 'suggestion_insert': {
+          const a = mark.attrs
+          text = `<span class="suggestion-insert" data-od-id="${a.odId || ''}" data-sug-author-id="${a.sugAuthorId || 0}" data-sug-author-name="${a.sugAuthorName || ''}" data-sug-created-at="${a.sugCreatedAt || ''}" style="--sug-color: ${a.sugColor || '#3b82f6'}">${text}</span>`
+          break
+        }
+        case 'suggestion_delete': {
+          const a = mark.attrs
+          text = `<span class="suggestion-delete" data-od-id="${a.odId || ''}" data-sug-author-id="${a.sugAuthorId || 0}" data-sug-author-name="${a.sugAuthorName || ''}" data-sug-created-at="${a.sugCreatedAt || ''}" style="--sug-color: ${a.sugColor || '#ef4444'}">${text}</span>`
+          break
+        }
       }
     }
     return text
   }
 
+  function renderInline(node: PMNode) {
+    if (node.isText) {
+      result += applyMarks(node.text || '', node.marks)
+    } else if (node.type.name === 'suggestion_note') {
+      const a = node.attrs
+      const attrStr = `data-note-id="${a.noteId || ''}" data-sug-author-id="${a.sugAuthorId || 0}" data-sug-author-name="${a.sugAuthorName || ''}" data-sug-color="${a.sugColor || '#f59e0b'}" data-note-text="${(a.noteText || '').replace(/"/g, '&quot;')}" data-sug-created-at="${a.sugCreatedAt || ''}"`
+      result += `<span class="suggestion-note" ${attrStr}></span>`
+    }
+  }
+
   cell.forEach(child => {
-    if (child.isText) {
-      result += applyMarks(child.text || '', child.marks)
+    if (child.isText || child.type.name === 'suggestion_note') {
+      renderInline(child)
     } else if (child.type.name === 'paragraph') {
       child.forEach(inline => {
-        if (inline.isText) {
-          result += applyMarks(inline.text || '', inline.marks)
-        }
+        renderInline(inline)
       })
     }
   })
@@ -880,6 +1058,12 @@ export function generateExportHtml(markdown: string, theme: 'dark' | 'light' = '
       padding: 1rem 0;
     }
     .katex { color: var(--math-render); }
+
+    /* Режим предложений (в экспорте скрываем непринятые изменения) */
+    .suggestion-insert { display: none !important; }
+    .suggestion-delete { color: inherit !important; text-decoration: none !important; background: transparent !important; opacity: 1 !important; padding: 0 !important; }
+    .suggestion-note { display: none !important; }
+    figure[data-sug-delete] { display: none !important; }
   </style>
 </head>
 <body>

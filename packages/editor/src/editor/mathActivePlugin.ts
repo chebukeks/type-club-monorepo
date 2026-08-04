@@ -1,6 +1,7 @@
 import { Plugin, PluginKey, NodeSelection, TextSelection } from 'prosemirror-state'
 import { Decoration, DecorationSet } from 'prosemirror-view'
 import katex from 'katex'
+import { suggestionPluginKey } from './suggestionPlugin'
 
 const mathActiveKey = new PluginKey('mathActive')
 
@@ -23,6 +24,9 @@ export const mathActivePlugin = new Plugin({
       return mathActiveKey.getState(state)
     },
     handleClick(view, _pos, event) {
+      const isSuggestion = suggestionPluginKey.getState(view.state)?.active
+      if (isSuggestion) return false
+
       const target = event.target as HTMLElement
       const renderEl = target.closest('.math-inline-render') as HTMLElement
       if (renderEl) {
@@ -48,20 +52,23 @@ export const mathActivePlugin = new Plugin({
 })
 
 function buildDecorations(state: any): DecorationSet {
+  const isSuggestion = suggestionPluginKey.getState(state)?.active
   const decos: Decoration[] = []
   const { selection } = state
 
   let activePos = -1
-  if (selection instanceof NodeSelection) {
-    if (selection.node.type.name.startsWith('math_')) {
-      activePos = selection.from
-    }
-  } else {
-    for (let d = selection.$from.depth; d > 0; d--) {
-      const node = selection.$from.node(d)
-      if (node.type.name.startsWith('math_')) {
-        activePos = selection.$from.before(d)
-        break
+  if (!isSuggestion) {
+    if (selection instanceof NodeSelection) {
+      if (selection.node.type.name.startsWith('math_')) {
+        activePos = selection.from
+      }
+    } else {
+      for (let d = selection.$from.depth; d > 0; d--) {
+        const node = selection.$from.node(d)
+        if (node.type.name.startsWith('math_')) {
+          activePos = selection.$from.before(d)
+          break
+        }
       }
     }
   }

@@ -11,6 +11,7 @@ import { addRowAfter, deleteRow, CellSelection } from 'prosemirror-tables'
 import { Command, TextSelection } from 'prosemirror-state'
 import { schema } from './schema'
 import type { Plugin } from 'prosemirror-state'
+import { suggestionPluginKey } from './suggestionPlugin'
 
 // Команда: выход из блоков кода и таблиц по Esc
 const exitBlockByEsc: Command = (state, dispatch) => {
@@ -506,19 +507,9 @@ const customKeymap = keymap({
   'Mod-q': (state, dispatch) => {
     if (!state.schema.nodes.suggestion_note) return false;
     if (dispatch) {
-      const noteText = prompt("Введите текст примечания:") || "";
-      if (!noteText.trim()) return true;
-
-      const { from } = state.selection;
-      const noteNode = state.schema.nodes.suggestion_note.create({
-        noteId: crypto.randomUUID(),
-        sugAuthorId: 0,
-        sugAuthorName: "Советчик",
-        sugColor: "#f59e0b",
-        noteText: noteText.trim(),
-        sugCreatedAt: new Date().toISOString(),
-      });
-      dispatch(state.tr.insert(from, noteNode));
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("editor-open-add-note-modal"));
+      }
     }
     return true;
   },

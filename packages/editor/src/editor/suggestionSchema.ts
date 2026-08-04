@@ -133,7 +133,6 @@ export const suggestionNoteNode: NodeSpec = {
         style: `--sug-color: ${node.attrs.sugColor}`,
         title: `${node.attrs.sugAuthorName}: ${node.attrs.noteText}`,
       },
-      "💬",
     ];
   },
 };

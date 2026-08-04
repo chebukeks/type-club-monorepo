@@ -25,6 +25,7 @@ export default function Editor() {
   const [showSiteHeader, setShowSiteHeader] = useState(false);
   const [loaded, setLoaded] = useState(id ? false : true);
   const [userRole, setUserRole] = useState<"author" | "co_author" | "editor" | null>(null);
+  const [suggestionModeActive, setSuggestionModeActive] = useState(false);
 
   const { user } = useAuth();
   const collab = useCollaboration(articleId, user ?? null, userRole);
@@ -135,17 +136,25 @@ export default function Editor() {
           title={title}
           setTitle={setTitle}
           editorMode={editorMode}
-          setEditorMode={setEditorMode}
-          autosave={autosave}
-          setAutosave={setAutosave}
-          onSave={handleSave}
-          onPublish={() => setShowPublish(true)}
-          saving={saving}
+          setEditorMode={(m) => {
+            setEditorMode(m);
+            if (m !== "seamless") setSuggestionModeActive(false);
+          }}
+          onPublish={() => {
+            if (userRole === "author" || isNew || !userRole) {
+              setShowPublish(true);
+            }
+          }}
           isNew={isNew}
           onToggleHeader={() => setShowSiteHeader(!showSiteHeader)}
           collabActive={collabActive}
           collabSynced={collab.synced}
           userRole={userRole}
+          suggestionModeActive={suggestionModeActive}
+          onToggleSuggestionMode={(active) => {
+            setSuggestionModeActive(active);
+            if (active) setEditorMode("seamless");
+          }}
         />
       )}
 
@@ -158,6 +167,8 @@ export default function Editor() {
         collaboration={collab.config ?? undefined}
         userRole={userRole}
         userId={user?.id}
+        userNickname={user?.nickname}
+        suggestionModeActive={suggestionModeActive}
       />
 
       {showPublish && (

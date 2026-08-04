@@ -30,6 +30,8 @@ export interface EditorProps {
   collaboration?: CollaborationConfig
   userRole?: 'author' | 'co_author' | 'editor' | null
   userId?: number
+  userNickname?: string
+  suggestionModeActive?: boolean
 }
 
 export type { CollaborationConfig }

@@ -1,5 +1,6 @@
 import { Node as PMNode } from 'prosemirror-model'
 import { EditorView, NodeView } from 'prosemirror-view'
+import { suggestionPluginKey } from './suggestionPlugin'
 
 /**
  * Кастомный View для блока кода (code_block).
@@ -58,6 +59,9 @@ export class CodeBlockView implements NodeView {
     const pre = document.createElement('pre')
     this.contentDOM = document.createElement('code')
     this.contentDOM.className = 'code-block-content'
+    if (suggestionPluginKey.getState(this.view.state)?.active) {
+      this.contentDOM.contentEditable = 'false'
+    }
 
     pre.appendChild(this.contentDOM)
 
@@ -73,6 +77,12 @@ export class CodeBlockView implements NodeView {
     const langSpan = this.dom.querySelector('.code-block-lang')
     if (langSpan) {
       langSpan.textContent = node.attrs.params || 'text'
+    }
+
+    if (suggestionPluginKey.getState(this.view.state)?.active) {
+      this.contentDOM.contentEditable = 'false'
+    } else {
+      this.contentDOM.removeAttribute('contenteditable')
     }
     
     return true

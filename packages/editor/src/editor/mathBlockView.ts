@@ -2,6 +2,7 @@ import { Node as PMNode } from 'prosemirror-model'
 import { EditorView, NodeView } from 'prosemirror-view'
 import { TextSelection } from 'prosemirror-state'
 import katex from 'katex'
+import { suggestionPluginKey } from './suggestionPlugin'
 
 export class MathBlockView implements NodeView {
   dom: HTMLElement
@@ -44,28 +45,17 @@ export class MathBlockView implements NodeView {
     // Кнопка OK убирает фокус
     const okBtn = previewHeader.querySelector('.math-btn-ok')
     okBtn?.addEventListener('click', () => {
-      // НЕ делаем this.dom.classList.remove('is-active') вручную, 
-      // потому что этим классом управляют Декорации ProseMirror!
-      // Если мы удалим класс руками, а курсор останется внутри (как в файле из 1 формулы), 
-      // то ProseMirror подумает, что декорация на месте, и не станет показывать редактор при повторном клике.
-      
       const pos = this.getPos()
-      console.log('[mathBlockView] OK click. Node pos:', pos)
-      
       if (pos !== undefined) {
         let { tr } = this.view.state
         const endPos = pos + this.node.nodeSize
         
-        // Если формула — последний элемент в документе, после нее нет места для курсора.
-        // Добавим пустой абзац.
         if (endPos === tr.doc.content.size) {
-           console.log('[mathBlockView] Block is at the end of doc. Appending paragraph to escape.')
            const p = this.view.state.schema.nodes.paragraph.create()
            tr = tr.insert(endPos, p)
         }
         
         tr = tr.setSelection(TextSelection.near(tr.doc.resolve(endPos)))
-        console.log('[mathBlockView] Setting selection to escape block.')
         this.view.dispatch(tr)
       }
     })
@@ -79,10 +69,9 @@ export class MathBlockView implements NodeView {
     this.dom.appendChild(editorWrapper)
     this.dom.appendChild(this.previewWrapper)
     
-    // При клике на превью, если мы не по кнопке OK, переводим формулу в режим редактирования
-    // ставя курсор внутрь блока, что вызовет появление класса is-active от mathActivePlugin.
     this.previewWrapper.addEventListener('mousedown', (e) => {
       if ((e.target as HTMLElement).closest('.math-btn-ok')) return
+      if (suggestionPluginKey.getState(this.view.state)?.active) return
       
       const pos = this.getPos()
       console.log('[mathBlockView] Mousedown on preview. Node pos:', pos)

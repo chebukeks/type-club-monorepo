@@ -103,6 +103,8 @@ export function EditorCore({
   collaboration,
   userRole,
   userId,
+  userNickname,
+  suggestionModeActive,
 }: EditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -143,19 +145,22 @@ export function EditorCore({
       : [];
 
     const isEditorRole = userRole === "editor";
+    const isSuggestionActive = (isEditorRole || (suggestionModeActive ?? false)) && editorMode === "seamless";
     const suggestionPlugins: Plugin[] = [];
 
-    if (isEditorRole) {
-      suggestionPlugins.push(
-        createSuggestionPlugin({
-          active: true,
-          authorId: userId ?? 0,
-          authorName: "Советчик",
-          color: "#3b82f6",
-        })
-      );
+    if (!isPreview) {
+      if (isSuggestionActive) {
+        suggestionPlugins.push(
+          createSuggestionPlugin({
+            active: true,
+            authorId: userId ?? 0,
+            authorName: userNickname || (isEditorRole ? "Советчик" : "Автор"),
+            color: isEditorRole ? "#3b82f6" : "#10b981",
+          })
+        );
+      }
+      suggestionPlugins.push(createSuggestionActionPlugin({ userRole }));
     }
-    suggestionPlugins.push(createSuggestionActionPlugin());
 
     const syncPlugin = new Plugin({
       view() {
@@ -174,8 +179,9 @@ export function EditorCore({
     const historyPlugins = collaboration ? [] : [history()];
 
     const plugins: Plugin[] = isPreview
-      ? [...historyPlugins, dropCursor(), gapCursor(), syncPlugin, foldingPlugin, interactivePlugin, syntaxHighlightPlugin, typographyPlugin(), focusModePlugin(() => focusModeRef.current || 'none'), ...collabPlugins, ...suggestionPlugins, ...(extraPlugins || [])]
+      ? [...historyPlugins, dropCursor(), gapCursor(), syncPlugin, foldingPlugin, interactivePlugin, syntaxHighlightPlugin, typographyPlugin(), focusModePlugin(() => focusModeRef.current || 'none'), ...collabPlugins, ...(extraPlugins || [])]
       : [
+          ...suggestionPlugins,
           ...getKeymapPlugins(),
           getInputRulesPlugin(),
           columnResizing({}),
@@ -196,7 +202,6 @@ export function EditorCore({
           focusModePlugin(() => focusModeRef.current || 'none'),
           ...(onTocUpdateRef.current ? [tocPlugin((toc) => onTocUpdateRef.current?.(toc))] : []),
           ...collabPlugins,
-          ...suggestionPlugins,
           ...(extraPlugins || []),
         ];
 
@@ -210,7 +215,7 @@ export function EditorCore({
         code_block: (node, view, getPos) => new CodeBlockView(node, view, getPos),
         math_block: (node, view, getPos) => new MathBlockView(node, view, getPos),
         image: (node, view, getPos) => new ImageView(node, view, getPos),
-        suggestion_note: (node) => new SuggestionNoteView(node),
+        suggestion_note: (node, view, getPos) => new SuggestionNoteView(node, view, getPos),
         math_inline: isPreview
           ? (node: PMNode) => new MathInlinePreviewView(node)
           : (node, view, getPos) => new MathInlineView(node, view, getPos),
@@ -233,7 +238,7 @@ export function EditorCore({
       view.destroy();
       viewRef.current = null;
     };
-  }, [editorMode, readOnly, collaboration]);
+  }, [editorMode, readOnly, collaboration, userRole, userId, userNickname, suggestionModeActive]);
 
   useEffect(() => {
     if (!viewRef.current || editorMode === "raw" || collaboration) return;

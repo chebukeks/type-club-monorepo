@@ -1,4 +1,5 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
+import { MessageCircleMore } from "lucide-react";
 import { toggleMark } from "prosemirror-commands";
 import { TextSelection, NodeSelection } from "prosemirror-state";
 import { deleteTable } from "prosemirror-tables";
@@ -6,6 +7,7 @@ import type { EditorView } from "prosemirror-view";
 
 import { EditorCore, schema, tableEditPluginKey } from "@type-club/editor";
 import type { EditorMode, CollaborationConfig } from "@type-club/editor";
+import AddNoteModal from "./AddNoteModal";
 
 export type { EditorMode } from "@type-club/editor";
 
@@ -44,6 +46,8 @@ interface MarkdownEditorProps {
   collaboration?: CollaborationConfig;
   userRole?: "author" | "co_author" | "editor" | null;
   userId?: number;
+  userNickname?: string;
+  suggestionModeActive?: boolean;
 }
 
 export function MarkdownEditor({
@@ -56,6 +60,8 @@ export function MarkdownEditor({
   collaboration,
   userRole,
   userId,
+  userNickname,
+  suggestionModeActive,
 }: MarkdownEditorProps) {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
   const [ctxSubmenu, setCtxSubmenu] = useState<"table" | "code" | null>(null);
@@ -64,7 +70,34 @@ export function MarkdownEditor({
   const [tableRows, setTableRows] = useState(3);
   const [codeLang, setCodeLang] = useState("");
   const [showLangDropdown, setShowLangDropdown] = useState(false);
+  const [showAddNoteModal, setShowAddNoteModal] = useState(false);
   const viewRef = useRef<EditorView | null>(null);
+
+  const isSuggestionActive = userRole === "editor" || (suggestionModeActive ?? false);
+
+  useEffect(() => {
+    const handleOpenModal = () => setShowAddNoteModal(true);
+    window.addEventListener("editor-open-add-note-modal", handleOpenModal);
+    return () => window.removeEventListener("editor-open-add-note-modal", handleOpenModal);
+  }, []);
+
+  const handleAddNoteSubmit = (noteText: string) => {
+    const view = viewRef.current;
+    if (!view || !noteText.trim()) return;
+    const { from } = view.state.selection;
+    const noteNode = view.state.schema.nodes.suggestion_note.create({
+      noteId: crypto.randomUUID(),
+      sugAuthorId: userId ?? 0,
+      sugAuthorName: userNickname || "Советчик",
+      sugColor: "#f59e0b",
+      noteText: noteText.trim(),
+      sugCreatedAt: new Date().toISOString(),
+    });
+    const tr = view.state.tr.insert(from, noteNode);
+    tr.setMeta("suggestionAction", true);
+    view.dispatch(tr);
+    view.focus();
+  };
 
   const closeCtxMenu = () => {
     setCtxMenu(null);
@@ -294,6 +327,8 @@ export function MarkdownEditor({
         collaboration={collaboration}
         userRole={userRole}
         userId={userId}
+        userNickname={userNickname}
+        suggestionModeActive={suggestionModeActive}
         onEditorView={(v) => { viewRef.current = v; }}
       />
 
@@ -307,15 +342,19 @@ export function MarkdownEditor({
           <button className={btnClass} onClick={handleTableCopy}>
             <span>Копировать таблицу</span>
           </button>
-          <button className={btnClass} onClick={handleTableCut}>
-            <span>Вырезать таблицу</span>
-          </button>
-          <button className={btnClass} onClick={handleTableEdit}>
-            <span>Редактировать таблицу</span>
-          </button>
-          <button className={btnClass} onClick={handleTableDelete}>
-            <span>Удалить таблицу</span>
-          </button>
+          {!isSuggestionActive && (
+            <>
+              <button className={btnClass} onClick={handleTableCut}>
+                <span>Вырезать таблицу</span>
+              </button>
+              <button className={btnClass} onClick={handleTableEdit}>
+                <span>Редактировать таблицу</span>
+              </button>
+              <button className={btnClass} onClick={handleTableDelete}>
+                <span>Удалить таблицу</span>
+              </button>
+            </>
+          )}
         </div>
       )}
 
@@ -350,42 +389,35 @@ export function MarkdownEditor({
             </button>
           ))}
           <div className={sepClass} />
-          <button className={btnClass} onClick={() => setCtxSubmenu("table")}>
-            <span>Создать таблицу...</span>
-            <span className="text-xs text-gray-400">▸</span>
-          </button>
-          <button className={btnClass} onClick={() => setCtxSubmenu("code")}>
-            <span>Создать блок кода...</span>
-            <span className="text-xs text-gray-400">▸</span>
-          </button>
-          <button className={btnClass} onClick={insertMathBlock}>
-            <span>Создать блок математики</span>
-          </button>
-          {userRole === "editor" && (
+          {!isSuggestionActive && (
+            <>
+              <button className={btnClass} onClick={() => setCtxSubmenu("table")}>
+                <span>Создать таблицу...</span>
+                <span className="text-xs text-gray-400">▸</span>
+              </button>
+              <button className={btnClass} onClick={() => setCtxSubmenu("code")}>
+                <span>Создать блок кода...</span>
+                <span className="text-xs text-gray-400">▸</span>
+              </button>
+              <button className={btnClass} onClick={insertMathBlock}>
+                <span>Создать блок математики</span>
+              </button>
+            </>
+          )}
+          {(userRole === "editor" || isSuggestionActive) && (
             <>
               <div className={sepClass} />
               <button
                 className={btnClass}
                 onClick={() => {
-                  if (viewRef.current) {
-                    const noteText = prompt("Введите текст примечания:") || "";
-                    if (noteText.trim()) {
-                      const { from } = viewRef.current.state.selection;
-                      const noteNode = viewRef.current.state.schema.nodes.suggestion_note.create({
-                        noteId: crypto.randomUUID(),
-                        sugAuthorId: userId ?? 0,
-                        sugAuthorName: "Советчик",
-                        sugColor: "#f59e0b",
-                        noteText: noteText.trim(),
-                        sugCreatedAt: new Date().toISOString(),
-                      });
-                      viewRef.current.dispatch(viewRef.current.state.tr.insert(from, noteNode));
-                    }
-                  }
                   closeCtxMenu();
+                  setShowAddNoteModal(true);
                 }}
               >
-                <span>📝 Создать примечание</span>
+                <div className="flex items-center gap-1.5">
+                  <MessageCircleMore size={14} className="text-amber-500 shrink-0" />
+                  <span>Создать примечание</span>
+                </div>
                 <span className="text-xs text-gray-400">Ctrl+Q</span>
               </button>
             </>
@@ -472,6 +504,12 @@ export function MarkdownEditor({
           </div>
         </div>
       )}
+
+      <AddNoteModal
+        isOpen={showAddNoteModal}
+        onClose={() => setShowAddNoteModal(false)}
+        onSubmit={handleAddNoteSubmit}
+      />
     </div>
   );
 }
