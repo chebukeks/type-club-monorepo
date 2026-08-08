@@ -37,7 +37,7 @@ export default function PublishModal({
   const { user } = useAuth();
   const username = user?.nickname || "username";
   const [accessState, setAccessState] = useState(currentState);
-  const [slug, setSlug] = useState(currentSlug);
+  const [slug, setSlug] = useState(currentSlug || generateRandomSlug());
   const [copied, setCopied] = useState(false);
   const [showCollab, setShowCollab] = useState(false);
 
@@ -47,7 +47,7 @@ export default function PublishModal({
     if (filtered.length <= 80) setSlug(filtered);
   };
 
-  const finalSlug = slug.trim() || _slugify("untitled");
+  const finalSlug = slug.trim() || generateRandomSlug();
   const error = slugError(finalSlug);
 
   const handleApply = () => {
@@ -157,10 +157,15 @@ export default function PublishModal({
   );
 }
 
+export function generateRandomSlug(): string {
+  return Math.random().toString(36).substring(2, 10);
+}
+
 function _slugify(text: string): string {
-  return text
+  const cleaned = text
     .toLowerCase()
     .replace(/[^\w\s-]/g, "")
     .trim()
     .replace(/[-\s]+/g, "-");
+  return cleaned || generateRandomSlug();
 }

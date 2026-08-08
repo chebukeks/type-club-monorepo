@@ -179,7 +179,7 @@ export function EditorCore({
     const historyPlugins = collaboration ? [] : [history()];
 
     const plugins: Plugin[] = isPreview
-      ? [...historyPlugins, dropCursor(), gapCursor(), syncPlugin, foldingPlugin, interactivePlugin, syntaxHighlightPlugin, typographyPlugin(), focusModePlugin(() => focusModeRef.current || 'none'), ...collabPlugins, ...(extraPlugins || [])]
+      ? [...historyPlugins, dropCursor(), gapCursor(), syncPlugin, foldingPlugin, interactivePlugin, syntaxHighlightPlugin, typographyPlugin(), focusModePlugin(() => focusModeRef.current || 'none'), ...(onTocUpdateRef.current ? [tocPlugin((toc) => onTocUpdateRef.current?.(toc))] : []), ...collabPlugins, ...(extraPlugins || [])]
       : [
           ...suggestionPlugins,
           ...getKeymapPlugins(),

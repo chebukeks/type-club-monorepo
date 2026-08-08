@@ -6,7 +6,7 @@ import { deleteTable } from "prosemirror-tables";
 import type { EditorView } from "prosemirror-view";
 
 import { EditorCore, schema, tableEditPluginKey } from "@type-club/editor";
-import type { EditorMode, CollaborationConfig } from "@type-club/editor";
+import type { EditorMode, CollaborationConfig, TocItem } from "@type-club/editor";
 import AddNoteModal from "./AddNoteModal";
 
 export type { EditorMode } from "@type-club/editor";
@@ -48,20 +48,22 @@ interface MarkdownEditorProps {
   userId?: number;
   userNickname?: string;
   suggestionModeActive?: boolean;
+  onTocUpdate?: (toc: TocItem[]) => void;
 }
 
 export function MarkdownEditor({
   content,
   editorMode,
   onChange,
-  textZoom,
-  documentZoom,
-  readOnly,
+  textZoom = 100,
+  documentZoom = 100,
+  readOnly = false,
   collaboration,
   userRole,
   userId,
   userNickname,
   suggestionModeActive,
+  onTocUpdate,
 }: MarkdownEditorProps) {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
   const [ctxSubmenu, setCtxSubmenu] = useState<"table" | "code" | null>(null);
@@ -79,6 +81,45 @@ export function MarkdownEditor({
     const handleOpenModal = () => setShowAddNoteModal(true);
     window.addEventListener("editor-open-add-note-modal", handleOpenModal);
     return () => window.removeEventListener("editor-open-add-note-modal", handleOpenModal);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { pos } = (e as CustomEvent<{ pos: number }>).detail;
+      if (!viewRef.current || viewRef.current.isDestroyed) return;
+      try {
+        const domNode = viewRef.current.nodeDOM(pos);
+        if (domNode instanceof Element) {
+          const rect = domNode.getBoundingClientRect();
+          const targetOffset = window.innerHeight * 0.25; // upper third of viewport
+
+          let scrollParent: Element | null = domNode.parentElement;
+          while (scrollParent && scrollParent !== document.body && scrollParent !== document.documentElement) {
+            const overflowY = window.getComputedStyle(scrollParent).overflowY;
+            if ((overflowY === "auto" || overflowY === "scroll") && scrollParent.scrollHeight > scrollParent.clientHeight) {
+              break;
+            }
+            scrollParent = scrollParent.parentElement;
+          }
+
+          if (scrollParent && scrollParent !== document.body && scrollParent !== document.documentElement) {
+            const parentRect = scrollParent.getBoundingClientRect();
+            const relativeTop = rect.top - parentRect.top;
+            scrollParent.scrollTo({
+              top: scrollParent.scrollTop + relativeTop - targetOffset,
+              behavior: "smooth",
+            });
+          } else {
+            window.scrollTo({
+              top: window.scrollY + rect.top - targetOffset,
+              behavior: "smooth",
+            });
+          }
+        }
+      } catch { /* ignore */ }
+    };
+    window.addEventListener("editor-scroll-to", handler);
+    return () => window.removeEventListener("editor-scroll-to", handler);
   }, []);
 
   const handleAddNoteSubmit = (noteText: string) => {
@@ -329,6 +370,7 @@ export function MarkdownEditor({
         userId={userId}
         userNickname={userNickname}
         suggestionModeActive={suggestionModeActive}
+        onTocUpdate={onTocUpdate}
         onEditorView={(v) => { viewRef.current = v; }}
       />
 

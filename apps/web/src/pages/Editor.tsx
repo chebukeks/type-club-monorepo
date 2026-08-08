@@ -1,17 +1,21 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { articlesApi, collaborationApi, Article } from "../api";
 import { MarkdownEditor, EditorMode } from "../components/MarkdownEditor";
 import EditorHeader from "../components/EditorHeader";
 import SiteHeader from "../components/SiteHeader";
-import PublishModal from "../components/PublishModal";
+import PublishModal, { generateRandomSlug } from "../components/PublishModal";
+import TableOfContents from "../components/TableOfContents";
 import { useAuth } from "../context/AuthContext";
 import { useCollaboration } from "../hooks/useCollaboration";
+import type { TocItem } from "@type-club/editor";
 
 export default function Editor() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const isNew = !id;
+  const initialSuggest = searchParams.get("mode") === "suggest";
 
   const [articleId, setArticleId] = useState<number | null>(id ? parseInt(id) : null);
   const [title, setTitle] = useState("");
@@ -25,7 +29,8 @@ export default function Editor() {
   const [showSiteHeader, setShowSiteHeader] = useState(false);
   const [loaded, setLoaded] = useState(id ? false : true);
   const [userRole, setUserRole] = useState<"author" | "co_author" | "editor" | null>(null);
-  const [suggestionModeActive, setSuggestionModeActive] = useState(false);
+  const [suggestionModeActive, setSuggestionModeActive] = useState(initialSuggest);
+  const [toc, setToc] = useState<TocItem[]>([]);
 
   const { user } = useAuth();
   const collab = useCollaboration(articleId, user ?? null, userRole);
@@ -47,7 +52,7 @@ export default function Editor() {
       setTitle(a.title);
       setContent(a.content);
       setAccessState(a.access_state);
-      setSlug(a.slug);
+      setSlug(a.slug || generateRandomSlug());
       setLoaded(true);
 
       if (a.author_id === user.id) {
@@ -75,8 +80,10 @@ export default function Editor() {
           // metadata (title) from the client to avoid clobbering the live doc.
           await articlesApi.update(articleId, { title: titleRef.current });
         } else {
-          const res = await articlesApi.create({ title: titleRef.current || "Untitled", content: contentRef.current });
+          const defaultSlug = generateRandomSlug();
+          const res = await articlesApi.create({ title: titleRef.current || "Untitled", content: contentRef.current, slug: defaultSlug });
           setArticleId(res.id);
+          setSlug(res.slug || defaultSlug);
           navigate(`/editor/${res.id}`, { replace: true });
         }
       } catch {
@@ -169,7 +176,10 @@ export default function Editor() {
         userId={user?.id}
         userNickname={user?.nickname}
         suggestionModeActive={suggestionModeActive}
+        onTocUpdate={setToc}
       />
+
+      <TableOfContents toc={toc} />
 
       {showPublish && (
         <PublishModal

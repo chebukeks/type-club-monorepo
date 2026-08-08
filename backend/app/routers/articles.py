@@ -629,11 +629,15 @@ async def get_user_role(
 
 def _slugify(text: str) -> str:
     import re
+    import secrets
     import unicodedata
 
-    text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
-    text = re.sub(r"[^\w\s-]", "", text).strip().lower()
-    return re.sub(r"[-\s]+", "-", text)
+    normalized = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
+    cleaned = re.sub(r"[^\w\s-]", "", normalized).strip().lower()
+    res = re.sub(r"[-\s]+", "-", cleaned)
+    if not res:
+        res = secrets.token_hex(4)
+    return res
 
 
 async def _get_collaborator_role(article: Article, user_id: int) -> str | None:

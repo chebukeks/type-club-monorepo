@@ -4,7 +4,7 @@ import { articlesApi, ArticleListItem } from "../api";
 import Pagination from "../components/Pagination";
 import SearchInput from "../components/SearchInput";
 import { useListQuery } from "../hooks/useListQuery";
-import { Trash2, Edit } from "lucide-react";
+import { Trash2, Edit, Lightbulb } from "lucide-react";
 
 const PAGE_SIZE = 20;
 const ALL_ROLES = ["author", "co_author", "editor"] as const;
@@ -113,6 +113,9 @@ export default function MyArticles() {
           <div className="space-y-3">
             {articles.map((a) => {
               const isAuthor = !a.my_roles || a.my_roles.includes("author");
+              const canEdit = !a.my_roles || a.my_roles.includes("author") || a.my_roles.includes("co_author");
+              const canSuggest = !a.my_roles || a.my_roles.includes("author") || a.my_roles.includes("co_author") || a.my_roles.includes("editor");
+
               return (
                 <div key={a.id} className="flex items-center gap-4 p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
                   <div className="flex-1 min-w-0">
@@ -134,11 +137,20 @@ export default function MyArticles() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    <Link to={`/editor/${a.id}`}
-                      className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                      title="Edit">
-                      <Edit size={16} />
-                    </Link>
+                    {canSuggest && (
+                      <Link to={`/editor/${a.id}?mode=suggest`}
+                        className="p-2 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-950 text-amber-600 dark:text-amber-400 transition-colors"
+                        title="Suggest">
+                        <Lightbulb size={16} />
+                      </Link>
+                    )}
+                    {canEdit && (
+                      <Link to={`/editor/${a.id}`}
+                        className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        title="Edit">
+                        <Edit size={16} />
+                      </Link>
+                    )}
                     {isAuthor && (
                       <button onClick={() => handleDelete(a.id)}
                         className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-950 text-red-500 transition-colors"
