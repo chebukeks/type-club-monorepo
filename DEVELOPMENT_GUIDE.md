@@ -155,8 +155,8 @@ packages/editor/
 ├── tsconfig.json
 └── src/
     ├── index.ts              # Публичный API пакета
-    ├── types.ts              # EditorMode, EditorProps, FocusMode, TocItem
-    ├── EditorCore.tsx         # Базовый компонент редактора (3 режима)
+    ├── types.ts              # EditorMode, EditorProps, FocusMode, TocItem, CollaborationConfig
+    ├── EditorCore.tsx         # Базовый компонент редактора ( seamless / raw / preview )
     └── editor/               # Плагины ProseMirror
         ├── schema.ts              # Схема документа (ноды + марки)
         ├── markdownConfig.ts      # Парсер + Сериализатор (MD ↔ PM) + generateExportHtml()
@@ -164,6 +164,10 @@ packages/editor/
         ├── inputRules.ts          # Авто-форматирование при вводе
         ├── editorTheme.ts         # CSS-стили WYSIWYG-отображения
         ├── seamlessPlugin.ts      # Typora-стиль
+        ├── suggestionPlugin.ts    # Режим советчика (фильтрация транзакций, марки советов)
+        ├── suggestionActionPlugin.ts # Плагин действий над советами (принять/отклонить)
+        ├── suggestionNoteView.ts  # NodeView: примечания советчика
+        ├── collaborationPlugin.ts # Yjs-синхронизация соавторства
         ├── codeBlockView.ts       # NodeView: блоки кода + highlight.js
         ├── mathBlockView.ts       # NodeView: блочные формулы (KaTeX)
         ├── mathInlineView.ts      # NodeView: инлайн-формулы
@@ -191,9 +195,14 @@ packages/editor/
   textZoom={100}                // Масштаб текста (%)
   documentZoom={100}            // Масштаб документа (%)
   readOnly={false}              // Только чтение
+  collaboration={collabConfig}  // Настройки Yjs/WebSocket синхронизации
+  userRole="author"             // 'author' | 'co_author' | 'editor' | null
+  userId={123}                  // ID пользователя
+  userNickname="Alex"           // Никнейм для подписи советов
+  suggestionModeActive={false}  // Флаг активности режима советчика
   className="typewriter-mode"   // CSS-класс на контейнер
   focusMode="paragraph"         // 'none' | 'paragraph' | 'sentence' | 'lines'
-  onTocUpdate={(toc) => ...}    // Коллбэк оглавления
+  onTocUpdate={(toc) => ...}    // Коллбэк оглавления (вызывается в seamless и preview)
   onEditorView={(view) => ...}  // Доступ к EditorView
   extraPlugins={[...]}          // Дополнительные ProseMirror-плагины
   containerStyle={{...}}        // Инлайн-стили контейнера

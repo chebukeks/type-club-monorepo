@@ -2,10 +2,10 @@
 
 A modern Markdown editing platform — WYSIWYG editor, desktop app, web publishing, and real-time collaboration in one monorepo.
 
-- **Editor** — ProseMirror-based WYSIWYG with seamless mode, LaTeX math, interactive tables, focus modes
+- **Editor** — ProseMirror-based WYSIWYG with seamless mode, LaTeX math, interactive tables, focus modes, suggestion mode, and interactive ToC
 - **Desktop** — Electron app with local file system access and publishing to type-club.ru
-- **Web** — React SPA with JWT auth, article management, and collaborative editing
-- **Backend** — FastAPI + PostgreSQL with collaboration API
+- **Web** — React SPA with JWT auth, article management, role-based access (author / co-author / advisor), and collaborative editing
+- **Backend** — FastAPI + PostgreSQL with collaboration API & slug generation
 - **Collab server** — Yjs CRDT-based WebSocket server for real-time multi-cursor editing
 
 ## Quick start
