@@ -50,10 +50,11 @@ npm install
 
 # 3. Запустить dev-сервер:
 
-# Десктоп (Electron + HMR):
+# Десктоп (Electron + HMR, подключение к продакшену type-club.ru):
 npm run dev:desktop
-# или вручную:
-cd apps/desktop && npm run dev
+
+# Десктоп + локальный бэкенд (http://localhost:8000):
+npm run dev:desktop:local
 
 # Веб-версия (SPA, :5173):
 npm run dev:web
@@ -61,7 +62,15 @@ npm run dev:web
 cd apps/web && npm run dev
 ```
 
-**Примечание:** в РФ npmjs.org может быть медленным. В проекте настроено зеркало `registry.npmmirror.com` через `.npmrc`. При необходимости заменить.
+### Подключение десктопа к локальному бэкенду
+
+По умолчанию `npm run dev:desktop` подключается к онлайн-серверу `https://type-club.ru`.
+
+Чтобы тестировать десктоп с локальным бэкендом:
+1. Запустите локальный бэкенд: `docker compose -f docker-compose.local.yml up`
+2. Запустите десктоп командой `npm run dev:desktop:local` (или `npm run dev:local` из `apps/desktop/`)
+
+Альтернативно можно создать файл `apps/desktop/.env.local` с текстом `VITE_SITE_URL=http://localhost:8000` и запускать обычный `npm run dev:desktop`.
 
 ---
 
