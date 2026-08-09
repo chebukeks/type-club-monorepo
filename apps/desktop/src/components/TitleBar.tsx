@@ -1,8 +1,4 @@
-/**
- * TitleBar.tsx — Кастомная шапка окна (frameless window).
- * Содержит логотип, MenuBar, переключатель режимов и кнопки управления окном.
- */
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { MenuBar } from './MenuBar'
 import { SettingsPopup } from './SettingsPopup'
 import { AuthModal } from './AuthModal'
@@ -12,7 +8,8 @@ import { RawModeWarningModal, STORAGE_KEY_HIDE_RAW_WARNING } from './RawModeWarn
 import { useEditor } from '../context/EditorContext'
 import { useAuth } from '../context/AuthContext'
 import { articlesApi, collaborationApi } from '../api'
-import { Users, Lightbulb, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { config } from '../config'
+import { Users, Lightbulb, PanelLeftClose, PanelLeftOpen, PanelTopClose, PanelTopOpen } from 'lucide-react'
 import type { EditorMode } from '../types'
 
 const modes: { key: EditorMode; label: string }[] = [
@@ -21,13 +18,83 @@ const modes: { key: EditorMode; label: string }[] = [
   { key: 'preview', label: 'Preview' },
 ]
 
+function ProfileMenuPopup({ user, logout, onClose }: { user: { nickname: string; id: number }; logout: () => void; onClose: () => void }) {
+  const popupRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
+        onClose()
+      }
+    }
+    const timer = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside)
+    }, 50)
+    return () => {
+      clearTimeout(timer)
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [onClose])
+
+  return (
+    <div
+      ref={popupRef}
+      className="absolute right-0 top-full mt-1 w-52 py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50 flex flex-col text-[13px] text-[var(--text-secondary)]"
+    >
+      <button
+        className="menu-item enabled flex items-center justify-between"
+        onClick={() => {
+          onClose()
+          window.api.openExternal(`${config.siteUrl}/${user.nickname}`)
+        }}
+      >
+        <span className="font-medium text-[var(--text-primary)] truncate">{user.nickname}</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--text-dim)] shrink-0 ml-2">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+          <polyline points="15 3 21 3 21 9" />
+          <line x1="10" y1="14" x2="21" y2="3" />
+        </svg>
+      </button>
+
+      <button
+        className="menu-item enabled flex items-center justify-between"
+        onClick={() => {
+          onClose()
+          window.api.openExternal(`${config.siteUrl}/settings`)
+        }}
+      >
+        <span>Настройки профиля</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--text-dim)] shrink-0 ml-2">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+          <polyline points="15 3 21 3 21 9" />
+          <line x1="10" y1="14" x2="21" y2="3" />
+        </svg>
+      </button>
+
+      <div className="border-t border-[var(--border-strong)] my-1" />
+
+      <button
+        className="menu-item enabled"
+        style={{ color: 'var(--text-danger)' }}
+        onClick={() => {
+          onClose()
+          logout()
+        }}
+      >
+        Выйти из аккаунта
+      </button>
+    </div>
+  )
+}
+
 export function TitleBar() {
   const [showSettings, setShowSettings] = useState(false)
   const [showAuth, setShowAuth] = useState(false)
   const [showPublish, setShowPublish] = useState(false)
   const [showCollab, setShowCollab] = useState(false)
   const [showRawWarning, setShowRawWarning] = useState(false)
-  const { state, dispatch, setEditorMode, toggleSidebar } = useEditor()
+  const [showProfileMenu, setShowProfileMenu] = useState(false)
+  const { state, dispatch, setEditorMode, toggleSidebar, toggleTabBar } = useEditor()
   const { user, logout } = useAuth()
   const [modeLoading, setModeLoading] = useState(false)
 
@@ -108,11 +175,24 @@ export function TitleBar() {
             className="w-7 h-7 flex items-center justify-center rounded text-[var(--text-dim)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)] transition-colors shrink-0"
             style={{
               WebkitAppRegion: 'no-drag',
-              marginRight: '6px',
+              marginRight: '4px',
             } as React.CSSProperties}
             title={state.sidebarOpen ? "Свернуть боковую панель (Ctrl+Shift+B)" : "Развернуть боковую панель (Ctrl+Shift+B)"}
           >
             {state.sidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
+          </button>
+
+          {/* Кнопка скрытия/показа панели вкладок */}
+          <button
+            onClick={toggleTabBar}
+            className="w-7 h-7 flex items-center justify-center rounded text-[var(--text-dim)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)] transition-colors shrink-0"
+            style={{
+              WebkitAppRegion: 'no-drag',
+              marginRight: '6px',
+            } as React.CSSProperties}
+            title={state.tabBarOpen ? "Свернуть панель вкладок" : "Показать панель вкладок"}
+          >
+            {state.tabBarOpen ? <PanelTopClose size={16} /> : <PanelTopOpen size={16} />}
           </button>
 
           {/* Интерактивное Меню */}
@@ -210,20 +290,11 @@ export function TitleBar() {
           {user && (!articleId || userRole === 'author') && (
             <button
               onClick={() => setShowPublish(true)}
-              className="w-9 h-full flex items-center justify-center transition-colors"
-              style={{
-                color: isOnlineArticle ? 'var(--accent)' : 'var(--text-dim)',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = isOnlineArticle
-                  ? 'var(--accent)'
-                  : 'var(--text-secondary)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = isOnlineArticle
-                  ? 'var(--accent)'
-                  : 'var(--text-dim)'
-              }}
+              className={`w-9 h-full flex items-center justify-center transition-colors ${
+                isOnlineArticle
+                  ? 'text-[var(--accent)] hover:bg-[var(--bg-hover)]'
+                  : 'text-[var(--text-dim)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)]'
+              }`}
               title="Настройки публикации на type-club.ru"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -236,32 +307,34 @@ export function TitleBar() {
             </button>
           )}
 
-          {/* Иконка пользователя */}
-          <button
-            onClick={() => {
-              if (user) {
-                logout()
-              } else {
-                setShowAuth(true)
-              }
-            }}
-            className="w-9 h-full flex items-center justify-center transition-colors"
-            style={{
-              color: user ? 'var(--accent)' : 'var(--text-dim)',
-            }}
-            onMouseEnter={(e) => {
-              if (user) e.currentTarget.style.color = '#e81123'
-            }}
-            onMouseLeave={(e) => {
-              if (user) e.currentTarget.style.color = 'var(--accent)'
-            }}
-            title={user ? `Выйти (${user.nickname})` : 'Аккаунт'}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
-          </button>
+          {/* Иконка пользователя / Меню профиля */}
+          <div className="relative h-full">
+            <button
+              onClick={() => {
+                if (user) {
+                  setShowProfileMenu(!showProfileMenu)
+                } else {
+                  setShowAuth(true)
+                }
+              }}
+              className={`w-9 h-full flex items-center justify-center transition-colors ${
+                showProfileMenu
+                  ? 'bg-[var(--bg-active)] text-[var(--text-primary)]'
+                  : user
+                  ? 'text-[var(--accent)] hover:bg-[var(--bg-hover)] hover:text-[var(--accent)]'
+                  : 'text-[var(--text-dim)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)]'
+              }`}
+              title={user ? `Профиль (${user.nickname})` : 'Аккаунт'}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+            </button>
+            {showProfileMenu && user && (
+              <ProfileMenuPopup user={user} logout={logout} onClose={() => setShowProfileMenu(false)} />
+            )}
+          </div>
 
           {/* Настройки */}
           <div className="relative h-full">

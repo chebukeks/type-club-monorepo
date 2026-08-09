@@ -1,8 +1,4 @@
-/**
- * PublishModal.tsx — Share article to type-club.ru from desktop app.
- * Uses shared modal CSS classes from index.css.
- */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { config } from "../config";
 import { useAuth } from "../context/AuthContext";
 import { useEditor } from "../context/EditorContext";
@@ -27,6 +23,10 @@ function slugError(s: string): string | null {
   return null;
 }
 
+export function generateRandomSlug(): string {
+  return Math.random().toString(36).substring(2, 10);
+}
+
 export function PublishModal({ onClose }: PublishModalProps) {
   const { user } = useAuth();
   const { state } = useEditor();
@@ -42,10 +42,23 @@ export function PublishModal({ onClose }: PublishModalProps) {
   const defaultFn = activeTab?.fileName?.replace(/\.md$/, "") || "Untitled";
   const [title, setTitle] = useState(isExisting ? defaultFn : defaultFn);
   const [accessState, setAccessState] = useState<string>("private");
-  const [slug, setSlug] = useState(_slugify(defaultFn));
+  const [slug, setSlug] = useState(isExisting ? _slugify(defaultFn) : generateRandomSlug());
   const [copied, setCopied] = useState(false);
   const [status, setStatus] = useState<"idle" | "publishing" | "done" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+
+  const overlayMouseDownRef = useRef(false);
+
+  const handleOverlayMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    overlayMouseDownRef.current = (e.target === e.currentTarget);
+  };
+
+  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget && overlayMouseDownRef.current) {
+      onClose();
+    }
+    overlayMouseDownRef.current = false;
+  };
 
   // Fetch existing article data
   useEffect(() => {
@@ -78,7 +91,7 @@ export function PublishModal({ onClose }: PublishModalProps) {
     if (filtered.length <= 80) setSlug(filtered);
   };
 
-  const finalSlug = slug.trim() || _slugify(title);
+  const finalSlug = slug.trim() || (isExisting ? _slugify(title) : generateRandomSlug());
   const serr = slugError(finalSlug);
 
   const handlePublish = async () => {
@@ -121,7 +134,7 @@ export function PublishModal({ onClose }: PublishModalProps) {
 
   if (status === "done") {
     return (
-      <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-overlay" onMouseDown={handleOverlayMouseDown} onClick={handleOverlayClick}>
         <div
           className="modal-panel"
           style={{ textAlign: "center" }}
@@ -148,7 +161,7 @@ export function PublishModal({ onClose }: PublishModalProps) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onMouseDown={handleOverlayMouseDown} onClick={handleOverlayClick}>
       <div
         className="modal-panel"
         style={{ maxWidth: "430px" }}

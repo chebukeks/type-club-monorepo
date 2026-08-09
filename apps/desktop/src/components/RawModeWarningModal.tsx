@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { AlertTriangle, X } from 'lucide-react'
 
 interface RawModeWarningModalProps {
@@ -10,6 +10,18 @@ export const STORAGE_KEY_HIDE_RAW_WARNING = 'typeclub_hide_raw_collab_warning'
 
 export function RawModeWarningModal({ onConfirm, onCancel }: RawModeWarningModalProps) {
   const [dontShowAgain, setDontShowAgain] = useState(false)
+  const overlayMouseDownRef = useRef(false)
+
+  const handleOverlayMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    overlayMouseDownRef.current = (e.target === e.currentTarget)
+  }
+
+  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget && overlayMouseDownRef.current) {
+      onCancel()
+    }
+    overlayMouseDownRef.current = false
+  }
 
   const handleConfirm = async () => {
     if (dontShowAgain) {
@@ -23,7 +35,7 @@ export function RawModeWarningModal({ onConfirm, onCancel }: RawModeWarningModal
   }
 
   return (
-    <div className="modal-overlay" style={{ zIndex: 99999 }} onClick={onCancel}>
+    <div className="modal-overlay" style={{ zIndex: 99999 }} onMouseDown={handleOverlayMouseDown} onClick={handleOverlayClick}>
       <div className="modal-panel" style={{ maxWidth: '440px' }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header" style={{ marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f59e0b' }}>

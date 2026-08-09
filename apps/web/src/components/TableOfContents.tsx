@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { List, X, ChevronRight, BookOpen } from "lucide-react";
+import { List, X, BookOpen } from "lucide-react";
 import type { TocItem } from "@type-club/editor";
 
 interface TableOfContentsProps {
@@ -50,12 +50,6 @@ export default function TableOfContents({ toc, variant = "floating", className =
             } ${indentClass}`}
             title={item.text}
           >
-            <ChevronRight
-              size={12}
-              className={`shrink-0 transition-transform ${
-                isActive ? "text-blue-500 translate-x-0.5 opacity-100" : "opacity-0 group-hover:opacity-50"
-              }`}
-            />
             <span className="truncate flex-1">{item.text || `Heading ${item.level}`}</span>
           </button>
         );

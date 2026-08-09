@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { collaborationApi, type Collaborator } from '../api';
 import { UserAutocompleteInput } from './UserAutocompleteInput';
 import { X, Copy, Check, Trash2, Link } from 'lucide-react';
@@ -15,6 +15,19 @@ export function CollaborationModal({ articleId, onClose }: Props) {
   const [coauthorLink, setCoauthorLink] = useState('');
   const [copiedRole, setCopiedRole] = useState<string | null>(null);
   const [error, setError] = useState('');
+
+  const overlayMouseDownRef = useRef(false);
+
+  const handleOverlayMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    overlayMouseDownRef.current = (e.target === e.currentTarget);
+  };
+
+  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget && overlayMouseDownRef.current) {
+      onClose();
+    }
+    overlayMouseDownRef.current = false;
+  };
 
   const fetchCollaborators = useCallback(async () => {
     try {
@@ -68,7 +81,7 @@ export function CollaborationModal({ articleId, onClose }: Props) {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onMouseDown={handleOverlayMouseDown} onClick={handleOverlayClick}>
       <div className="modal-panel collab-modal" style={{ maxWidth: '520px' }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3 className="modal-title">Совместная работа</h3>

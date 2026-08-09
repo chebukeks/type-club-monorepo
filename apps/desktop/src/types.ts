@@ -103,6 +103,8 @@ export interface AppState {
   documentZoom: number;
   /** Отображение сайдбара открыт/свёрнут */
   sidebarOpen: boolean;
+  /** Отображение панели вкладок открыта/свёрнута */
+  tabBarOpen: boolean;
 }
 
 /** Действия для редьюсера состояния */
@@ -138,7 +140,9 @@ export type AppAction =
   | { type: 'SET_ONLINE_ARTICLES'; payload: { articles: ArticleListItem[] } }
   | { type: 'SET_SUGGESTION_MODE'; payload: { tabId: string; active: boolean } }
   | { type: 'TOGGLE_SIDEBAR' }
-  | { type: 'SET_SIDEBAR_OPEN'; payload: { open: boolean } };
+  | { type: 'SET_SIDEBAR_OPEN'; payload: { open: boolean } }
+  | { type: 'TOGGLE_TAB_BAR' }
+  | { type: 'SET_TAB_BAR_OPEN'; payload: { open: boolean } };
 
 
 /** API, доступный из Renderer-процесса через contextBridge */

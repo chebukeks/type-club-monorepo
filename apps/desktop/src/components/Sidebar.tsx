@@ -1,17 +1,23 @@
-/**
- * Sidebar.tsx — Боковая панель File Explorer / Online Articles.
- */
 import { useState, useEffect, useRef } from 'react'
 import { useEditor } from '../context/EditorContext'
 import { config } from '../config'
 import { useAuth } from '../context/AuthContext'
 import type { FileEntry, TocItem } from '../types'
 import type { ArticleListItem } from '../api'
+import { Search, X } from 'lucide-react'
 
 export function Sidebar({ width }: { width: number }) {
   const { user } = useAuth()
   const { state, dispatch, openFolder, openFile, createFile, createFolder, startCreating, setActiveExplorerPath, refreshFileTree, setShowEmptyFolders, startRenaming, deleteItem, showInExplorer, moveItem, setSidebarMode, fetchOnlineArticles, openOnlineArticle, deleteOnlineArticle, renameOnlineArticle, duplicateOnlineArticle } = useEditor()
   const [copied, setCopied] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedRoles, setSelectedRoles] = useState<('author' | 'co_author' | 'editor')[]>(['author', 'co_author', 'editor'])
+
+  const toggleRoleFilter = (role: 'author' | 'co_author' | 'editor') => {
+    setSelectedRoles((prev) =>
+      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
+    )
+  }
 
   const isOnline = state.sidebarMode === 'online'
 
@@ -30,6 +36,46 @@ export function Sidebar({ width }: { width: number }) {
   }
 
   const visibleTree = filterTree(state.fileTree)
+
+  const isLocalSearching = !isOnline && searchQuery.trim() !== ''
+
+  const collectFlatFiles = (nodes: FileEntry[], query: string): FileEntry[] => {
+    const result: FileEntry[] = []
+    const q = query.trim().toLowerCase()
+
+    const recurse = (list: FileEntry[]) => {
+      for (const item of list) {
+        if (!item.isDirectory) {
+          if (!q || item.name.toLowerCase().includes(q)) {
+            result.push(item)
+          }
+        } else if (item.children) {
+          recurse(item.children)
+        }
+      }
+    }
+
+    recurse(nodes)
+    return result
+  }
+
+  const flatSearchResults = isLocalSearching ? collectFlatFiles(state.fileTree, searchQuery) : []
+
+  const filteredOnlineArticles = state.onlineArticles.filter((article) => {
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase()
+      if (!article.title.toLowerCase().includes(q)) return false
+    }
+
+    if (selectedRoles.length === 0) return false
+    if (selectedRoles.length === 3) return true
+
+    const articleRoles = article.my_roles && article.my_roles.length > 0
+      ? article.my_roles
+      : (user && article.author_nickname === user.nickname ? ['author'] : ['author'])
+
+    return articleRoles.some((r) => selectedRoles.includes(r as any))
+  })
 
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, path: string, type: 'file' | 'folder', name: string } | null>(null)
   const [onlineMenu, setOnlineMenu] = useState<{ x: number, y: number, article: ArticleListItem } | null>(null)
@@ -147,6 +193,68 @@ export function Sidebar({ width }: { width: number }) {
         </div>
       </div>
 
+      {/* Поисковый блок */}
+      <div
+        className="border-b border-[var(--border-default)] shrink-0"
+        style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}
+      >
+        <div className="relative flex items-center">
+          <Search size={13} className="absolute text-[var(--text-dim)] pointer-events-none" style={{ left: '10px' }} />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={isOnline ? "Поиск по статьям..." : "Поиск по файлам..."}
+            style={{ paddingLeft: '30px', paddingRight: '28px', paddingTop: '6px', paddingBottom: '6px' }}
+            className="w-full rounded bg-[var(--bg-input)] border border-[var(--border-default)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)] transition-colors placeholder-[var(--text-dim)]"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+              style={{ right: '8px', padding: '2px' }}
+              title="Очистить поиск"
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
+
+        {isOnline && (
+          <div className="select-none" style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingTop: '2px', paddingLeft: '2px' }}>
+            <label className="flex items-center text-[11px] text-[var(--text-secondary)] cursor-pointer hover:text-[var(--text-primary)]" style={{ gap: '6px' }}>
+              <input
+                type="checkbox"
+                checked={selectedRoles.includes('author')}
+                onChange={() => toggleRoleFilter('author')}
+                className="w-3.5 h-3.5 accent-[var(--accent)] rounded cursor-pointer"
+              />
+              <span>Автор</span>
+            </label>
+
+            <label className="flex items-center text-[11px] text-[var(--text-secondary)] cursor-pointer hover:text-[var(--text-primary)]" style={{ gap: '6px' }}>
+              <input
+                type="checkbox"
+                checked={selectedRoles.includes('co_author')}
+                onChange={() => toggleRoleFilter('co_author')}
+                className="w-3.5 h-3.5 accent-[var(--accent)] rounded cursor-pointer"
+              />
+              <span>Соавтор</span>
+            </label>
+
+            <label className="flex items-center text-[11px] text-[var(--text-secondary)] cursor-pointer hover:text-[var(--text-primary)]" style={{ gap: '6px' }}>
+              <input
+                type="checkbox"
+                checked={selectedRoles.includes('editor')}
+                onChange={() => toggleRoleFilter('editor')}
+                className="w-3.5 h-3.5 accent-[var(--accent)] rounded cursor-pointer"
+              />
+              <span>Советчик</span>
+            </label>
+          </div>
+        )}
+      </div>
+
       {/* Content */}
       <div className="flex-1 overflow-y-auto py-2"
         onClick={(e) => { if (e.target === e.currentTarget) setActiveExplorerPath(null) }}
@@ -177,6 +285,10 @@ export function Sidebar({ width }: { width: number }) {
                 isOnline
                 onCreateArticle={() => startCreating('file')}
               />
+            ) : filteredOnlineArticles.length === 0 ? (
+              <div style={{ padding: '16px', textAlign: 'center' }} className="text-xs text-[var(--text-dim)] italic">
+                Статьи не найдены
+              </div>
             ) : (
               <>
                 {state.creating && (
@@ -192,7 +304,7 @@ export function Sidebar({ width }: { width: number }) {
                     onCancel={() => dispatch({ type: 'STOP_CREATING' })}
                   />
                 )}
-                {state.onlineArticles.map((article) => (
+                {filteredOnlineArticles.map((article) => (
                   <OnlineArticleItem
                     key={article.id}
                     article={article}
@@ -213,7 +325,34 @@ export function Sidebar({ width }: { width: number }) {
         ) : (
           /* --- Local Files --- */
           <>
-            {visibleTree.length === 0 && !state.creating ? (
+            {isLocalSearching ? (
+              flatSearchResults.length === 0 ? (
+                <div style={{ padding: '16px', textAlign: 'center' }} className="text-xs text-[var(--text-dim)] italic">
+                  Файлы не найдены
+                </div>
+              ) : (
+                <div style={{ padding: '4px 6px' }}>
+                  {flatSearchResults.map((file) => (
+                    <div
+                      key={file.path}
+                      onClick={() => openFile(file.path, file.name)}
+                      onContextMenu={(e) => handleContextMenu(e, file.path, 'file', file.name)}
+                      style={{ padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '8px' }}
+                      className={`rounded text-xs cursor-pointer hover:bg-[var(--bg-hover)] ${
+                        activeTab?.filePath === file.path ? 'bg-[var(--bg-active)] text-[var(--accent)] font-medium' : 'text-[var(--text-primary)]'
+                      }`}
+                      title={`${file.name}\n${file.path}`}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-[var(--accent)]">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                      </svg>
+                      <span className="truncate">{file.name}</span>
+                    </div>
+                  ))}
+                </div>
+              )
+            ) : visibleTree.length === 0 && !state.creating ? (
               <EmptyState onOpenFolder={openFolder} isFolderOpen={!!state.folderPath} onCreateFile={() => startCreating('file')} />
             ) : (
               <div className="px-1" onClick={(e) => {
@@ -423,6 +562,7 @@ function OnlineArticleItem({ article, activeTabArticleId, activeToc, onOpen, onC
           onClick={onOpen}
           className="flex-1 flex items-center gap-1.5 overflow-hidden"
           style={{ paddingTop: '5px', paddingBottom: '5px' }}
+          title={`${article.title}\n${article.author_nickname && article.slug ? `${config.siteUrl}/${article.author_nickname}/${article.slug}` : `${config.siteUrl}/articles/${article.id}`}`}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-[var(--accent)]">
             <circle cx="12" cy="12" r="10" />
@@ -452,7 +592,6 @@ function OnlineArticleItem({ article, activeTabArticleId, activeToc, onOpen, onC
               }}
               title={toc.text}
             >
-              <span className="opacity-50 mr-1">#</span>
               {toc.text}
             </button>
           ))}
@@ -703,6 +842,7 @@ function FileTreeItem({ entry, depth, onFileClick, onContextMenu, activeFilePath
                isDragOver ? 'bg-[var(--accent)] text-white' : isFolderActive ? 'bg-[var(--bg-hover)] text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
               }`}
             style={{ paddingTop: '5px', paddingBottom: '5px', paddingLeft: `${depth * 12 + 8}px`, paddingRight: '8px' }}
+            title={`${entry.name}\n${entry.path}`}
           >
             <svg width="12" height="12" viewBox="0 0 12 12" className={`transition-transform flex-shrink-0 ${isOpen ? 'rotate-90' : ''}`} fill="currentColor">
               <path d="M4 2l4 4-4 4z" />
@@ -768,6 +908,7 @@ function FileTreeItem({ entry, depth, onFileClick, onContextMenu, activeFilePath
             onClick={() => onFileClick(entry.path, entry.name)}
             className="flex-1 flex items-center gap-1.5 overflow-hidden"
             style={{ paddingTop: '5px', paddingBottom: '5px' }}
+            title={`${entry.name}\n${entry.path}`}
           >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`flex-shrink-0 ${isDragOver ? 'text-white' : 'text-[var(--accent)]'}`}>
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -791,7 +932,6 @@ function FileTreeItem({ entry, depth, onFileClick, onContextMenu, activeFilePath
               }}
               title={toc.text}
             >
-              <span className="opacity-50 mr-1">#</span>
               {toc.text}
             </button>
           ))}

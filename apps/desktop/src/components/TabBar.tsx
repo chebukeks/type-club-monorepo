@@ -78,7 +78,11 @@ export function TabBar() {
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 opacity-50">
               {tab.articleId ? (
-                <circle cx="12" cy="12" r="10" />
+                <>
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="2" y1="12" x2="22" y2="12" />
+                  <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" />
+                </>
               ) : (
                 <>
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -87,7 +91,7 @@ export function TabBar() {
               )}
             </svg>
             <span className="text-[12px] truncate">{tab.fileName}</span>
-            {tab.isModified && (
+            {!state.autosave && tab.isModified && (
               <span className="w-2 h-2 rounded-full bg-[var(--accent)] flex-shrink-0" />
             )}
             <button

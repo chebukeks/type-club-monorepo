@@ -1,8 +1,4 @@
-/**
- * AuthModal.tsx — Login / Register popup for the desktop app.
- * Uses shared modal CSS classes from index.css.
- */
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 
 interface AuthModalProps {
@@ -19,6 +15,19 @@ export function AuthModal({ onClose }: AuthModalProps) {
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const overlayMouseDownRef = useRef(false);
+
+  const handleOverlayMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    overlayMouseDownRef.current = (e.target === e.currentTarget);
+  };
+
+  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget && overlayMouseDownRef.current) {
+      onClose();
+    }
+    overlayMouseDownRef.current = false;
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,7 +67,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onMouseDown={handleOverlayMouseDown} onClick={handleOverlayClick}>
       <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
         {/* Tabs */}
         <div className="modal-tabs">

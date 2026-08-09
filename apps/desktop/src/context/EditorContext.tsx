@@ -30,6 +30,7 @@ const initialState: AppState = {
   sidebarMode: 'local' as 'local' | 'online',
   onlineArticles: [] as import('../api').ArticleListItem[],
   sidebarOpen: true,
+  tabBarOpen: true,
 }
 
 // ============================================================
@@ -192,6 +193,15 @@ function appReducer(state: AppState, action: AppAction): AppState {
       window.api.storeSet('sidebarOpen', action.payload.open).catch(() => {})
       return { ...state, sidebarOpen: action.payload.open }
     }
+    case 'TOGGLE_TAB_BAR': {
+      const nextOpen = !state.tabBarOpen
+      window.api.storeSet('tabBarOpen', nextOpen).catch(() => {})
+      return { ...state, tabBarOpen: nextOpen }
+    }
+    case 'SET_TAB_BAR_OPEN': {
+      window.api.storeSet('tabBarOpen', action.payload.open).catch(() => {})
+      return { ...state, tabBarOpen: action.payload.open }
+    }
     default:
       return state
   }
@@ -247,6 +257,8 @@ interface EditorContextValue {
   setSidebarMode: (mode: 'local' | 'online') => void
   toggleSidebar: () => void
   setSidebarOpen: (open: boolean) => void
+  toggleTabBar: () => void
+  setTabBarOpen: (open: boolean) => void
 }
 
 const EditorContext = createContext<EditorContextValue | null>(null)
@@ -283,6 +295,9 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
 
         const savedSidebarOpen = await window.api.storeGet('sidebarOpen') as boolean | undefined
         if (savedSidebarOpen !== undefined) dispatch({ type: 'SET_SIDEBAR_OPEN', payload: { open: savedSidebarOpen } })
+
+        const savedTabBarOpen = await window.api.storeGet('tabBarOpen') as boolean | undefined
+        if (savedTabBarOpen !== undefined) dispatch({ type: 'SET_TAB_BAR_OPEN', payload: { open: savedTabBarOpen } })
 
         const savedTextZoom = await window.api.storeGet('textZoom') as number | undefined
         if (savedTextZoom) dispatch({ type: 'SET_TEXT_ZOOM', payload: { zoom: savedTextZoom } })
@@ -913,6 +928,14 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: 'SET_SIDEBAR_OPEN', payload: { open } })
   }, [])
 
+  const toggleTabBar = useCallback(() => {
+    dispatch({ type: 'TOGGLE_TAB_BAR' })
+  }, [])
+
+  const setTabBarOpen = useCallback((open: boolean) => {
+    dispatch({ type: 'SET_TAB_BAR_OPEN', payload: { open } })
+  }, [])
+
   return (
     <EditorContext.Provider value={{
       state, dispatch,
@@ -933,6 +956,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       deleteOnlineArticle, renameOnlineArticle, duplicateOnlineArticle,
       downloadOnlineArticle, setSidebarMode,
       toggleSidebar, setSidebarOpen,
+      toggleTabBar, setTabBarOpen,
     }}>
       {children}
     </EditorContext.Provider>

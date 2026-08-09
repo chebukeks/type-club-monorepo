@@ -271,7 +271,7 @@ body {
 
 /* Пункты выпадающих меню */
 .menu-item {
-  padding: 8px 20px;
+  padding: 6px 14px;
   display: flex;
   justify-content: space-between;
   align-items: center;

@@ -10,6 +10,18 @@ interface AddNoteModalProps {
 export function AddNoteModal({ isOpen, onClose, onSubmit }: AddNoteModalProps) {
   const [text, setText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const overlayMouseDownRef = useRef(false);
+
+  const handleOverlayMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    overlayMouseDownRef.current = (e.target === e.currentTarget);
+  };
+
+  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget && overlayMouseDownRef.current) {
+      onClose();
+    }
+    overlayMouseDownRef.current = false;
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -40,7 +52,8 @@ export function AddNoteModal({ isOpen, onClose, onSubmit }: AddNoteModalProps) {
     <div
       className="modal-overlay"
       style={{ zIndex: 99999 }}
-      onClick={onClose}
+      onMouseDown={handleOverlayMouseDown}
+      onClick={handleOverlayClick}
     >
       <div
         className="modal-panel"

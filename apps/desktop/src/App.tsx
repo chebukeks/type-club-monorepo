@@ -96,7 +96,7 @@ function AppLayout() {
 
         {/* Правая панель — вкладки + редактор + StatsToast */}
         <div className="relative flex flex-col flex-1 overflow-hidden">
-          <TabBar />
+          {state.tabBarOpen && <TabBar />}
           <MarkdownEditor />
           {state.showStats && <StatsToast />}
         </div>
