@@ -12,6 +12,7 @@ export function MenuBar() {
     setTheme, refreshTab, setFocusMode,
     getRecentFiles, getRecentFolders, clearRecentFiles, clearRecentFolders,
     removeRecentFile, removeRecentFolder,
+    toggleSidebar,
   } = useEditor()
   const { activeTabId, tabs, folderPath, theme, focusMode } = state
   const [openMenu, setOpenMenu] = useState<string | null>(null)
@@ -45,6 +46,7 @@ export function MenuBar() {
       else if (ctrl && shift && code === 'KeyS') { e.preventDefault(); saveActiveFileAs() }
       else if (ctrl && !shift && code === 'KeyO') { e.preventDefault(); openFileViaDialog() }
       else if (ctrl && shift && code === 'KeyO') { e.preventDefault(); openFolder() }
+      else if (ctrl && shift && code === 'KeyB') { e.preventDefault(); toggleSidebar() }
       else if (ctrl && !shift && code === 'KeyN') {
         e.preventDefault()
         if (folderPath) startCreating('file')
@@ -286,6 +288,10 @@ export function MenuBar() {
             {/* Обновить */}
             <div className={itemCls(!!activeTabId)} onClick={activeTabId ? handleRefresh : undefined}>
               <span>Обновить</span><span className="text-[11px] text-[var(--text-dim)]">F5</span>
+            </div>
+            {/* Боковая панель */}
+            <div className={itemCls(true)} onClick={() => { closeMenu(); toggleSidebar() }}>
+              <span>{state.sidebarOpen ? 'Свернуть панель' : 'Показать панель'}</span><span className="text-[11px] text-[var(--text-dim)]">Ctrl+Shift+B</span>
             </div>
             {sep}
 

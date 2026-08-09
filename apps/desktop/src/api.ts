@@ -98,14 +98,64 @@ export interface ArticleListItem {
   author_nickname: string;
   created_at: string;
   updated_at: string;
+  my_roles?: string[];
 }
 
 export const articlesApi = {
   listMy: (page = 1, size = 50) => api.get<ArticleListItem[]>(`/articles/my?page=${page}&size=${size}`),
+  myListPaged: (params: { page?: number; size?: number; q?: string; roles?: string[] }) => {
+    const sp = new URLSearchParams();
+    if (params.page) sp.set("page", String(params.page));
+    if (params.size) sp.set("size", String(params.size));
+    if (params.q) sp.set("q", params.q);
+    if (params.roles?.length) sp.set("roles", params.roles.join(","));
+    return api.get<ArticleListItem[]>(`/articles/my?${sp}`);
+  },
   get: (id: number) => api.get<Article>(`/articles/${id}`),
   create: (data: { title: string; content?: string; slug?: string }) =>
     api.post<Article>("/articles", data),
   update: (id: number, data: { title?: string; content?: string; access_state?: string; slug?: string }) =>
     api.patch<Article>(`/articles/${id}`, data),
   delete: (id: number) => api.delete<void>(`/articles/${id}`),
+  myRole: (articleId: number) => api.get<{ role: string }>(`/articles/${articleId}/my-role`),
 };
+
+// ── Collaboration ──
+
+export interface Collaborator {
+  id: number;
+  user_id: number;
+  nickname: string;
+  role: "editor" | "co_author";
+  source: "invite" | "link";
+  invited_at: string;
+}
+
+export interface ShareLink {
+  token: string;
+  url: string;
+  role: string;
+}
+
+export const collaborationApi = {
+  list: (articleId: number) => api.get<Collaborator[]>(`/articles/${articleId}/collaborators`),
+  invite: (articleId: number, nickname: string, role: "editor" | "co_author") =>
+    api.post<Collaborator>(`/articles/${articleId}/collaborators`, { nickname, role }),
+  remove: (articleId: number, userId: number) =>
+    api.delete<void>(`/articles/${articleId}/collaborators/${userId}`),
+  generateLink: (articleId: number, role: "editor" | "co_author") =>
+    api.post<ShareLink>(`/articles/${articleId}/share-link`, { role }),
+};
+
+// ── Users ──
+
+export interface UserSearchResult {
+  id: number;
+  nickname: string;
+}
+
+export const usersApi = {
+  search: (query: string, limit = 6) =>
+    api.get<UserSearchResult[]>(`/users/search?q=${encodeURIComponent(query)}&limit=${limit}`),
+};
+

@@ -176,12 +176,21 @@ function createWindow() {
   }
 
   win.once('ready-to-show', () => {
-
     // Восстанавливаем полноэкранный режим
     if (savedBounds?.isMaximized) {
       win!.maximize()
     }
     win!.show()
+  })
+
+  // Разрешаем открытие DevTools по F12 или Ctrl+Shift+I для отладки
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.type === 'keyDown') {
+      if (input.key === 'F12' || (input.control && input.shift && input.key.toLowerCase() === 'i')) {
+        event.preventDefault()
+        win?.webContents.toggleDevTools()
+      }
+    }
   })
 
   // --- Сохранение размеров окна с debounce ---

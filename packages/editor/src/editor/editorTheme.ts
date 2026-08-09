@@ -35,6 +35,20 @@ export function getEditorStyles(): string {
   padding-bottom: 24px;
 }
 
+/* Нейтрализация внутрисепараторных <img> элементов ProseMirror в Chromium */
+.ProseMirror-separator {
+  display: inline !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  vertical-align: baseline !important;
+  line-height: 0 !important;
+  font-size: 0 !important;
+  pointer-events: none !important;
+}
+
 /* ==========================================
    Suggestion Mode Styles
 /* ==========================================
@@ -67,15 +81,22 @@ export function getEditorStyles(): string {
   justify-content: center;
   width: 20px;
   height: 20px;
+  vertical-align: 1px;
   background: #fef3c7;
   color: #d97706;
   border: 1px solid #fde68a;
   border-radius: 50%;
   margin: 0 4px;
-  vertical-align: middle;
   cursor: pointer;
   box-shadow: 0 1px 3px rgba(0,0,0,0.08);
   transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.suggestion-note svg,
+.suggestion-note-badge svg {
+  display: block;
+  width: 13px;
+  height: 13px;
 }
 
 .dark .suggestion-note,
@@ -688,9 +709,14 @@ figure[data-sug-delete]::after {
   font-family: 'Inter', sans-serif; font-size: 0.85em; user-select: none; pointer-events: none;
   line-height: 0; vertical-align: baseline;
 }
-/* Скрыть trailing <br> после виджетов пустых марок — иначе появляется фантомная строка */
-.pm-mark-syntax ~ br:last-child {
-  display: none;
+/* Скрыть trailing <br> после виджетов, бейджей примечаний и чужих курсоров — иначе появляется фантомная строка */
+.pm-mark-syntax ~ br:last-child,
+.suggestion-note ~ br:last-child,
+.suggestion-note-badge ~ br:last-child,
+.ProseMirror-yjs-cursor ~ br:last-child,
+.ProseMirror-widget ~ br:last-child,
+.ProseMirror-separator ~ br:last-child {
+  display: none !important;
 }
 
 /* Горизонтальная линия */
@@ -931,6 +957,8 @@ figure[data-sug-delete]::after {
 .ProseMirror-yjs-cursor {
   position: relative;
   display: inline;
+  line-height: 0;
+  vertical-align: baseline;
   pointer-events: none;
 }
 .ProseMirror-yjs-cursor > div {

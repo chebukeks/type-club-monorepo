@@ -11,7 +11,6 @@ import { addRowAfter, deleteRow, CellSelection } from 'prosemirror-tables'
 import { Command, TextSelection } from 'prosemirror-state'
 import { schema } from './schema'
 import type { Plugin } from 'prosemirror-state'
-import { suggestionPluginKey } from './suggestionPlugin'
 
 // Команда: выход из блоков кода и таблиц по Esc
 const exitBlockByEsc: Command = (state, dispatch) => {

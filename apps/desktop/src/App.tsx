@@ -83,14 +83,16 @@ function AppLayout() {
       {/* Основная область: сайдбар + ручка ресайза + редактор */}
       <div className="flex flex-1 overflow-hidden">
         {/* Левая панель — файловый проводник */}
-        <Sidebar width={sidebarWidth} />
+        {state.sidebarOpen && <Sidebar width={sidebarWidth} />}
 
-        {/* Ручка ресайза (#40) */}
-        <div
-          onMouseDown={handleMouseDown}
-          className="w-[4px] flex-shrink-0 cursor-col-resize hover:bg-[var(--accent)] transition-colors duration-150"
-          style={{ marginLeft: '-2px', marginRight: '-2px', zIndex: 10 }}
-        />
+        {/* Ручка ресайза */}
+        {state.sidebarOpen && (
+          <div
+            onMouseDown={handleMouseDown}
+            className="w-[4px] flex-shrink-0 cursor-col-resize hover:bg-[var(--accent)] transition-colors duration-150"
+            style={{ marginLeft: '-2px', marginRight: '-2px', zIndex: 10 }}
+          />
+        )}
 
         {/* Правая панель — вкладки + редактор + StatsToast */}
         <div className="relative flex flex-col flex-1 overflow-hidden">

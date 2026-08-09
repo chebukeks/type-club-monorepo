@@ -484,3 +484,35 @@ body {
   border-color: var(--accent);
   background: rgba(108, 140, 255, 0.08);
 }
+
+/* ── Collaboration modal ── */
+.collab-section { padding: 12px 20px; border-bottom: 1px solid var(--border-default); }
+.collab-section-title { font-size: 11px; font-weight: 600; letter-spacing: 0.05em; color: var(--text-dim); margin-bottom: 4px; }
+.collab-section-desc { font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; }
+.collab-user { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; }
+.collab-user-name { font-size: 13px; color: var(--text-primary); }
+.collab-remove { background: none; border: none; cursor: pointer; color: var(--text-dim); padding: 4px; border-radius: 4px; }
+.collab-remove:hover { color: #ef4444; background: rgba(239,68,68,0.1); }
+.collab-link-section { margin-top: 10px; }
+.collab-link-label { font-size: 10px; font-weight: 600; letter-spacing: 0.05em; color: var(--text-dim); }
+.collab-link-btn { background: none; border: 1px solid var(--border-default); border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer; color: var(--text-secondary); display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; }
+.collab-link-btn:hover { background: var(--bg-elevated); }
+.collab-link-display { display: flex; gap: 6px; margin-top: 8px; }
+.collab-link-input { flex: 1; font-size: 12px; }
+
+/* ── Autocomplete ── */
+.autocomplete-container { position: relative; margin-top: 8px; }
+.autocomplete-input-wrap { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--border-default); border-radius: 6px; background: var(--bg-base); }
+.autocomplete-icon { color: var(--text-dim); flex-shrink: 0; }
+.autocomplete-input { flex: 1; border: none; outline: none; background: transparent; font-size: 13px; color: var(--text-primary); }
+.autocomplete-dropdown { position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px; background: var(--bg-elevated); border: 1px solid var(--border-strong); border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 100; overflow: hidden; }
+.autocomplete-item { padding: 8px 12px; font-size: 13px; cursor: pointer; color: var(--text-primary); }
+.autocomplete-item:hover, .autocomplete-item.selected { background: var(--menu-hover-bg); }
+
+/* ── Titlebar badge ── */
+.titlebar-badge { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: rgba(245,158,11,0.15); color: #f59e0b; font-weight: 500; }
+
+/* ── Role badges in sidebar ── */
+.role-badge { font-size: 10px; padding: 1px 5px; border-radius: 3px; font-weight: 500; }
+.role-badge.co_author { background: rgba(59,130,246,0.15); color: #3b82f6; }
+.role-badge.editor { background: rgba(245,158,11,0.15); color: #f59e0b; }

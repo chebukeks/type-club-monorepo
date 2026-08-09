@@ -419,20 +419,20 @@ export function MarkdownEditor({
             <span>Вставить</span>
             <span className="text-xs text-gray-400">Ctrl+V</span>
           </button>
-          <div className={sepClass} />
-          {formatItems.map((item) => (
-            <button
-              key={item.command}
-              className={btnClass}
-              onClick={() => applyFormat(item.command)}
-            >
-              <span>{item.label}</span>
-              <span className="text-xs text-gray-400">{item.hotkey}</span>
-            </button>
-          ))}
-          <div className={sepClass} />
           {!isSuggestionActive && (
             <>
+              <div className={sepClass} />
+              {formatItems.map((item) => (
+                <button
+                  key={item.command}
+                  className={btnClass}
+                  onClick={() => applyFormat(item.command)}
+                >
+                  <span>{item.label}</span>
+                  <span className="text-xs text-gray-400">{item.hotkey}</span>
+                </button>
+              ))}
+              <div className={sepClass} />
               <button className={btnClass} onClick={() => setCtxSubmenu("table")}>
                 <span>Создать таблицу...</span>
                 <span className="text-xs text-gray-400">▸</span>

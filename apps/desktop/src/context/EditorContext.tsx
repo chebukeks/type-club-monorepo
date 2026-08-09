@@ -29,6 +29,7 @@ const initialState: AppState = {
   documentZoom: 100,
   sidebarMode: 'local' as 'local' | 'online',
   onlineArticles: [] as import('../api').ArticleListItem[],
+  sidebarOpen: true,
 }
 
 // ============================================================
@@ -93,7 +94,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         tabs: state.tabs.map((t) =>
-          t.id === tabId ? { ...t, content, isModified: true } : t
+          t.id === tabId ? { ...t, content, isModified: t.articleId ? false : true } : t
         ),
       }
     }
@@ -175,6 +176,22 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, sidebarMode: action.payload.mode }
     case 'SET_ONLINE_ARTICLES':
       return { ...state, onlineArticles: action.payload.articles }
+    case 'SET_SUGGESTION_MODE':
+      return {
+        ...state,
+        tabs: state.tabs.map(t =>
+          t.id === action.payload.tabId ? { ...t, suggestionMode: action.payload.active } : t
+        ),
+      }
+    case 'TOGGLE_SIDEBAR': {
+      const nextOpen = !state.sidebarOpen
+      window.api.storeSet('sidebarOpen', nextOpen).catch(() => {})
+      return { ...state, sidebarOpen: nextOpen }
+    }
+    case 'SET_SIDEBAR_OPEN': {
+      window.api.storeSet('sidebarOpen', action.payload.open).catch(() => {})
+      return { ...state, sidebarOpen: action.payload.open }
+    }
     default:
       return state
   }
@@ -228,6 +245,8 @@ interface EditorContextValue {
   duplicateOnlineArticle: (id: number) => Promise<void>
   downloadOnlineArticle: (tabId: string) => Promise<void>
   setSidebarMode: (mode: 'local' | 'online') => void
+  toggleSidebar: () => void
+  setSidebarOpen: (open: boolean) => void
 }
 
 const EditorContext = createContext<EditorContextValue | null>(null)
@@ -261,6 +280,9 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
 
         const savedEditorMode = await window.api.storeGet('editorMode') as EditorMode | undefined
         if (savedEditorMode) dispatch({ type: 'SET_EDITOR_MODE', payload: { mode: savedEditorMode } })
+
+        const savedSidebarOpen = await window.api.storeGet('sidebarOpen') as boolean | undefined
+        if (savedSidebarOpen !== undefined) dispatch({ type: 'SET_SIDEBAR_OPEN', payload: { open: savedSidebarOpen } })
 
         const savedTextZoom = await window.api.storeGet('textZoom') as number | undefined
         if (savedTextZoom) dispatch({ type: 'SET_TEXT_ZOOM', payload: { zoom: savedTextZoom } })
@@ -387,8 +409,8 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     if (!tab) return
     try {
       if (tab.articleId) {
-        // Update existing
-        await articlesApi.update(tab.articleId, { title: tab.fileName, content: tab.content })
+        // Content is persisted continuously by collab-server. Only sync title via REST.
+        await articlesApi.update(tab.articleId, { title: tab.fileName })
       } else {
         // Create new
         const slug = tab.fileName.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-|-$/g, '')
@@ -780,21 +802,11 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
   // --- Закрытие вкладки с проверкой несохранённых изменений ---
   const closeTab = useCallback(async (tabId: string) => {
     const tab = state.tabs.find(t => t.id === tabId)
+    if (tab?.articleId) {
+      dispatch({ type: 'CLOSE_TAB', payload: { tabId } })
+      return
+    }
     if (tab?.isModified) {
-      if (tab.articleId) {
-        // Онлайн-статья: спрашиваем, сохранить на сервере?
-        const result = await window.api.confirmExit([tab.fileName])
-        if (result === 'save') {
-          try {
-            await articlesApi.update(tab.articleId, { title: tab.fileName, content: tab.content })
-            dispatch({ type: 'MARK_SAVED', payload: { tabId: tab.id } })
-          } catch (err) { console.error('Ошибка сохранения статьи:', err) }
-          dispatch({ type: 'CLOSE_TAB', payload: { tabId } })
-        } else if (result === 'discard') {
-          dispatch({ type: 'CLOSE_TAB', payload: { tabId } })
-        }
-        return
-      }
       const result = await window.api.confirmExit([tab.fileName])
       if (result === 'save') {
         try {
@@ -816,8 +828,8 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
 
   const fetchOnlineArticles = useCallback(async () => {
     try {
-      const articles = await articlesApi.listMy(1, 50)
-      dispatch({ type: 'SET_ONLINE_ARTICLES', payload: { articles } })
+      const articles = await articlesApi.myListPaged({ page: 1, size: 100, roles: ['author', 'co_author', 'editor'] })
+      dispatch({ type: 'SET_ONLINE_ARTICLES', payload: { articles: articles || [] } })
     } catch (err) { console.error('Ошибка загрузки статей:', err) }
   }, [])
 
@@ -893,6 +905,14 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     }
   }, [fetchOnlineArticles])
 
+  const toggleSidebar = useCallback(() => {
+    dispatch({ type: 'TOGGLE_SIDEBAR' })
+  }, [])
+
+  const setSidebarOpen = useCallback((open: boolean) => {
+    dispatch({ type: 'SET_SIDEBAR_OPEN', payload: { open } })
+  }, [])
+
   return (
     <EditorContext.Provider value={{
       state, dispatch,
@@ -912,6 +932,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       fetchOnlineArticles, openOnlineArticle, saveOnlineArticle,
       deleteOnlineArticle, renameOnlineArticle, duplicateOnlineArticle,
       downloadOnlineArticle, setSidebarMode,
+      toggleSidebar, setSidebarOpen,
     }}>
       {children}
     </EditorContext.Provider>

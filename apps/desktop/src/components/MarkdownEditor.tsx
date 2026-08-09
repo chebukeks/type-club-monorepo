@@ -11,7 +11,11 @@ import type { EditorView } from 'prosemirror-view'
 
 import { EditorCore, injectEditorStyles, schema, tableEditPluginKey } from '@type-club/editor'
 import { useEditor } from '../context/EditorContext'
+import { useAuth } from '../context/AuthContext'
+import { useCollaboration } from '../hooks/useCollaboration'
+import { articlesApi, collaborationApi } from '../api'
 import { SearchBar, RawSearchBar, searchPlugin } from './SearchBar'
+import { AddNoteModal } from './AddNoteModal'
 
 export function MarkdownEditor() {
   const { state, dispatch, setTextZoom, setDocumentZoom } = useEditor()
@@ -53,8 +57,66 @@ export function MarkdownEditor() {
     }
   }, [state.activeTabId, state.editorMode])
 
+  const { user } = useAuth()
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
   const content = activeTab?.content || ''
+  const articleId = activeTab?.articleId ?? null
+
+  const [userRole, setUserRole] = useState<'author' | 'co_author' | 'editor' | null>(null)
+  const [showAddNoteModal, setShowAddNoteModal] = useState(false)
+
+  useEffect(() => {
+    setUserRole(null)
+    if (!articleId || !user) {
+      return
+    }
+    articlesApi.get(articleId).then((art) => {
+      if (art.author_id === user.id) {
+        setUserRole('author')
+      } else {
+        collaborationApi.list(articleId)
+          .then((list) => {
+            const me = list.find((c) => c.user_id === user.id)
+            setUserRole((me?.role as any) ?? null)
+          })
+          .catch(() => setUserRole(null))
+      }
+    }).catch(() => setUserRole(null))
+  }, [articleId, user])
+
+  useEffect(() => {
+    const handler = () => setShowAddNoteModal(true)
+    window.addEventListener('editor-open-add-note-modal', handler)
+    return () => window.removeEventListener('editor-open-add-note-modal', handler)
+  }, [])
+
+  const handleAddNoteSubmit = useCallback((noteText: string) => {
+    if (!editorView || !noteText.trim()) return
+    const { from } = editorView.state.selection
+    const noteNode = editorView.state.schema.nodes.suggestion_note.create({
+      noteId: crypto.randomUUID(),
+      sugAuthorId: user?.id ?? 0,
+      sugAuthorName: user?.nickname || 'Советчик',
+      sugColor: '#f59e0b',
+      noteText: noteText.trim(),
+      sugCreatedAt: new Date().toISOString(),
+    })
+    const tr = editorView.state.tr.insert(from, noteNode)
+    tr.setMeta('suggestionAction', true)
+    editorView.dispatch(tr)
+    editorView.focus()
+  }, [editorView, user])
+
+  const collab = useCollaboration(articleId, user, userRole)
+  const suggestionModeActive = activeTab?.suggestionMode ?? false
+
+  useEffect(() => {
+    if (userRole === 'editor' && activeTab && !activeTab.suggestionMode) {
+      dispatch({ type: 'SET_SUGGESTION_MODE', payload: { tabId: activeTab.id, active: true } })
+    }
+  }, [userRole, activeTab, dispatch])
+
+  const isReadOnly = state.editorMode === 'preview' || (articleId != null && userRole == null)
 
   const replaceDataUris = useCallback((md: string): string => {
     const map = new Map<string, string>()
@@ -551,7 +613,8 @@ export function MarkdownEditor() {
     return rows
   }, [tableCols, tableRows])
 
-  // ── Render ──
+  const isSuggestionActive = (userRole === 'editor' || suggestionModeActive) && state.editorMode === 'seamless'
+
   return (
     <div
       className="flex-1 flex flex-col overflow-hidden bg-[var(--bg-base)]"
@@ -567,12 +630,18 @@ export function MarkdownEditor() {
       )}
 
       <EditorCore
+        key={state.activeTabId || 'none'}
         content={state.editorMode === 'raw' ? (rawContent ?? content) : content}
         editorMode={state.editorMode}
         onChange={state.editorMode === 'raw' ? handleRawChange : handleChange}
         textZoom={state.textZoom}
         documentZoom={state.documentZoom}
-        readOnly={state.editorMode === 'preview'}
+        readOnly={isReadOnly}
+        collaboration={collab.config ?? undefined}
+        userRole={userRole}
+        userId={user?.id}
+        userNickname={user?.nickname || ''}
+        suggestionModeActive={suggestionModeActive}
         onEditorView={(v) => setEditorView(v)}
         className={state.typewriterMode ? 'typewriter-mode' : ''}
         focusMode={state.focusMode}
@@ -589,9 +658,13 @@ export function MarkdownEditor() {
           onClick={(e) => e.stopPropagation()}
         >
           {ctxMenuItem('Копировать таблицу', undefined, handleTableCopy)}
-          {ctxMenuItem('Вырезать таблицу', undefined, handleTableCut)}
-          {ctxMenuItem('Редактировать таблицу', undefined, handleTableEdit)}
-          {ctxMenuItem('Удалить таблицу', undefined, handleTableDelete)}
+          {!isSuggestionActive && (
+            <>
+              {ctxMenuItem('Вырезать таблицу', undefined, handleTableCut)}
+              {ctxMenuItem('Редактировать таблицу', undefined, handleTableEdit)}
+              {ctxMenuItem('Удалить таблицу', undefined, handleTableDelete)}
+            </>
+          )}
         </div>
       )}
 
@@ -605,21 +678,34 @@ export function MarkdownEditor() {
           {ctxMenuItem('Копировать', 'Ctrl+C', () => handleClipboard('copy'))}
           {ctxMenuItem('Вырезать', 'Ctrl+X', () => handleClipboard('cut'))}
           {ctxMenuItem('Вставить', 'Ctrl+V', () => handleClipboard('paste'))}
-          {sep}
-          {formatItems.map((item) => (
-            <div
-              key={item.command}
-              className="menu-item enabled"
-              onClick={() => applyFormat(item.command)}
-            >
-              <span>{item.label}</span>
-              <span className="text-[11px] text-[var(--text-dim)]">{item.hotkey}</span>
-            </div>
-          ))}
-          {sep}
-          {ctxMenuItem('Создать таблицу...', '▸', () => setCtxSubmenu('table'))}
-          {ctxMenuItem('Создать блок кода...', '▸', () => setCtxSubmenu('code'))}
-          {ctxMenuItem('Создать блок математики', undefined, insertMathBlock)}
+          {!isSuggestionActive && (
+            <>
+              {sep}
+              {formatItems.map((item) => (
+                <div
+                  key={item.command}
+                  className="menu-item enabled"
+                  onClick={() => applyFormat(item.command)}
+                >
+                  <span>{item.label}</span>
+                  <span className="text-[11px] text-[var(--text-dim)]">{item.hotkey}</span>
+                </div>
+              ))}
+              {sep}
+              {ctxMenuItem('Создать таблицу...', '▸', () => setCtxSubmenu('table'))}
+              {ctxMenuItem('Создать блок кода...', '▸', () => setCtxSubmenu('code'))}
+              {ctxMenuItem('Создать блок математики', undefined, insertMathBlock)}
+            </>
+          )}
+          {isSuggestionActive && (
+            <>
+              {sep}
+              {ctxMenuItem('Создать примечание', 'Ctrl+Q', () => {
+                closeCtxMenu()
+                setShowAddNoteModal(true)
+              })}
+            </>
+          )}
         </div>
       )}
 
@@ -700,6 +786,12 @@ export function MarkdownEditor() {
           </div>
         </div>
       )}
+
+      <AddNoteModal
+        isOpen={showAddNoteModal}
+        onClose={() => setShowAddNoteModal(false)}
+        onSubmit={handleAddNoteSubmit}
+      />
     </div>
   )
 }

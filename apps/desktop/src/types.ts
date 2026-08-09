@@ -42,6 +42,8 @@ export interface Tab {
   scrollTop: number;
   /** Если заполнен — вкладка является онлайн-статьёй с type-club.ru */
   articleId?: number;
+  /** Активен ли режим советчика для этой вкладки */
+  suggestionMode?: boolean;
 }
 
 /** Тип ограничения (символы или слова) */
@@ -99,6 +101,8 @@ export interface AppState {
   textZoom: number;
   /** Масштаб документа в процентах (50–300) — Ctrl+Scroll, Ctrl+Alt++/- */
   documentZoom: number;
+  /** Отображение сайдбара открыт/свёрнут */
+  sidebarOpen: boolean;
 }
 
 /** Действия для редьюсера состояния */
@@ -131,7 +135,11 @@ export type AppAction =
   | { type: 'SET_DOCUMENT_ZOOM'; payload: { zoom: number } }
   | { type: 'REORDER_TABS'; payload: { fromIndex: number; toIndex: number } }
   | { type: 'SET_SIDEBAR_MODE'; payload: { mode: 'local' | 'online' } }
-  | { type: 'SET_ONLINE_ARTICLES'; payload: { articles: ArticleListItem[] } };
+  | { type: 'SET_ONLINE_ARTICLES'; payload: { articles: ArticleListItem[] } }
+  | { type: 'SET_SUGGESTION_MODE'; payload: { tabId: string; active: boolean } }
+  | { type: 'TOGGLE_SIDEBAR' }
+  | { type: 'SET_SIDEBAR_OPEN'; payload: { open: boolean } };
+
 
 /** API, доступный из Renderer-процесса через contextBridge */
 export interface IElectronAPI {

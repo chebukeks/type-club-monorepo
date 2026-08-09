@@ -2,13 +2,17 @@
  * TitleBar.tsx — Кастомная шапка окна (frameless window).
  * Содержит логотип, MenuBar, переключатель режимов и кнопки управления окном.
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { MenuBar } from './MenuBar'
 import { SettingsPopup } from './SettingsPopup'
 import { AuthModal } from './AuthModal'
 import { PublishModal } from './PublishModal'
+import { CollaborationModal } from './CollaborationModal'
+import { RawModeWarningModal, STORAGE_KEY_HIDE_RAW_WARNING } from './RawModeWarningModal'
 import { useEditor } from '../context/EditorContext'
 import { useAuth } from '../context/AuthContext'
+import { articlesApi, collaborationApi } from '../api'
+import { Users, Lightbulb, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import type { EditorMode } from '../types'
 
 const modes: { key: EditorMode; label: string }[] = [
@@ -21,12 +25,38 @@ export function TitleBar() {
   const [showSettings, setShowSettings] = useState(false)
   const [showAuth, setShowAuth] = useState(false)
   const [showPublish, setShowPublish] = useState(false)
-  const { state, setEditorMode } = useEditor()
+  const [showCollab, setShowCollab] = useState(false)
+  const [showRawWarning, setShowRawWarning] = useState(false)
+  const { state, dispatch, setEditorMode, toggleSidebar } = useEditor()
   const { user, logout } = useAuth()
   const [modeLoading, setModeLoading] = useState(false)
 
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
-  const isOnlineArticle = !!(activeTab?.articleId)
+  const articleId = activeTab?.articleId ?? null
+  const isOnlineArticle = !!articleId
+
+  const [userRole, setUserRole] = useState<'author' | 'co_author' | 'editor' | null>(null)
+  const suggestionModeActive = activeTab?.suggestionMode ?? false
+  const isSuggestionActive = userRole === 'editor' || suggestionModeActive
+
+  useEffect(() => {
+    if (!articleId || !user) {
+      setUserRole(null)
+      return
+    }
+    articlesApi.get(articleId).then((art) => {
+      if (art.author_id === user.id) {
+        setUserRole('author')
+      } else {
+        collaborationApi.list(articleId)
+          .then(list => {
+            const me = list.find((c) => c.user_id === user.id)
+            setUserRole((me?.role as any) ?? null)
+          })
+          .catch(() => setUserRole(null))
+      }
+    }).catch(() => setUserRole(null))
+  }, [articleId, user])
 
   // Слушаем событие от MarkdownEditor, что редактор готов
   useEffect(() => {
@@ -34,6 +64,28 @@ export function TitleBar() {
     window.addEventListener('editor-mode-ready', handler)
     return () => window.removeEventListener('editor-mode-ready', handler)
   }, [])
+
+  const changeModeWithSpinner = useCallback((targetMode: EditorMode) => {
+    setModeLoading(true)
+    setTimeout(() => setEditorMode(targetMode), 50)
+  }, [setEditorMode])
+
+  const handleModeClick = useCallback(async (targetMode: EditorMode) => {
+    if (state.editorMode === targetMode) return
+    if (targetMode === 'raw' && isOnlineArticle) {
+      let hideWarning = false
+      try {
+        hideWarning = !!(await window.api.storeGet(STORAGE_KEY_HIDE_RAW_WARNING))
+      } catch {
+        hideWarning = localStorage.getItem(STORAGE_KEY_HIDE_RAW_WARNING) === 'true'
+      }
+      if (!hideWarning) {
+        setShowRawWarning(true)
+        return
+      }
+    }
+    changeModeWithSpinner(targetMode)
+  }, [state.editorMode, isOnlineArticle, changeModeWithSpinner])
 
   return (
     <>
@@ -46,19 +98,22 @@ export function TitleBar() {
           className="flex items-center h-full"
           style={{
             WebkitAppRegion: 'drag',
-            paddingLeft: '12px',
+            paddingLeft: '6px',
             paddingRight: '12px',
           } as React.CSSProperties}
         >
-          {/* Логотип */}
-          <div
-            className="flex items-center gap-2 text-[var(--text-muted)] text-xs font-medium tracking-wide"
-            style={{ marginRight: '12px' }}
+          {/* Кнопка сворачивания/разворачивания сайдбара */}
+          <button
+            onClick={toggleSidebar}
+            className="w-7 h-7 flex items-center justify-center rounded text-[var(--text-dim)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)] transition-colors shrink-0"
+            style={{
+              WebkitAppRegion: 'no-drag',
+              marginRight: '6px',
+            } as React.CSSProperties}
+            title={state.sidebarOpen ? "Свернуть боковую панель (Ctrl+Shift+B)" : "Развернуть боковую панель (Ctrl+Shift+B)"}
           >
-            <svg width="16" height="16" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" className="block opacity-80">
-              <path fill="#637be5" d="m512,32c-164.69,0-309.99,82.96-396.44,209.35h506.04v168.49h-229.66v238.43c7.94-22.8,18.86-44.76,32.85-65.86,29.77-44.92,70.94-81.63,123.54-110.16,45.89-24.89,91.65-39.18,137.28-42.91,45.63-3.71,88.93,3.13,129.9,20.49l-46.01,130.76c-53.77-21.56-103.85-19.78-150.21,5.37-27.25,14.78-48.27,33.93-63.06,57.41-14.79,23.49-22.15,49.29-22.06,77.39.08,28.11,7.78,56.26,23.08,84.46,15.3,28.21,34.7,50.01,58.21,65.4,23.51,15.41,49.14,23.32,76.9,23.72,27.75.42,55.26-6.77,82.51-21.55,46.37-25.15,75.18-66.14,86.43-122.98l59.16,14.38c45.35-73.29,71.55-159.68,71.55-252.2,0-265.1-214.9-480-480-480ZM32,512c0,136,56.57,258.77,147.45,346.11v-448.27H42.93c-7.14,32.93-10.93,67.1-10.93,102.16Zm381.82,371.01c-8.88-16.37-16.15-32.87-21.88-49.5v143.35c38.37,9.88,78.6,15.14,120.06,15.14.17,0,.34,0,.52,0-40.65-26.32-73.56-62.64-98.69-108.98Z"/>
-            </svg>
-          </div>
+            {state.sidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
+          </button>
 
           {/* Интерактивное Меню */}
           <div style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
@@ -66,39 +121,33 @@ export function TitleBar() {
           </div>
         </div>
 
-        {/* Центральная часть — переключатель режимов */}
+        {/* Центральная часть — переключатель режимов (скрыт в режиме советчика) */}
         <div
           className="flex-1 flex items-center justify-center h-full"
           style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
         >
-          <div
-            className="flex items-center rounded-md overflow-hidden border border-[var(--border-default)]"
-            style={{ WebkitAppRegion: 'no-drag', height: '22px' } as React.CSSProperties}
-          >
-            {modes.map((m) => (
-              <button
-                key={m.key}
-                onClick={() => {
-                  if (state.editorMode !== m.key) {
-                    setModeLoading(true)
-                    // Даём браузеру кадр на отрисовку спиннера,
-                    // прежде чем начать тяжёлую синхронную работу
-                    // (сериализация 32 МБ + рендер textarea)
-                    setTimeout(() => setEditorMode(m.key), 50)
-                  }
-                }}
-                className="transition-colors text-[11px] font-medium tracking-wide"
-                style={{
-                  padding: '0 10px',
-                  height: '100%',
-                  backgroundColor: state.editorMode === m.key ? 'var(--accent)' : 'transparent',
-                  color: state.editorMode === m.key ? 'white' : 'var(--text-dim)',
-                }}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
+          {!isSuggestionActive && (
+            <div
+              className="flex items-center rounded-md overflow-hidden border border-[var(--border-default)]"
+              style={{ WebkitAppRegion: 'no-drag', height: '22px' } as React.CSSProperties}
+            >
+              {modes.map((m) => (
+                <button
+                  key={m.key}
+                  onClick={() => handleModeClick(m.key)}
+                  className="transition-colors text-[11px] font-medium tracking-wide"
+                  style={{
+                    padding: '0 10px',
+                    height: '100%',
+                    backgroundColor: state.editorMode === m.key ? 'var(--accent)' : 'transparent',
+                    color: state.editorMode === m.key ? 'white' : 'var(--text-dim)',
+                  }}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          )}
           {/* Спиннер при переключении режима */}
           {modeLoading && (
             <div
@@ -130,8 +179,35 @@ export function TitleBar() {
             </svg>
           </button>
 
-          {/* Кнопка "Поделиться" (только когда залогинен) */}
-          {user && (
+          {/* Кнопка "Совместная работа" (для автора онлайн-статьи) */}
+          {articleId && userRole === 'author' && (
+            <button
+              onClick={() => setShowCollab(true)}
+              className="w-9 h-full flex items-center justify-center text-[var(--text-dim)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)] transition-colors"
+              title="Совместная работа (соавторы и редакторы)"
+            >
+              <Users size={15} />
+            </button>
+          )}
+
+          {/* Переключатель режима советчика (доступен только в режиме seamless) */}
+          {state.editorMode === 'seamless' && articleId && (userRole === 'author' || userRole === 'co_author') && activeTab && (
+            <button
+              onClick={() => dispatch({ type: 'SET_SUGGESTION_MODE', payload: { tabId: activeTab.id, active: !activeTab.suggestionMode } })}
+              className={`w-9 h-full flex items-center justify-center transition-colors ${activeTab.suggestionMode ? 'text-amber-500 bg-amber-500/10' : 'text-[var(--text-dim)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)]'}`}
+              title={activeTab.suggestionMode ? "Выключить режим советчика" : "Включить режим советчика"}
+            >
+              <Lightbulb size={15} />
+            </button>
+          )}
+
+          {/* Индикатор роли для редактора (только в режиме seamless) */}
+          {state.editorMode === 'seamless' && articleId && userRole === 'editor' && (
+            <span className="titlebar-badge" title="Вы редактор этой статьи (режим советчика)">Советчик</span>
+          )}
+
+          {/* Кнопка "Публикация / Поделиться" (для автора или новой статьи) */}
+          {user && (!articleId || userRole === 'author') && (
             <button
               onClick={() => setShowPublish(true)}
               className="w-9 h-full flex items-center justify-center transition-colors"
@@ -148,7 +224,7 @@ export function TitleBar() {
                   ? 'var(--accent)'
                   : 'var(--text-dim)'
               }}
-              title="Поделиться на type-club.ru"
+              title="Настройки публикации на type-club.ru"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="18" cy="5" r="3" />
@@ -240,6 +316,16 @@ export function TitleBar() {
       {/* Модальные окна */}
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
       {showPublish && <PublishModal onClose={() => setShowPublish(false)} />}
+      {showCollab && articleId && <CollaborationModal articleId={articleId} onClose={() => setShowCollab(false)} />}
+      {showRawWarning && (
+        <RawModeWarningModal
+          onConfirm={() => {
+            setShowRawWarning(false)
+            changeModeWithSpinner('raw')
+          }}
+          onCancel={() => setShowRawWarning(false)}
+        />
+      )}
     </>
   )
 }

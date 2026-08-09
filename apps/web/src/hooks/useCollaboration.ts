@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import * as Y from "yjs"
 import { WebsocketProvider } from "y-websocket"
 import { Awareness } from "y-protocols/awareness"
@@ -17,29 +17,28 @@ export function useCollaboration(
   user: { id?: number; nickname: string } | null,
   userRole?: string | null
 ): CollaborationState {
+  const [collabConfig, setCollabConfig] = useState<CollaborationConfig | null>(null)
   const [connected, setConnected] = useState(false)
   const [synced, setSynced] = useState(false)
   const [peers, setPeers] = useState(0)
-  const [ready, setReady] = useState(false)
-  const yFragmentRef = useRef<Y.XmlFragment | null>(null)
-  const awarenessRef = useRef<Awareness | null>(null)
-  const providerRef = useRef<WebsocketProvider | null>(null)
-  const ydocRef = useRef<Y.Doc | null>(null)
-  const destroyRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
-    if (!articleId) return
+    if (!articleId) {
+      setCollabConfig(null)
+      setConnected(false)
+      setSynced(false)
+      setPeers(0)
+      return
+    }
 
-    setReady(false)
+    setCollabConfig(null)
+    setConnected(false)
+    setSynced(false)
+    setPeers(0)
 
     const ydoc = new Y.Doc()
-    ydocRef.current = ydoc
-
     const yXmlFragment = ydoc.getXmlFragment("content")
-    yFragmentRef.current = yXmlFragment
-
     const awareness = new Awareness(ydoc)
-    awarenessRef.current = awareness
 
     if (user) {
       awareness.setLocalStateField("user", {
@@ -53,16 +52,16 @@ export function useCollaboration(
     const token = getToken() || ""
     const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:"
     const wsUrl = `${wsProtocol}//${location.host}/collab`
+    const roomName = `article-${articleId}`
     const provider = new WebsocketProvider(
       wsUrl,
-      "article",
+      roomName,
       ydoc,
       {
         awareness,
         params: { articleId: String(articleId), token },
       },
     )
-    providerRef.current = provider
 
     provider.on("status", (event: { status: string }) => {
       setConnected(event.status === "connected")
@@ -91,17 +90,17 @@ export function useCollaboration(
       awareness.off("change", updatePeers)
       provider.disconnect()
       ydoc.destroy()
-      yFragmentRef.current = null
-      awarenessRef.current = null
-      setReady(false)
+      setCollabConfig(null)
       setConnected(false)
       setSynced(false)
       setPeers(0)
     }
 
-    destroyRef.current = destroyAll
-
-    setReady(true)
+    setCollabConfig({
+      yXmlFragment,
+      awareness,
+      destroy: destroyAll,
+    })
 
     return () => {
       destroyAll()
@@ -109,23 +108,14 @@ export function useCollaboration(
   }, [articleId])
 
   useEffect(() => {
-    if (!user || !awarenessRef.current) return
-    awarenessRef.current.setLocalStateField("user", {
+    if (!user || !collabConfig) return
+    collabConfig.awareness.setLocalStateField("user", {
       name: user.nickname,
       userId: user.id,
       role: userRole,
       color: "#" + Math.floor(Math.random() * 16777215).toString(16).padStart(6, "0"),
     })
-  }, [user, userRole])
+  }, [user, userRole, collabConfig])
 
-  const config = useMemo<CollaborationConfig | null>(() => {
-    if (!ready || !yFragmentRef.current || !awarenessRef.current) return null
-    return {
-      yXmlFragment: yFragmentRef.current,
-      awareness: awarenessRef.current,
-      destroy: () => destroyRef.current?.(),
-    }
-  }, [ready])
-
-  return { config, connected, synced, peers }
+  return { config: collabConfig, connected, synced, peers }
 }

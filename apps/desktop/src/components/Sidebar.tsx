@@ -309,60 +309,72 @@ export function Sidebar({ width }: { width: number }) {
       )}
 
       {/* Context menu — online articles */}
-      {onlineMenu && (
-        <div
-          className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
-          style={{ top: onlineMenu.y, left: onlineMenu.x, minWidth: '160px' }}
-          onContextMenu={(e) => e.preventDefault()}
-        >
-          <button className="menu-item enabled" onClick={() => {
-            // Start inline rename by setting renaming state
-            startRenaming(`__online__/${onlineMenu.article.id}`, 'file')
-            setOnlineMenu(null)
-          }}>
-            Переименовать
-          </button>
-          <button className="menu-item enabled" onClick={() => {
-            navigator.clipboard.writeText(`${config.siteUrl}/${onlineUsername}/${onlineMenu.article.slug}`)
-            setOnlineMenu(null)
-          }}>
-            Копировать ссылку
-          </button>
-          <button className="menu-item enabled" onClick={() => {
-            duplicateOnlineArticle(onlineMenu.article.id)
-            setOnlineMenu(null)
-          }}>
-            Создать копию
-          </button>
-          <div className="border-t border-[var(--border-strong)] my-1" />
-          <button className="menu-item enabled" style={{ color: 'var(--text-danger)' }} onClick={() => {
-            deleteOnlineArticle(onlineMenu.article.id)
-            setOnlineMenu(null)
-          }}>
-            Удалить
-          </button>
-          <div className="border-t border-[var(--border-strong)] my-1" />
-          <button className="menu-item enabled" onClick={() => {
-            window.api.openExternal(`${config.siteUrl}/${onlineUsername}/${onlineMenu.article.slug}`)
-            setOnlineMenu(null)
-          }}>
-            Открыть в браузере
-          </button>
-          <button className="menu-item enabled" onClick={async () => {
-            try {
-              const { articlesApi } = await import('../api')
-              const article = await articlesApi.get(onlineMenu.article.id)
-              await window.api.saveFileAs(
-                article.content,
-                onlineMenu.article.title + '.md'
-              )
-            } catch (err) { console.error('Ошибка скачивания:', err) }
-            setOnlineMenu(null)
-          }}>
-            Скачать
-          </button>
-        </div>
-      )}
+      {onlineMenu && (() => {
+        const isAuthor = !onlineMenu.article.my_roles || onlineMenu.article.my_roles.includes('author')
+        return (
+          <div
+            className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
+            style={{ top: onlineMenu.y, left: onlineMenu.x, minWidth: '160px' }}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            {isAuthor && (
+              <button className="menu-item enabled" onClick={() => {
+                startRenaming(`__online__/${onlineMenu.article.id}`, 'file')
+                setOnlineMenu(null)
+              }}>
+                Переименовать
+              </button>
+            )}
+            <button className="menu-item enabled" onClick={() => {
+              const authorNick = onlineMenu.article.author_nickname || onlineUsername
+              navigator.clipboard.writeText(`${config.siteUrl}/${authorNick}/${onlineMenu.article.slug}`)
+              setOnlineMenu(null)
+            }}>
+              Копировать ссылку
+            </button>
+            {isAuthor && (
+              <button className="menu-item enabled" onClick={() => {
+                duplicateOnlineArticle(onlineMenu.article.id)
+                setOnlineMenu(null)
+              }}>
+                Создать копию
+              </button>
+            )}
+            {isAuthor && (
+              <>
+                <div className="border-t border-[var(--border-strong)] my-1" />
+                <button className="menu-item enabled" style={{ color: 'var(--text-danger)' }} onClick={() => {
+                  deleteOnlineArticle(onlineMenu.article.id)
+                  setOnlineMenu(null)
+                }}>
+                  Удалить
+                </button>
+              </>
+            )}
+            <div className="border-t border-[var(--border-strong)] my-1" />
+            <button className="menu-item enabled" onClick={() => {
+              const authorNick = onlineMenu.article.author_nickname || onlineUsername
+              window.api.openExternal(`${config.siteUrl}/${authorNick}/${onlineMenu.article.slug}`)
+              setOnlineMenu(null)
+            }}>
+              Открыть в браузере
+            </button>
+            <button className="menu-item enabled" onClick={async () => {
+              try {
+                const { articlesApi } = await import('../api')
+                const article = await articlesApi.get(onlineMenu.article.id)
+                await window.api.saveFileAs(
+                  article.content,
+                  onlineMenu.article.title + '.md'
+                )
+              } catch (err) { console.error('Ошибка скачивания:', err) }
+              setOnlineMenu(null)
+            }}>
+              Скачать
+            </button>
+          </div>
+        )
+      })()}
     </div>
   )
 }
@@ -418,6 +430,12 @@ function OnlineArticleItem({ article, activeTabArticleId, activeToc, onOpen, onC
             <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" />
           </svg>
           <span className="truncate">{article.title}</span>
+          {article.my_roles?.includes('co_author') && (
+            <span className="role-badge co_author ml-auto flex-shrink-0">Соавтор</span>
+          )}
+          {!article.my_roles?.includes('co_author') && article.my_roles?.includes('editor') && (
+            <span className="role-badge editor ml-auto flex-shrink-0">Редактор</span>
+          )}
         </button>
       </div>
       {isActive && isTocOpen && activeToc.length > 0 && (
