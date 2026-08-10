@@ -59,9 +59,13 @@ export function UserAutocompleteInput({ placeholder = "Поиск пользов
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setSelectedIdx((i) => Math.max(i - 1, 0));
-    } else if (e.key === "Enter" && selectedIdx >= 0 && selectedIdx < results.length) {
+    } else if (e.key === "Enter") {
       e.preventDefault();
-      handleSelect(results[selectedIdx].nickname);
+      if (selectedIdx >= 0 && selectedIdx < results.length) {
+        handleSelect(results[selectedIdx].nickname);
+      } else if (query.trim()) {
+        handleSelect(query.trim());
+      }
     } else if (e.key === "Escape") {
       setShowDropdown(false);
     }

@@ -848,7 +848,7 @@ figure[data-sug-delete]::after {
   padding: 6px 10px;
   background: var(--bg-elevated);
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  border-radius: 12px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
 }
 
@@ -856,7 +856,7 @@ figure[data-sug-delete]::after {
   flex: 1;
   background: var(--bg-input);
   border: 1px solid var(--border-default);
-  border-radius: 4px;
+  border-radius: 8px;
   padding: 5px 10px;
   font-size: 13px;
   color: var(--text-primary);

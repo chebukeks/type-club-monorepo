@@ -331,7 +331,7 @@ export function EditorCore({
 
   if (editorMode === "raw") {
     return (
-      <div className="flex-1 h-full flex flex-col overflow-auto bg-[var(--bg-base)]" style={containerStyle}>
+      <div className="flex-1 h-full flex flex-col overflow-auto bg-[var(--bg-base)] rounded-[inherit]" style={containerStyle}>
         <textarea
           ref={(el) => {
             (textareaRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = el;
@@ -372,7 +372,7 @@ export function EditorCore({
       <div
         ref={(el) => { scrollContainerRef.current = el; }}
         onScroll={handleScroll}
-        className={`flex-1 overflow-auto bg-[var(--bg-base)] ${className || ''} ${focusClass}`}
+        className={`flex-1 overflow-auto bg-[var(--bg-base)] rounded-[inherit] ${className || ''} ${focusClass}`}
         style={{
           "--editor-font-size": `${15 * (textZoom / 100) * docScale}px`,
           "--doc-scale": docScale,

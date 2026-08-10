@@ -316,7 +316,7 @@ body {
   padding: 20px 24px;
   background: var(--bg-elevated);
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  border-radius: 14px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
@@ -368,7 +368,7 @@ body {
   padding: 8px 12px;
   background: var(--bg-input);
   border: 1px solid var(--border-default);
-  border-radius: 6px;
+  border-radius: 8px;
   outline: none;
   font-size: 13px;
   color: var(--text-primary);
@@ -386,7 +386,7 @@ body {
 /* Блок ошибки */
 .modal-error {
   padding: 8px 12px;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 13px;
   background: rgba(232, 17, 35, 0.1);
   color: #e81123;
@@ -404,7 +404,7 @@ body {
 .btn-primary {
   width: 100%;
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 13px;
   font-weight: 600;
   color: white;
@@ -426,7 +426,7 @@ body {
 /* Кнопка: вторичная */
 .btn-secondary {
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 13px;
   font-weight: 500;
   color: var(--text-secondary);
@@ -443,7 +443,7 @@ body {
 /* Переключатель вкладок (login/register и т.п.) */
 .modal-tabs {
   display: flex;
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 2px;
   background: var(--bg-hover);
   margin-bottom: 20px;
@@ -452,7 +452,7 @@ body {
 .modal-tab {
   flex: 1;
   padding: 6px 0;
-  border-radius: 5px;
+  border-radius: 6px;
   font-size: 12px;
   font-weight: 500;
   text-align: center;
@@ -473,7 +473,7 @@ body {
   width: 100%;
   text-align: left;
   padding: 10px 12px;
-  border-radius: 6px;
+  border-radius: 8px;
   border: 1px solid var(--border-default);
   background: transparent;
   cursor: pointer;

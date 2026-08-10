@@ -98,7 +98,7 @@ export function StatsToast() {
       }}
     >
       <div
-        className={`bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg transition-all duration-200 overflow-visible ${isExpanded ? 'py-1' : ''}`}
+        className={`bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg transition-all duration-200 overflow-visible ${isExpanded ? 'py-1' : ''}`}
         style={{ minWidth: isExpanded ? '240px' : 'auto' }}
       >
         {/* Компактный вид / Заголовок раскрытого вида */}
@@ -171,7 +171,7 @@ export function StatsToast() {
                   value={limitInputValue}
                   onChange={(e) => setLimitInputValue(e.target.value)}
                   onKeyDown={handleLimitKeyDown}
-                  className="w-[70px] px-2 text-[12px] rounded bg-[var(--bg-input)] border border-[var(--border-strong)] text-[var(--text-primary)] outline-none focus:border-[var(--accent)] transition-colors"
+                  className="w-[70px] px-2 text-[12px] rounded-lg bg-[var(--bg-input)] border border-[var(--border-strong)] text-[var(--text-primary)] outline-none focus:border-[var(--accent)] transition-colors"
                   style={{ padding: '5px' }}
                 />
 
@@ -179,7 +179,7 @@ export function StatsToast() {
                 <div className="relative flex-1" ref={selectRef}>
                   <div
                     onClick={() => setIsSelectOpen(!isSelectOpen)}
-                    className="flex items-center justify-between w-full text-[13px] rounded bg-[var(--bg-input)] border border-[var(--border-strong)] text-[var(--text-primary)] outline-none cursor-pointer transition-colors"
+                    className="flex items-center justify-between w-full text-[13px] rounded-lg bg-[var(--bg-input)] border border-[var(--border-strong)] text-[var(--text-primary)] outline-none cursor-pointer transition-colors"
                     style={{
                       padding: '6px 8px',
                       borderColor: isSelectOpen ? 'var(--accent)' : 'var(--border-strong)'
@@ -195,7 +195,7 @@ export function StatsToast() {
 
                   {/* Выпадающее (наверх) меню */}
                   {isSelectOpen && (
-                    <div className="absolute bottom-[calc(100%+4px)] left-0 w-full bg-[var(--bg-input)] border border-[var(--border-strong)] rounded shadow-lg overflow-hidden z-40">
+                    <div className="absolute bottom-[calc(100%+4px)] left-0 w-full bg-[var(--bg-input)] border border-[var(--border-strong)] rounded-lg shadow-lg overflow-hidden z-40">
                       <div
                         className={`px-3 py-2 text-[13px] cursor-pointer hover:bg-[var(--menu-hover-bg)] ${limitInputType === 'chars' ? 'text-[var(--accent)] bg-[var(--menu-hover-bg)]' : 'text-[var(--text-primary)]'}`}
                         onClick={() => {

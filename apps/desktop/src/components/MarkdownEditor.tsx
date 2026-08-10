@@ -623,7 +623,7 @@ export function MarkdownEditor() {
 
   return (
     <div
-      className="flex-1 flex flex-col overflow-hidden bg-[var(--bg-base)]"
+      className="flex-1 flex flex-col overflow-hidden bg-[var(--bg-base)] rounded-[inherit]"
       onContextMenu={handleContextMenu}
       onClick={() => closeCtxMenu()}
     >
@@ -660,7 +660,7 @@ export function MarkdownEditor() {
 
       {ctxMenu && ctxTable !== null && (
         <div
-          className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
+          className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
           style={ctxMenuStyle!}
           onContextMenu={(e) => e.preventDefault()}
           onClick={(e) => e.stopPropagation()}
@@ -678,7 +678,7 @@ export function MarkdownEditor() {
 
       {ctxMenu && !ctxSubmenu && ctxTable === null && (
         <div
-          className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
+          className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
           style={ctxMenuStyle!}
           onContextMenu={(e) => e.preventDefault()}
           onClick={(e) => e.stopPropagation()}
@@ -719,7 +719,7 @@ export function MarkdownEditor() {
 
       {ctxMenu && ctxSubmenu === 'table' && (
         <div
-          className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
+          className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
           style={ctxMenuStyle!}
           onContextMenu={(e) => e.preventDefault()}
           onClick={(e) => e.stopPropagation()}
@@ -747,7 +747,7 @@ export function MarkdownEditor() {
 
       {ctxMenu && ctxSubmenu === 'code' && (
         <div
-          className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
+          className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
           style={ctxMenuStyle!}
           onContextMenu={(e) => e.preventDefault()}
           onClick={(e) => e.stopPropagation()}

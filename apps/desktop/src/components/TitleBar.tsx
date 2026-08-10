@@ -13,8 +13,8 @@ import { Users, Lightbulb, PanelLeftClose, PanelLeftOpen, PanelTopClose, PanelTo
 import type { EditorMode } from '../types'
 
 const modes: { key: EditorMode; label: string }[] = [
-  { key: 'raw', label: 'Raw' },
   { key: 'seamless', label: 'Seamless' },
+  { key: 'raw', label: 'Raw' },
   { key: 'preview', label: 'Preview' },
 ]
 
@@ -39,7 +39,7 @@ function ProfileMenuPopup({ user, logout, onClose }: { user: { nickname: string;
   return (
     <div
       ref={popupRef}
-      className="absolute right-0 top-full mt-1 w-52 py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50 flex flex-col text-[13px] text-[var(--text-secondary)]"
+      className="absolute right-0 top-full mt-1 w-52 py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50 flex flex-col text-[13px] text-[var(--text-secondary)]"
     >
       <button
         className="menu-item enabled flex items-center justify-between"
@@ -157,7 +157,7 @@ export function TitleBar() {
   return (
     <>
       <div
-        className="flex items-center h-9 bg-[var(--bg-surface)] border-b border-[var(--border-default)] select-none"
+        className="flex items-center h-9 bg-[var(--bg-surface)] select-none"
         style={{ paddingLeft: '8px', paddingRight: '0' }}
       >
         {/* Область перетаскивания окна — левая часть */}
@@ -208,20 +208,19 @@ export function TitleBar() {
         >
           {!isSuggestionActive && (
             <div
-              className="flex items-center rounded-md overflow-hidden border border-[var(--border-default)]"
-              style={{ WebkitAppRegion: 'no-drag', height: '22px' } as React.CSSProperties}
+              className="flex items-center rounded-lg bg-[var(--bg-surface)] select-none"
+              style={{ padding: '3px', gap: '3px', WebkitAppRegion: 'no-drag' } as React.CSSProperties}
             >
               {modes.map((m) => (
                 <button
                   key={m.key}
                   onClick={() => handleModeClick(m.key)}
-                  className="transition-colors text-[11px] font-medium tracking-wide"
-                  style={{
-                    padding: '0 10px',
-                    height: '100%',
-                    backgroundColor: state.editorMode === m.key ? 'var(--accent)' : 'transparent',
-                    color: state.editorMode === m.key ? 'white' : 'var(--text-dim)',
-                  }}
+                  className={`text-[12px] font-medium rounded-md transition-all border ${
+                    state.editorMode === m.key
+                      ? 'bg-[var(--bg-base)] text-[var(--text-primary)] shadow-xs border-[var(--border-default)] font-medium'
+                      : 'text-[var(--text-dim)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] border-transparent'
+                  }`}
+                  style={{ padding: '3px 10px' }}
                 >
                   {m.label}
                 </button>
@@ -354,8 +353,7 @@ export function TitleBar() {
             {showSettings && <SettingsPopup onClose={() => setShowSettings(false)} />}
           </div>
 
-          {/* Разделитель */}
-          <div className="w-px h-4 bg-[var(--border-default)] mx-0.5" />
+
 
           {/* Кнопки управления окном */}
           <button

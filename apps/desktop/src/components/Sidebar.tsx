@@ -102,10 +102,10 @@ export function Sidebar({ width }: { width: number }) {
   const onlineUsername = user?.nickname || 'username'
 
   return (
-    <div style={{ width: `${width}px`, minWidth: '140px', maxWidth: '500px' }} className="bg-[var(--bg-surface)] border-r border-[var(--border-default)] flex flex-col h-full flex-shrink-0">
+    <div style={{ width: `${width}px`, minWidth: '140px', maxWidth: '500px' }} className="bg-[var(--bg-surface)] flex flex-col h-full flex-shrink-0">
       {/* Header */}
       <div
-        className="flex items-center justify-between border-b border-[var(--border-default)]"
+        className="flex items-center justify-between"
         style={{ height: '36px', paddingLeft: '16px', paddingRight: '12px' }}
       >
         <span
@@ -195,7 +195,7 @@ export function Sidebar({ width }: { width: number }) {
 
       {/* Поисковый блок */}
       <div
-        className="border-b border-[var(--border-default)] shrink-0"
+        className="shrink-0"
         style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}
       >
         <div className="relative flex items-center">
@@ -206,7 +206,7 @@ export function Sidebar({ width }: { width: number }) {
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={isOnline ? "Поиск по статьям..." : "Поиск по файлам..."}
             style={{ paddingLeft: '30px', paddingRight: '28px', paddingTop: '6px', paddingBottom: '6px' }}
-            className="w-full rounded bg-[var(--bg-input)] border border-[var(--border-default)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)] transition-colors placeholder-[var(--text-dim)]"
+            className="w-full rounded-xl bg-[var(--bg-input)] border border-[var(--border-default)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)] transition-colors placeholder-[var(--text-dim)]"
           />
           {searchQuery && (
             <button
@@ -389,7 +389,7 @@ export function Sidebar({ width }: { width: number }) {
       {/* Context menu — local */}
       {contextMenu && (
         <div
-          className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
+          className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
           style={{ top: contextMenu.y, left: contextMenu.x, minWidth: '160px' }}
           onContextMenu={(e) => e.preventDefault()}
         >
@@ -452,7 +452,7 @@ export function Sidebar({ width }: { width: number }) {
         const isAuthor = !onlineMenu.article.my_roles || onlineMenu.article.my_roles.includes('author')
         return (
           <div
-            className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
+            className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
             style={{ top: onlineMenu.y, left: onlineMenu.x, minWidth: '160px' }}
             onContextMenu={(e) => e.preventDefault()}
           >

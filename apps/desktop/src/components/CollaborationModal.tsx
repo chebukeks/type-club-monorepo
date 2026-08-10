@@ -80,85 +80,135 @@ export function CollaborationModal({ articleId, onClose }: Props) {
     setTimeout(() => setCopiedRole(null), 2000);
   };
 
+  const memberList = (members: Collaborator[]) => members.map((c) => (
+    <div
+      key={c.user_id}
+      className="flex items-center justify-between rounded-lg hover:bg-[var(--bg-hover)] text-xs text-[var(--text-primary)] transition-colors"
+      style={{ padding: '6px 10px' }}
+    >
+      <span className="font-medium">{c.nickname}</span>
+      <button
+        onClick={() => handleRemove(c.user_id)}
+        className="rounded-md hover:bg-red-500/10 text-[var(--text-dim)] hover:text-red-500 transition-colors"
+        style={{ padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        title="Удалить"
+      >
+        <Trash2 size={14} />
+      </button>
+    </div>
+  ));
+
+  const linkSection = (role: 'editor' | 'co_author', link: string) => (
+    <div style={{ marginTop: '12px' }}>
+      <div className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-tight" style={{ marginBottom: '6px' }}>
+        Приглашение по ссылке
+      </div>
+      {link ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div className="flex items-center" style={{ gap: '8px' }}>
+            <input
+              className="modal-input text-xs flex-1"
+              value={link}
+              readOnly
+              onFocus={(e) => e.target.select()}
+            />
+            <button
+              className="btn-primary shrink-0 flex items-center text-xs font-medium"
+              style={{ width: 'auto', padding: '6px 12px', gap: '6px' }}
+              onClick={() => copyToClipboard(link, role)}
+            >
+              {copiedRole === role ? <Check size={14} /> : <Copy size={14} />}
+              <span>{copiedRole === role ? 'Скопировано' : 'Копировать'}</span>
+            </button>
+          </div>
+          <button
+            className="w-full text-left text-xs text-[var(--text-dim)] hover:text-[var(--text-secondary)] transition-colors"
+            style={{ padding: '2px 0' }}
+            onClick={() => handleGenerateLink(role)}
+          >
+            Сгенерировать новую (старая перестанет работать)
+          </button>
+        </div>
+      ) : (
+        <button
+          className="w-full rounded-lg bg-[var(--bg-hover)] border border-[var(--border-default)] text-[var(--text-secondary)] text-xs font-medium hover:bg-[var(--bg-active)] hover:text-[var(--text-primary)] transition-colors flex items-center justify-center"
+          style={{ padding: '8px 12px', gap: '6px' }}
+          onClick={() => handleGenerateLink(role)}
+        >
+          <Link size={14} />
+          <span>Сгенерировать ссылку</span>
+        </button>
+      )}
+    </div>
+  );
+
   return (
     <div className="modal-overlay" onMouseDown={handleOverlayMouseDown} onClick={handleOverlayClick}>
-      <div className="modal-panel collab-modal" style={{ maxWidth: '520px' }} onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3 className="modal-title">Совместная работа</h3>
-          <button onClick={onClose} className="modal-close">
+      <div
+        className="modal-panel"
+        style={{ maxWidth: '448px', padding: '24px', borderRadius: '16px' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between" style={{ marginBottom: '16px' }}>
+          <h3 className="text-lg font-bold text-[var(--text-primary)]">Совместная работа</h3>
+          <button onClick={onClose} className="modal-close" style={{ padding: '4px', borderRadius: '8px' }}>
             <X size={18} />
           </button>
         </div>
 
-        <div style={{ maxHeight: '75vh', overflowY: 'auto' }}>
-          {error && <div className="modal-error" style={{ margin: '12px 20px 0' }}>{error}</div>}
+        {error && <div className="modal-error" style={{ marginBottom: '12px' }}>{error}</div>}
 
-          {/* EDITORS Section */}
-          <div className="collab-section">
-            <h4 className="collab-section-title">РЕДАКТОРЫ</h4>
-            <p className="collab-section-desc">Могут оставлять предложения по тексту (режим советчика)</p>
-
-            {editors.map((ed) => (
-              <div key={ed.user_id} className="collab-user">
-                <span className="collab-user-name">{ed.nickname}</span>
-                <button onClick={() => handleRemove(ed.user_id)} className="collab-remove" title="Удалить">
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            ))}
-
-            <UserAutocompleteInput
-              placeholder="Пригласить редактора по никнейму…"
-              onSelect={(nickname) => handleInvite(nickname, 'editor')}
-            />
-
-            <div className="collab-link-section">
-              <button onClick={() => handleGenerateLink('editor')} className="collab-link-btn">
-                <Link size={14} /> Создать ссылку для редактора
-              </button>
-              {editorLink && (
-                <div className="collab-link-display">
-                  <input value={editorLink} readOnly className="modal-input collab-link-input" />
-                  <button className="btn-secondary" onClick={() => copyToClipboard(editorLink, 'editor')}>
-                    {copiedRole === 'editor' ? <Check size={14} /> : <Copy size={14} />}
-                  </button>
-                </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '75vh', overflowY: 'auto', paddingRight: '2px' }}>
+          {/* Section 1: Редакторы */}
+          <div>
+            <h4 className="text-xs font-bold text-[var(--text-dim)] uppercase tracking-wider" style={{ marginBottom: '4px' }}>
+              Редакторы
+            </h4>
+            <p className="text-xs text-[var(--text-muted)]" style={{ marginBottom: '10px' }}>
+              Могут оставлять предложения по тексту (режим советчика)
+            </p>
+            <div style={{ marginBottom: '8px' }}>
+              <UserAutocompleteInput
+                placeholder="Пригласить редактора по никнейму…"
+                onSelect={(nickname) => handleInvite(nickname, 'editor')}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginBottom: '8px' }}>
+              {editors.length > 0 ? (
+                memberList(editors)
+              ) : (
+                <div className="text-xs text-[var(--text-dim)] italic" style={{ padding: '4px 10px' }}>Нет приглашённых</div>
               )}
             </div>
+            {linkSection('editor', editorLink)}
           </div>
 
-          {/* CO-AUTHORS Section */}
-          <div className="collab-section">
-            <h4 className="collab-section-title">СОАВТОРЫ</h4>
-            <p className="collab-section-desc">Могут редактировать текст напрямую</p>
+          {/* Separator */}
+          <div className="border-t border-[var(--border-default)]" style={{ margin: '16px 0' }} />
 
-            {coauthors.map((ca) => (
-              <div key={ca.user_id} className="collab-user">
-                <span className="collab-user-name">{ca.nickname}</span>
-                <button onClick={() => handleRemove(ca.user_id)} className="collab-remove" title="Удалить">
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            ))}
-
-            <UserAutocompleteInput
-              placeholder="Пригласить соавтора по никнейму…"
-              onSelect={(nickname) => handleInvite(nickname, 'co_author')}
-            />
-
-            <div className="collab-link-section">
-              <button onClick={() => handleGenerateLink('co_author')} className="collab-link-btn">
-                <Link size={14} /> Создать ссылку для соавтора
-              </button>
-              {coauthorLink && (
-                <div className="collab-link-display">
-                  <input value={coauthorLink} readOnly className="modal-input collab-link-input" />
-                  <button className="btn-secondary" onClick={() => copyToClipboard(coauthorLink, 'co_author')}>
-                    {copiedRole === 'co_author' ? <Check size={14} /> : <Copy size={14} />}
-                  </button>
-                </div>
+          {/* Section 2: Соавторы */}
+          <div>
+            <h4 className="text-xs font-bold text-[var(--text-dim)] uppercase tracking-wider" style={{ marginBottom: '4px' }}>
+              Соавторы
+            </h4>
+            <p className="text-xs text-[var(--text-muted)]" style={{ marginBottom: '10px' }}>
+              Могут редактировать текст напрямую
+            </p>
+            <div style={{ marginBottom: '8px' }}>
+              <UserAutocompleteInput
+                placeholder="Пригласить соавтора по никнейму…"
+                onSelect={(nickname) => handleInvite(nickname, 'co_author')}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginBottom: '8px' }}>
+              {coauthors.length > 0 ? (
+                memberList(coauthors)
+              ) : (
+                <div className="text-xs text-[var(--text-dim)] italic" style={{ padding: '4px 10px' }}>Нет приглашённых</div>
               )}
             </div>
+            {linkSection('co_author', coauthorLink)}
           </div>
         </div>
       </div>

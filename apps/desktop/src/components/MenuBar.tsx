@@ -167,7 +167,7 @@ export function MenuBar() {
       <div className="relative">
         <button onClick={() => toggleMenu('file')} className={menuBtnCls('file')} style={{ padding: '2px 12px' }}>File</button>
         {openMenu === 'file' && (
-          <div className="absolute top-full left-0 mt-1 min-w-[240px] w-max py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50">
+          <div className="absolute top-full left-0 mt-1 min-w-[240px] w-max py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50">
             <div className={itemCls(!!folderPath)} onClick={folderPath ? handleCreateFile : undefined}>
               <span>Создать файл</span><span className="text-[11px] text-[var(--text-dim)]">Ctrl+N</span>
             </div>
@@ -191,7 +191,7 @@ export function MenuBar() {
               <span>Недавние файлы</span>
               <span className="text-[11px]">▸</span>
               {submenu === 'recentFiles' && (
-                <div className="absolute left-full top-0 ml-0.5 w-72 py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50"
+                <div className="absolute left-full top-0 ml-0.5 w-72 py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50"
                   onMouseEnter={() => setSubmenu('recentFiles')} onMouseLeave={() => setSubmenu(null)}
                 >
                   {recentFiles.length === 0 ? (
@@ -226,7 +226,7 @@ export function MenuBar() {
               <span>Недавние папки</span>
               <span className="text-[11px]">▸</span>
               {submenu === 'recentFolders' && (
-                <div className="absolute left-full top-0 ml-0.5 w-72 py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50"
+                <div className="absolute left-full top-0 ml-0.5 w-72 py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50"
                   onMouseEnter={() => setSubmenu('recentFolders')} onMouseLeave={() => setSubmenu(null)}
                 >
                   {recentFolders.length === 0 ? (
@@ -274,7 +274,7 @@ export function MenuBar() {
       <div className="relative">
         <button onClick={() => toggleMenu('edit')} className={menuBtnCls('edit')} style={{ padding: '2px 12px' }}>Edit</button>
         {openMenu === 'edit' && (
-          <div className="absolute top-full left-0 mt-1 w-48 py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50">
+          <div className="absolute top-full left-0 mt-1 w-48 py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50">
             <div className="px-4 py-3 text-[12px] text-[var(--text-dim)] text-center italic">Пока ничего</div>
           </div>
         )}
@@ -284,7 +284,7 @@ export function MenuBar() {
       <div className="relative">
         <button onClick={() => toggleMenu('view')} className={menuBtnCls('view')} style={{ padding: '2px 12px' }}>View</button>
         {openMenu === 'view' && (
-          <div className="absolute top-full left-0 mt-1 min-w-[240px] w-max py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50">
+          <div className="absolute top-full left-0 mt-1 min-w-[240px] w-max py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50">
             {/* Обновить */}
             <div className={itemCls(!!activeTabId)} onClick={activeTabId ? handleRefresh : undefined}>
               <span>Обновить</span><span className="text-[11px] text-[var(--text-dim)]">F5</span>
@@ -308,7 +308,7 @@ export function MenuBar() {
               <span>Тема</span>
               <span className="text-[11px]">▸</span>
               {submenu === 'theme' && (
-                <div className="absolute left-full top-0 ml-0.5 w-44 py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50"
+                <div className="absolute left-full top-0 ml-0.5 w-44 py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50"
                   onMouseEnter={() => setSubmenu('theme')} onMouseLeave={() => setSubmenu(null)}
                 >
                   <div className={`${itemCls(true)} gap-2`} onClick={() => handleSetTheme('light')}>
@@ -333,7 +333,7 @@ export function MenuBar() {
               <span>Акцентировать</span>
               <span className="text-[11px]">▸</span>
               {submenu === 'focus' && (
-                <div className="absolute left-full top-0 ml-0.5 w-52 py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-md shadow-lg z-50"
+                <div className="absolute left-full top-0 ml-0.5 w-52 py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50"
                   onMouseEnter={() => setSubmenu('focus')} onMouseLeave={() => setSubmenu(null)}
                 >
                   <div className={`${itemCls(true)} gap-2`} onClick={() => handleSetFocusMode('none')}>

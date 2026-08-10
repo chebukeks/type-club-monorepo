@@ -47,7 +47,7 @@ export function TabBar() {
   }
 
   return (
-    <div className="flex items-end h-9 bg-[var(--bg-surface)] border-b border-[var(--border-default)] overflow-x-auto">
+    <div className="flex items-center h-[36px] bg-[var(--bg-surface)] overflow-x-auto select-none" style={{ paddingLeft: '10px', paddingRight: '10px', gap: '6px' }}>
       {state.tabs.map((tab, index) => {
         const isActive = tab.id === state.activeTabId
         const isDropTarget = dropIndex === index && dragIndex !== null && dragIndex !== index
@@ -63,20 +63,23 @@ export function TabBar() {
             onDragLeave={() => { if (dropIndex === index) setDropIndex(null) }}
             onDrop={(e) => handleDrop(e, index)}
             onClick={() => dispatch({ type: 'SET_ACTIVE_TAB', payload: { tabId: tab.id } })}
-            className={`group flex items-center gap-1.5 h-full cursor-pointer border-r border-[var(--border-default)] transition-colors min-w-0 max-w-[200px] ${
+            className={`group flex items-center cursor-pointer transition-all min-w-0 max-w-[220px] rounded-lg ${
               isActive
-                ? 'bg-[var(--bg-base)] text-[var(--text-primary)] border-t-2 border-t-[var(--accent)]'
-                : 'text-[var(--text-dim)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-hover)] border-t-2 border-t-transparent'
+                ? 'bg-[var(--bg-base)] text-[var(--text-primary)] shadow-xs border border-[var(--border-default)] font-medium'
+                : 'text-[var(--text-dim)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] border border-transparent'
             }`}
             style={{
-              paddingLeft: '16px',
-              paddingRight: '12px',
+              paddingTop: '5px',
+              paddingBottom: '5px',
+              paddingLeft: '14px',
+              paddingRight: '10px',
+              gap: '7px',
               borderLeftWidth: isDropTarget ? '2px' : '0px',
               borderLeftColor: isDropTarget ? 'var(--accent)' : 'transparent',
               borderLeftStyle: 'solid',
             }}
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 opacity-50">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 opacity-50">
               {tab.articleId ? (
                 <>
                   <circle cx="12" cy="12" r="10" />
@@ -90,7 +93,7 @@ export function TabBar() {
                 </>
               )}
             </svg>
-            <span className="text-[12px] truncate">{tab.fileName}</span>
+            <span className="text-[13px] truncate">{tab.fileName}</span>
             {!state.autosave && tab.isModified && (
               <span className="w-2 h-2 rounded-full bg-[var(--accent)] flex-shrink-0" />
             )}
