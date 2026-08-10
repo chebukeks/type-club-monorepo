@@ -26,7 +26,7 @@ export default function Editor() {
   const [showPublish, setShowPublish] = useState(false);
   const [accessState, setAccessState] = useState("private");
   const [slug, setSlug] = useState("");
-  const [showSiteHeader, setShowSiteHeader] = useState(false);
+  const [authorNickname, setAuthorNickname] = useState("");
   const [loaded, setLoaded] = useState(id ? false : true);
   const [userRole, setUserRole] = useState<"author" | "co_author" | "editor" | null>(null);
   const [suggestionModeActive, setSuggestionModeActive] = useState(initialSuggest);
@@ -53,6 +53,7 @@ export default function Editor() {
       setContent(a.content);
       setAccessState(a.access_state);
       setSlug(a.slug || generateRandomSlug());
+      setAuthorNickname(a.author_nickname || "");
       setLoaded(true);
 
       if (a.author_id === user.id) {
@@ -136,34 +137,32 @@ export default function Editor() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
-      {showSiteHeader ? (
-        <SiteHeader onLogoClick={() => setShowSiteHeader(false)} />
-      ) : (
-        <EditorHeader
-          title={title}
-          setTitle={setTitle}
-          editorMode={editorMode}
-          setEditorMode={(m) => {
-            setEditorMode(m);
-            if (m !== "seamless") setSuggestionModeActive(false);
-          }}
-          onPublish={() => {
-            if (userRole === "author" || isNew || !userRole) {
-              setShowPublish(true);
-            }
-          }}
-          isNew={isNew}
-          onToggleHeader={() => setShowSiteHeader(!showSiteHeader)}
-          collabActive={collabActive}
-          collabSynced={collab.synced}
-          userRole={userRole}
-          suggestionModeActive={suggestionModeActive}
-          onToggleSuggestionMode={(active) => {
-            setSuggestionModeActive(active);
-            if (active) setEditorMode("seamless");
-          }}
-        />
-      )}
+      <EditorHeader
+        title={title}
+        setTitle={setTitle}
+        editorMode={editorMode}
+        setEditorMode={(m) => {
+          setEditorMode(m);
+          if (m !== "seamless") setSuggestionModeActive(false);
+        }}
+        onPublish={() => {
+          if (userRole === "author" || isNew || !userRole) {
+            setShowPublish(true);
+          }
+        }}
+        isNew={isNew}
+        articleId={articleId}
+        slug={slug}
+        authorNickname={authorNickname}
+        collabActive={collabActive}
+        collabSynced={collab.synced}
+        userRole={userRole}
+        suggestionModeActive={suggestionModeActive}
+        onToggleSuggestionMode={(active) => {
+          setSuggestionModeActive(active);
+          if (active) setEditorMode("seamless");
+        }}
+      />
 
       <MarkdownEditor
         content={content}

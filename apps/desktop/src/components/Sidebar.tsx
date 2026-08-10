@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useEditor } from '../context/EditorContext'
 import { config } from '../config'
 import { useAuth } from '../context/AuthContext'
@@ -18,6 +18,25 @@ export function Sidebar({ width }: { width: number }) {
       prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
     )
   }
+
+  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({})
+
+  useEffect(() => {
+    window.api.storeGet('expandedFolders').then((saved) => {
+      if (saved && typeof saved === 'object') {
+        setExpandedFolders(saved as Record<string, boolean>)
+      }
+    }).catch(() => {})
+  }, [])
+
+  const toggleFolderExpanded = useCallback((path: string, defaultOpen: boolean) => {
+    setExpandedFolders((prev) => {
+      const currentIsOpen = prev[path] ?? defaultOpen
+      const next = { ...prev, [path]: !currentIsOpen }
+      window.api.storeSet('expandedFolders', next).catch(() => {})
+      return next
+    })
+  }, [])
 
   const isOnline = state.sidebarMode === 'online'
 
@@ -378,6 +397,8 @@ export function Sidebar({ width }: { width: number }) {
                     onContextMenu={handleContextMenu}
                     activeFilePath={activeTab?.filePath || null}
                     activeToc={state.activeToc || []}
+                    expandedFolders={expandedFolders}
+                    toggleFolderExpanded={toggleFolderExpanded}
                   />
                 ))}
               </div>
@@ -756,15 +777,18 @@ function InlineCreateInput({ type, depth, onSubmit, onCancel }: {
   )
 }
 
-function FileTreeItem({ entry, depth, onFileClick, onContextMenu, activeFilePath, activeToc }: {
+function FileTreeItem({ entry, depth, onFileClick, onContextMenu, activeFilePath, activeToc, expandedFolders, toggleFolderExpanded }: {
   entry: FileEntry; depth: number;
   onFileClick: (filePath: string, fileName: string) => void;
   onContextMenu: (e: React.MouseEvent, path: string, type: 'file' | 'folder', name: string) => void;
   activeFilePath: string | null;
   activeToc: TocItem[];
+  expandedFolders: Record<string, boolean>;
+  toggleFolderExpanded: (path: string, defaultOpen: boolean) => void;
 }) {
   const { state, dispatch, createFile, createFolder, setActiveExplorerPath, renameItem, moveItem } = useEditor()
-  const [isOpen, setIsOpen] = useState(depth < 1)
+  const defaultOpen = depth < 1
+  const isOpen = expandedFolders[entry.path] ?? defaultOpen
   const [isTocOpen, setIsTocOpen] = useState(true)
   const [isDragOver, setIsDragOver] = useState(false)
 
@@ -809,8 +833,10 @@ function FileTreeItem({ entry, depth, onFileClick, onContextMenu, activeFilePath
   }
 
   useEffect(() => {
-    if (state.creating?.targetPath === entry.path) setIsOpen(true)
-  }, [state.creating?.targetPath, entry.path])
+    if (state.creating?.targetPath === entry.path && !isOpen) {
+      toggleFolderExpanded(entry.path, defaultOpen)
+    }
+  }, [state.creating?.targetPath, entry.path, isOpen, toggleFolderExpanded, defaultOpen])
 
   const isRenaming = state.renaming?.path === entry.path
 
@@ -836,7 +862,7 @@ function FileTreeItem({ entry, depth, onFileClick, onContextMenu, activeFilePath
             onContextMenu={(e) => onContextMenu(e, entry.path, 'folder', entry.name)}
             onClick={() => {
               setActiveExplorerPath(entry.path)
-              setIsOpen(!isOpen)
+              toggleFolderExpanded(entry.path, defaultOpen)
             }}
             className={`w-full flex items-center gap-1.5 text-[13px] rounded transition-colors ${
                isDragOver ? 'bg-[var(--accent)] text-white' : isFolderActive ? 'bg-[var(--bg-hover)] text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
@@ -867,7 +893,17 @@ function FileTreeItem({ entry, depth, onFileClick, onContextMenu, activeFilePath
               />
             )}
             {entry.children?.map((child) => (
-              <FileTreeItem key={child.path} entry={child} depth={depth + 1} onFileClick={onFileClick} onContextMenu={onContextMenu} activeFilePath={activeFilePath} activeToc={activeToc} />
+              <FileTreeItem
+                key={child.path}
+                entry={child}
+                depth={depth + 1}
+                onFileClick={onFileClick}
+                onContextMenu={onContextMenu}
+                activeFilePath={activeFilePath}
+                activeToc={activeToc}
+                expandedFolders={expandedFolders}
+                toggleFolderExpanded={toggleFolderExpanded}
+              />
             ))}
           </div>
         )}

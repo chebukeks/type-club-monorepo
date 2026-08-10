@@ -73,7 +73,7 @@ async def get_profile(
 
     article_count = (
         await session.execute(
-            select(func.count(Article.id)).where(Article.author_id == user.id)
+            select(func.count(Article.id)).where(Article.author_id == user.id, Article.access_state == "public")
         )
     ).scalar_one()
 
@@ -81,7 +81,7 @@ async def get_profile(
         await session.execute(
             select(func.count(ArticleView.id))
             .join(Article, ArticleView.article_id == Article.id)
-            .where(Article.author_id == user.id)
+            .where(Article.author_id == user.id, Article.access_state == "public")
         )
     ).scalar_one()
 
@@ -89,7 +89,7 @@ async def get_profile(
         await session.execute(
             select(func.count(ArticleLike.id))
             .join(Article, ArticleLike.article_id == Article.id)
-            .where(Article.author_id == user.id)
+            .where(Article.author_id == user.id, Article.access_state == "public")
         )
     ).scalar_one()
 

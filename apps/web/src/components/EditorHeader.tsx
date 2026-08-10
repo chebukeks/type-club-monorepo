@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Globe, RefreshCw, Menu, X, Cloud, Lightbulb } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Globe, RefreshCw, Menu, X, Cloud, Lightbulb, ChevronLeft } from "lucide-react";
 import { EditorMode } from "./MarkdownEditor";
 import RawModeWarningModal, { STORAGE_KEY_HIDE_RAW_WARNING } from "./RawModeWarningModal";
 
@@ -10,7 +11,9 @@ interface EditorHeaderProps {
   setEditorMode: (m: EditorMode) => void;
   onPublish: () => void;
   isNew: boolean;
-  onToggleHeader: () => void;
+  articleId?: number | null;
+  slug?: string;
+  authorNickname?: string;
   collabActive?: boolean;
   collabSynced?: boolean;
   userRole?: string | null;
@@ -25,13 +28,16 @@ export default function EditorHeader({
   setEditorMode,
   onPublish,
   isNew,
-  onToggleHeader,
+  articleId,
+  slug,
+  authorNickname,
   collabActive,
   collabSynced,
   userRole,
   suggestionModeActive,
   onToggleSuggestionMode,
 }: EditorHeaderProps) {
+  const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [showRawWarning, setShowRawWarning] = useState(false);
 
@@ -133,9 +139,24 @@ export default function EditorHeader({
     <header className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 shrink-0">
       {/* Main row */}
       <div className="flex items-center px-3 sm:px-4 gap-2 sm:gap-3 h-14">
-        <button onClick={onToggleHeader} className="shrink-0 hover:opacity-80" title="Toggle header">
-          <img src="/icons/icon_48x48.png" alt="Type Club" className="h-8 w-8" />
-        </button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={() => {
+              if (articleId && authorNickname && slug) {
+                navigate(`/${authorNickname}/${slug}`);
+              } else {
+                navigate(-1);
+              }
+            }}
+            className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+            title="Назад к статье"
+          >
+            <ChevronLeft size={20} />
+          </button>
+          <Link to="/" className="shrink-0 hover:opacity-80 flex items-center" title="На главную">
+            <img src="/icons/icon_48x48.png" alt="Type Club" className="h-8 w-8" />
+          </Link>
+        </div>
 
         <input
           type="text"

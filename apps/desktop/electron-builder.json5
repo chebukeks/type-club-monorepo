@@ -46,6 +46,7 @@
     "oneClick": false,
     "perMachine": false,
     "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": "ask",
     "deleteAppDataOnUninstall": false
   },
   "linux": {
