@@ -127,6 +127,8 @@ export function EditorCore({
     if (!editorRef.current) return;
     if (editorMode === "raw") return;
 
+    let isUnmounted = false;
+
     if (viewRef.current) {
       viewRef.current.destroy();
       viewRef.current = null;
@@ -166,6 +168,7 @@ export function EditorCore({
       view() {
         return {
           update(view, prevState) {
+            if (isUnmounted) return;
             if (!view.state.doc.eq(prevState.doc)) {
               const md = serializeMarkdown(view.state.doc);
               lastEmittedRef.current = md;
@@ -234,7 +237,8 @@ export function EditorCore({
     });
 
     return () => {
-      view.dispatch = () => {}
+      isUnmounted = true;
+      view.dispatch = () => {};
       view.destroy();
       viewRef.current = null;
     };

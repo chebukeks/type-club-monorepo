@@ -187,30 +187,31 @@ export function MarkdownEditor() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [state.textZoom, state.documentZoom, setTextZoom, setDocumentZoom])
 
+  const activeTabId = activeTab?.id
   // ── Content handlers ──
   const handleChange = useCallback((md: string) => {
-    if (!state.activeTabId) return
-    dispatch({ type: 'UPDATE_CONTENT', payload: { tabId: state.activeTabId, content: md } })
-  }, [state.activeTabId, dispatch])
+    if (!activeTabId) return
+    dispatch({ type: 'UPDATE_CONTENT', payload: { tabId: activeTabId, content: md } })
+  }, [activeTabId, dispatch])
 
   useEffect(() => {
-    if (state.editorMode === 'raw' && state.activeTabId) {
-      if (rawTabIdRef.current !== state.activeTabId || rawContent === null) {
-        rawTabIdRef.current = state.activeTabId
+    if (state.editorMode === 'raw' && activeTabId) {
+      if (rawTabIdRef.current !== activeTabId || rawContent === null) {
+        rawTabIdRef.current = activeTabId
         const replaced = replaceDataUris(content)
         setRawContent(replaced)
       }
     }
-  }, [state.editorMode, state.activeTabId, content, replaceDataUris, rawContent])
+  }, [state.editorMode, activeTabId, content, replaceDataUris, rawContent])
 
   const handleRawChange = useCallback((text: string) => {
     setRawContent(text)
-    rawTabIdRef.current = state.activeTabId
+    rawTabIdRef.current = activeTabId ?? null
     if (rawSyncTimerRef.current) clearTimeout(rawSyncTimerRef.current)
     rawSyncTimerRef.current = setTimeout(() => {
       flushRawContentRef.current?.()
     }, 1500)
-  }, [state.activeTabId])
+  }, [activeTabId])
 
   // ── Typewriter plugin ──
   const isTypewriterModeRef = useRef(state.typewriterMode)
