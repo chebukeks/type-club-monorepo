@@ -103,26 +103,33 @@ export function TitleBar() {
   const isOnlineArticle = !!articleId
 
   const [userRole, setUserRole] = useState<'author' | 'co_author' | 'editor' | null>(null)
-  const suggestionModeActive = activeTab?.suggestionMode ?? false
-  const isSuggestionActive = userRole === 'editor' || suggestionModeActive
+  const suggestionModeActive = articleId != null && (activeTab?.suggestionMode ?? false)
+  const isSuggestionActive = articleId != null && (userRole === 'editor' || suggestionModeActive)
 
   useEffect(() => {
+    setUserRole(null)
     if (!articleId || !user) {
-      setUserRole(null)
       return
     }
+    let isCurrent = true
     articlesApi.get(articleId).then((art) => {
+      if (!isCurrent) return
       if (art.author_id === user.id) {
         setUserRole('author')
       } else {
         collaborationApi.list(articleId)
           .then(list => {
+            if (!isCurrent) return
             const me = list.find((c) => c.user_id === user.id)
             setUserRole((me?.role as any) ?? null)
           })
-          .catch(() => setUserRole(null))
+          .catch(() => { if (isCurrent) setUserRole(null) })
       }
-    }).catch(() => setUserRole(null))
+    }).catch(() => { if (isCurrent) setUserRole(null) })
+
+    return () => {
+      isCurrent = false
+    }
   }, [articleId, user])
 
   // Слушаем событие от MarkdownEditor, что редактор готов

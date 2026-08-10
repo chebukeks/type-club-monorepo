@@ -70,18 +70,25 @@ export function MarkdownEditor() {
     if (!articleId || !user) {
       return
     }
+    let isCurrent = true
     articlesApi.get(articleId).then((art) => {
+      if (!isCurrent) return
       if (art.author_id === user.id) {
         setUserRole('author')
       } else {
         collaborationApi.list(articleId)
           .then((list) => {
+            if (!isCurrent) return
             const me = list.find((c) => c.user_id === user.id)
             setUserRole((me?.role as any) ?? null)
           })
-          .catch(() => setUserRole(null))
+          .catch(() => { if (isCurrent) setUserRole(null) })
       }
-    }).catch(() => setUserRole(null))
+    }).catch(() => { if (isCurrent) setUserRole(null) })
+
+    return () => {
+      isCurrent = false
+    }
   }, [articleId, user])
 
   useEffect(() => {
@@ -108,13 +115,13 @@ export function MarkdownEditor() {
   }, [editorView, user])
 
   const collab = useCollaboration(articleId, user, userRole)
-  const suggestionModeActive = activeTab?.suggestionMode ?? false
+  const suggestionModeActive = articleId != null && (activeTab?.suggestionMode ?? false)
 
   useEffect(() => {
-    if (userRole === 'editor' && activeTab && !activeTab.suggestionMode) {
+    if (articleId != null && userRole === 'editor' && activeTab && !activeTab.suggestionMode) {
       dispatch({ type: 'SET_SUGGESTION_MODE', payload: { tabId: activeTab.id, active: true } })
     }
-  }, [userRole, activeTab, dispatch])
+  }, [articleId, userRole, activeTab?.id, activeTab?.suggestionMode, dispatch])
 
   const isReadOnly = state.editorMode === 'preview' || (articleId != null && userRole == null)
 
@@ -614,7 +621,7 @@ export function MarkdownEditor() {
     return rows
   }, [tableCols, tableRows])
 
-  const isSuggestionActive = (userRole === 'editor' || suggestionModeActive) && state.editorMode === 'seamless'
+  const isSuggestionActive = articleId != null && (userRole === 'editor' || suggestionModeActive) && state.editorMode === 'seamless'
 
   const handleScroll = useCallback((st: number) => {
     if (!activeTabId) return
@@ -644,10 +651,10 @@ export function MarkdownEditor() {
         documentZoom={state.documentZoom}
         readOnly={isReadOnly}
         collaboration={articleId != null ? (collab.config ?? undefined) : undefined}
-        userRole={userRole}
+        userRole={articleId != null ? userRole : null}
         userId={user?.id}
         userNickname={user?.nickname || ''}
-        suggestionModeActive={suggestionModeActive}
+        suggestionModeActive={isSuggestionActive}
         onEditorView={(v) => setEditorView(v)}
         className={state.typewriterMode ? 'typewriter-mode' : ''}
         focusMode={state.focusMode}

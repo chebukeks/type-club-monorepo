@@ -181,7 +181,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         tabs: state.tabs.map(t =>
-          t.id === action.payload.tabId ? { ...t, suggestionMode: action.payload.active } : t
+          t.id === action.payload.tabId ? { ...t, suggestionMode: t.articleId ? action.payload.active : false } : t
         ),
       }
     case 'TOGGLE_SIDEBAR': {
