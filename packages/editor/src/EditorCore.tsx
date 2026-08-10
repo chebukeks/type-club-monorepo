@@ -105,8 +105,11 @@ export function EditorCore({
   userId,
   userNickname,
   suggestionModeActive,
+  scrollTop,
+  onScroll,
 }: EditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const onChangeRef = useRef(onChange);
@@ -121,6 +124,21 @@ export function EditorCore({
   collaborationRef.current = collaboration;
 
   const docScale = documentZoom / 100;
+
+  // ── Scroll position restoration ──
+  useEffect(() => {
+    if (scrollTop == null) return;
+    const timer = setTimeout(() => {
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = scrollTop;
+      }
+    }, 30);
+    return () => clearTimeout(timer);
+  }, [scrollTop, editorMode]);
+
+  const handleScroll = (e: React.UIEvent<HTMLElement>) => {
+    onScroll?.(e.currentTarget.scrollTop);
+  };
 
   useEffect(() => {
     injectEditorStyles();
@@ -315,7 +333,11 @@ export function EditorCore({
     return (
       <div className="flex-1 h-full flex flex-col overflow-auto bg-[var(--bg-base)]" style={containerStyle}>
         <textarea
-          ref={textareaRef}
+          ref={(el) => {
+            (textareaRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = el;
+            scrollContainerRef.current = el;
+          }}
+          onScroll={handleScroll}
           className="w-full flex-1 resize-none outline-none bg-transparent text-[var(--editor-text)] p-6"
           style={{
             fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
@@ -348,6 +370,8 @@ export function EditorCore({
 
     return (
       <div
+        ref={(el) => { scrollContainerRef.current = el; }}
+        onScroll={handleScroll}
         className={`flex-1 overflow-auto bg-[var(--bg-base)] ${className || ''} ${focusClass}`}
         style={{
           "--editor-font-size": `${15 * (textZoom / 100) * docScale}px`,

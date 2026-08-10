@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { Awareness } from "y-protocols/awareness";
@@ -18,27 +18,12 @@ export function useCollaboration(
   user: { id?: number; nickname: string } | null,
   userRole?: string | null
 ): CollaborationState {
-  const [activeArticleId, setActiveArticleId] = useState<number | null>(null);
-  const [collabConfig, setCollabConfig] = useState<CollaborationConfig | null>(null);
   const [connected, setConnected] = useState(false);
   const [synced, setSynced] = useState(false);
   const [peers, setPeers] = useState(0);
 
-  useEffect(() => {
-    if (!articleId) {
-      setActiveArticleId(null);
-      setCollabConfig(null);
-      setConnected(false);
-      setSynced(false);
-      setPeers(0);
-      return;
-    }
-
-    setActiveArticleId(null);
-    setCollabConfig(null);
-    setConnected(false);
-    setSynced(false);
-    setPeers(0);
+  const collabObj = useMemo(() => {
+    if (!articleId) return null;
 
     const ydoc = new Y.Doc();
     const yXmlFragment = ydoc.getXmlFragment("content");
@@ -66,14 +51,39 @@ export function useCollaboration(
       }
     );
 
-    provider.on("status", (event: { status: string }) => {
+    let destroyed = false;
+    const destroyAll = () => {
+      if (destroyed) return;
+      destroyed = true;
+      provider.disconnect();
+      ydoc.destroy();
+    };
+
+    const configObj: CollaborationConfig = {
+      yXmlFragment,
+      awareness,
+      destroy: destroyAll,
+    };
+
+    return { configObj, provider, awareness, articleId };
+  }, [articleId]);
+
+  useEffect(() => {
+    if (!collabObj) {
+      setConnected(false);
+      setSynced(false);
+      setPeers(0);
+      return;
+    }
+
+    const { provider, awareness } = collabObj;
+
+    const onStatus = (event: { status: string }) => {
       setConnected(event.status === "connected");
-    });
-
-    provider.on("sync", (isSynced: boolean) => {
+    };
+    const onSync = (isSynced: boolean) => {
       setSynced(isSynced);
-    });
-
+    };
     const updatePeers = () => {
       const states = awareness.getStates();
       let count = 0;
@@ -83,51 +93,32 @@ export function useCollaboration(
       setPeers(count);
     };
 
+    provider.on("status", onStatus);
+    provider.on("sync", onSync);
     awareness.on("change", updatePeers);
 
-    let destroyed = false;
-
-    const destroyAll = () => {
-      if (destroyed) return;
-      destroyed = true;
-      awareness.off("change", updatePeers);
-      provider.disconnect();
-      ydoc.destroy();
-      setActiveArticleId(null);
-      setCollabConfig(null);
-      setConnected(false);
-      setSynced(false);
-      setPeers(0);
-    };
-
-    setActiveArticleId(articleId);
-    setCollabConfig({
-      yXmlFragment,
-      awareness,
-      destroy: destroyAll,
-    });
-
     return () => {
-      destroyAll();
+      provider.off("status", onStatus);
+      provider.off("sync", onSync);
+      awareness.off("change", updatePeers);
+      collabObj.configObj.destroy();
     };
-  }, [articleId]);
+  }, [collabObj]);
 
   useEffect(() => {
-    if (!user || !collabConfig || activeArticleId !== articleId) return;
-    collabConfig.awareness.setLocalStateField("user", {
+    if (!user || !collabObj) return;
+    collabObj.awareness.setLocalStateField("user", {
       name: user.nickname,
       userId: user.id,
       role: userRole,
       color: "#" + Math.floor(Math.random() * 16777215).toString(16).padStart(6, "0"),
     });
-  }, [user, userRole, collabConfig, activeArticleId, articleId]);
-
-  const effectiveConfig = (activeArticleId === articleId && articleId !== null) ? collabConfig : null;
+  }, [user, userRole, collabObj]);
 
   return {
-    config: effectiveConfig,
-    connected: activeArticleId === articleId ? connected : false,
-    synced: activeArticleId === articleId ? synced : false,
-    peers: activeArticleId === articleId ? peers : 0,
+    config: collabObj ? collabObj.configObj : null,
+    connected,
+    synced,
+    peers,
   };
 }

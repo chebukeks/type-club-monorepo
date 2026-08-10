@@ -616,6 +616,11 @@ export function MarkdownEditor() {
 
   const isSuggestionActive = (userRole === 'editor' || suggestionModeActive) && state.editorMode === 'seamless'
 
+  const handleScroll = useCallback((st: number) => {
+    if (!activeTabId) return
+    dispatch({ type: 'SAVE_SCROLL_POSITION', payload: { tabId: activeTabId, scrollTop: st } })
+  }, [activeTabId, dispatch])
+
   return (
     <div
       className="flex-1 flex flex-col overflow-hidden bg-[var(--bg-base)]"
@@ -649,6 +654,8 @@ export function MarkdownEditor() {
         onTocUpdate={handleTocUpdate}
         extraPlugins={[typewriterPlugin, searchPlugin]}
         containerStyle={containerStyle}
+        scrollTop={activeTab?.scrollTop}
+        onScroll={handleScroll}
       />
 
       {ctxMenu && ctxTable !== null && (

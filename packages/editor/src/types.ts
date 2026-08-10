@@ -32,6 +32,8 @@ export interface EditorProps {
   userId?: number
   userNickname?: string
   suggestionModeActive?: boolean
+  scrollTop?: number
+  onScroll?: (scrollTop: number) => void
 }
 
 export type { CollaborationConfig }
