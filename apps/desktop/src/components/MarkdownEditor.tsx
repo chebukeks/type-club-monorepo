@@ -638,7 +638,7 @@ export function MarkdownEditor() {
         textZoom={state.textZoom}
         documentZoom={state.documentZoom}
         readOnly={isReadOnly}
-        collaboration={collab.config ?? undefined}
+        collaboration={articleId != null ? (collab.config ?? undefined) : undefined}
         userRole={userRole}
         userId={user?.id}
         userNickname={user?.nickname || ''}

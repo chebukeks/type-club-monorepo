@@ -17,6 +17,7 @@ export function useCollaboration(
   user: { id?: number; nickname: string } | null,
   userRole?: string | null
 ): CollaborationState {
+  const [activeArticleId, setActiveArticleId] = useState<number | null>(null)
   const [collabConfig, setCollabConfig] = useState<CollaborationConfig | null>(null)
   const [connected, setConnected] = useState(false)
   const [synced, setSynced] = useState(false)
@@ -24,6 +25,7 @@ export function useCollaboration(
 
   useEffect(() => {
     if (!articleId) {
+      setActiveArticleId(null)
       setCollabConfig(null)
       setConnected(false)
       setSynced(false)
@@ -31,6 +33,7 @@ export function useCollaboration(
       return
     }
 
+    setActiveArticleId(null)
     setCollabConfig(null)
     setConnected(false)
     setSynced(false)
@@ -90,12 +93,14 @@ export function useCollaboration(
       awareness.off("change", updatePeers)
       provider.disconnect()
       ydoc.destroy()
+      setActiveArticleId(null)
       setCollabConfig(null)
       setConnected(false)
       setSynced(false)
       setPeers(0)
     }
 
+    setActiveArticleId(articleId)
     setCollabConfig({
       yXmlFragment,
       awareness,
@@ -108,14 +113,21 @@ export function useCollaboration(
   }, [articleId])
 
   useEffect(() => {
-    if (!user || !collabConfig) return
+    if (!user || !collabConfig || activeArticleId !== articleId) return
     collabConfig.awareness.setLocalStateField("user", {
       name: user.nickname,
       userId: user.id,
       role: userRole,
       color: "#" + Math.floor(Math.random() * 16777215).toString(16).padStart(6, "0"),
     })
-  }, [user, userRole, collabConfig])
+  }, [user, userRole, collabConfig, activeArticleId, articleId])
 
-  return { config: collabConfig, connected, synced, peers }
+  const effectiveConfig = (activeArticleId === articleId && articleId !== null) ? collabConfig : null
+
+  return {
+    config: effectiveConfig,
+    connected: activeArticleId === articleId ? connected : false,
+    synced: activeArticleId === articleId ? synced : false,
+    peers: activeArticleId === articleId ? peers : 0,
+  }
 }
