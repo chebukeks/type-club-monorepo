@@ -102,35 +102,36 @@ export function TitleBar() {
   const articleId = activeTab?.articleId ?? null
   const isOnlineArticle = !!articleId
 
-  const [userRole, setUserRole] = useState<'author' | 'co_author' | 'editor' | null>(null)
+  const [rolesMap, setRolesMap] = useState<Record<number, 'author' | 'co_author' | 'editor' | null>>({})
+  const userRole = articleId ? (rolesMap[articleId] ?? null) : null
   const suggestionModeActive = articleId != null && (activeTab?.suggestionMode ?? false)
   const isSuggestionActive = articleId != null && (userRole === 'editor' || suggestionModeActive)
 
   useEffect(() => {
-    setUserRole(null)
-    if (!articleId || !user) {
+    if (!articleId || !user || rolesMap[articleId] !== undefined) {
       return
     }
     let isCurrent = true
     articlesApi.get(articleId).then((art) => {
       if (!isCurrent) return
       if (art.author_id === user.id) {
-        setUserRole('author')
+        setRolesMap((prev) => ({ ...prev, [articleId]: 'author' }))
       } else {
         collaborationApi.list(articleId)
           .then(list => {
             if (!isCurrent) return
             const me = list.find((c) => c.user_id === user.id)
-            setUserRole((me?.role as any) ?? null)
+            const role = (me?.role as any) ?? null
+            setRolesMap((prev) => ({ ...prev, [articleId]: role }))
           })
-          .catch(() => { if (isCurrent) setUserRole(null) })
+          .catch(() => { if (isCurrent) setRolesMap((prev) => ({ ...prev, [articleId]: null })) })
       }
-    }).catch(() => { if (isCurrent) setUserRole(null) })
+    }).catch(() => { if (isCurrent) setRolesMap((prev) => ({ ...prev, [articleId]: null })) })
 
     return () => {
       isCurrent = false
     }
-  }, [articleId, user])
+  }, [articleId, user, rolesMap])
 
   // Слушаем событие от MarkdownEditor, что редактор готов
   useEffect(() => {
