@@ -289,6 +289,17 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
 
+/* Адаптивное отображение оглавления на полях */
+@media (min-width: 1240px) {
+  .right-toc-sidebar { display: block !important; }
+  .right-toc-floating-button { display: none !important; }
+}
+
+@media (max-width: 1239px) {
+  .right-toc-sidebar { display: none !important; }
+  .right-toc-floating-button { display: block !important; }
+}
+
 @media (max-width: 640px) {
   .ProseMirror {
     padding-left: 12px !important;

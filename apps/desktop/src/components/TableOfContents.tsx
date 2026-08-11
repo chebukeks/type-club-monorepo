@@ -1,28 +1,32 @@
 import { useState, useEffect } from "react";
 import { List, X, BookOpen, MessageSquare, Plus, Minus, FileText } from "lucide-react";
 import type { TocItem, SuggestionItem } from "@type-club/editor";
+import type { TocLayoutMode } from "../types";
+import { useEditor } from "../context/EditorContext";
 
 interface TableOfContentsProps {
   toc: TocItem[];
   suggestions?: SuggestionItem[];
-  isEditor?: boolean;
+  tocLayoutMode?: TocLayoutMode;
   variant?: "floating" | "sidebar";
+  showStats?: boolean;
   className?: string;
 }
 
 export default function TableOfContents({
   toc,
   suggestions = [],
-  isEditor = false,
+  tocLayoutMode = "separate",
   variant = "floating",
+  showStats = false,
   className = "",
 }: TableOfContentsProps) {
   const [open, setOpen] = useState(false);
   const [activePos, setActivePos] = useState<number | null>(null);
   const [mounted, setMounted] = useState(false);
 
-  const hasToc = toc && toc.length > 0;
-  const showSuggestions = isEditor && suggestions && suggestions.length > 0;
+  const hasToc = tocLayoutMode === "combined" && toc && toc.length > 0;
+  const showSuggestions = suggestions && suggestions.length > 0;
 
   useEffect(() => {
     if (open) {
@@ -58,26 +62,21 @@ export default function TableOfContents({
   };
 
   const TocList = () => (
-    <div className="space-y-0.5">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
       {toc.map((item) => {
         const isActive = activePos === item.pos;
         const levelIndent = item.level === 1 ? 10 : item.level === 2 ? 18 : 26;
-        const fontClass =
-          item.level === 1
-            ? "font-semibold text-gray-900 dark:text-gray-100"
-            : item.level === 2
-            ? "text-gray-700 dark:text-gray-300"
-            : "text-gray-500 dark:text-gray-400 text-xs";
+        const fontClass = item.level === 1 ? "font-semibold text-[var(--text-primary)]" : item.level === 2 ? "text-[var(--text-secondary)]" : "text-[var(--text-dim)] text-xs";
 
         return (
           <button
             key={item.id}
             onClick={() => handleSelectToc(item)}
             style={{ padding: '6px 10px', paddingLeft: `${levelIndent}px` }}
-            className={`w-full text-left rounded-lg text-sm transition-all flex items-center gap-2 group ${
+            className={`w-full text-left rounded-lg text-xs transition-all flex items-center gap-2 group ${
               isActive
-                ? "bg-blue-50 dark:bg-blue-950/70 text-blue-600 dark:text-blue-400 font-medium shadow-xs"
-                : "hover:bg-gray-100/80 dark:hover:bg-gray-800/60"
+                ? "bg-[var(--bg-active)] text-[var(--accent)] font-medium"
+                : "hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"
             } ${fontClass}`}
             title={item.text}
           >
@@ -89,26 +88,35 @@ export default function TableOfContents({
   );
 
   const SuggestionsList = () => (
-    <div className={`space-y-1 ${hasToc ? "mt-3 pt-3 border-t border-gray-200/80 dark:border-gray-800/80" : ""}`}>
+    <div
+      style={{
+        marginTop: hasToc ? '12px' : '0px',
+        paddingTop: hasToc ? '12px' : '0px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '4px',
+      }}
+      className={hasToc ? "border-t border-[var(--border-default)]" : ""}
+    >
       {hasToc && (
-        <div className="flex items-center gap-2 mb-2 px-1">
+        <div style={{ paddingLeft: '4px', marginBottom: '8px' }} className="flex items-center gap-2">
           <MessageSquare size={14} className="text-amber-500" />
-          <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+          <h4 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
             Предложения ({suggestions.length})
           </h4>
         </div>
       )}
-      <div className="space-y-1">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
         {suggestions.map((sug) => {
           const isActive = activePos === sug.pos;
           const isInsert = sug.type === "insert";
           const isDelete = sug.type === "delete";
 
           const badgeColor = isInsert
-            ? "bg-green-100 text-green-700 dark:bg-green-950/80 dark:text-green-400"
+            ? "bg-[rgba(16,185,129,0.15)] text-[#10b981]"
             : isDelete
-            ? "bg-red-100 text-red-700 dark:bg-red-950/80 dark:text-red-400"
-            : "bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-400";
+            ? "bg-[rgba(239,68,68,0.15)] text-[#ef4444]"
+            : "bg-[rgba(245,158,11,0.15)] text-[#f59e0b]";
 
           const typeLabel = isInsert ? "Вставка" : isDelete ? "Удаление" : "Примечание";
           const Icon = isInsert ? Plus : isDelete ? Minus : FileText;
@@ -117,23 +125,24 @@ export default function TableOfContents({
             <button
               key={sug.id}
               onClick={() => handleSelectSuggestion(sug)}
-              className={`w-full text-left p-2 rounded-lg text-xs transition-all flex flex-col gap-1 group ${
+              style={{ padding: '8px 10px' }}
+              className={`w-full text-left rounded-xl text-xs transition-all flex flex-col gap-1 group ${
                 isActive
-                  ? "bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800"
-                  : "hover:bg-gray-100/80 dark:hover:bg-gray-800/60 border border-transparent"
+                  ? "bg-[var(--bg-active)] border border-[var(--accent)]"
+                  : "hover:bg-[var(--bg-hover)] border border-transparent"
               }`}
               title={`${sug.authorName}: ${sug.text}`}
             >
               <div className="flex items-center justify-between w-full gap-2">
-                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${badgeColor}`}>
+                <span style={{ padding: '2px 6px' }} className={`inline-flex items-center gap-1 rounded text-[10px] font-semibold ${badgeColor}`}>
                   <Icon size={10} />
                   {typeLabel}
                 </span>
-                <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-[100px]">
+                <span className="text-[10px] text-[var(--text-dim)] truncate max-w-[100px]">
                   {sug.authorName}
                 </span>
               </div>
-              <p className="text-gray-700 dark:text-gray-300 line-clamp-2 leading-relaxed">
+              <p className="text-[var(--text-secondary)] line-clamp-2 leading-relaxed">
                 {sug.text || "(пусто)"}
               </p>
             </button>
@@ -147,13 +156,18 @@ export default function TableOfContents({
 
   if (variant === "sidebar") {
     return (
-      <nav className={`w-full h-full overflow-hidden rounded-2xl border border-gray-200/80 dark:border-gray-800/80 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md shadow-xs flex flex-col ${className}`}>
-        <div className="overflow-y-auto flex-1 p-4 custom-scrollbar">
+      <nav
+        style={{ width: '100%', height: '100%' }}
+        className={`rounded-2xl border border-[var(--border-default)] bg-[var(--bg-surface)] backdrop-blur-md shadow-lg overflow-hidden flex flex-col ${className}`}
+      >
+        <div style={{ padding: '16px' }} className="overflow-y-auto flex-1 custom-scrollbar">
           {hasToc && (
             <>
-              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100 dark:border-gray-800/80">
-                <BookOpen size={16} className="text-blue-500" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Оглавление</h3>
+              <div style={{ marginBottom: '12px', paddingBottom: '8px' }} className="flex items-center gap-2 border-b border-[var(--border-default)]">
+                <BookOpen size={16} className="text-[var(--accent)]" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                  Оглавление ({toc.length})
+                </h3>
               </div>
               <TocList />
             </>
@@ -164,39 +178,48 @@ export default function TableOfContents({
     );
   }
 
+  const { state } = useEditor();
+  const showStatsRight = showStats && state.statsLayoutMode === "right";
+  const bottomOffset = showStatsRight ? '80px' : '24px';
+
   return (
     <>
       {/* Floating Action Button */}
-      <div className={`fixed bottom-6 right-6 z-40 ${className}`}>
+      <div style={{ bottom: bottomOffset, right: '32px' }} className={`fixed z-40 ${className}`}>
         <button
           onClick={() => setOpen(!open)}
-          className="relative p-3.5 rounded-full bg-blue-600 hover:bg-blue-700 active:scale-95 text-white shadow-xl shadow-blue-500/25 transition-all duration-200 flex items-center justify-center group"
-          title="Оглавление и предложения"
+          style={{ padding: '14px' }}
+          className="relative rounded-full bg-[var(--accent)] hover:opacity-90 active:scale-95 text-white shadow-xl shadow-[var(--accent)]/20 transition-all duration-200 flex items-center justify-center group"
+          title={hasToc ? "Оглавление и предложения" : "Предложения"}
         >
           <List size={20} className="transition-transform group-hover:rotate-6" />
-          <span className="absolute -top-1 -right-1 px-1.5 py-0.5 text-[10px] font-bold bg-amber-500 text-white rounded-full border-2 border-white dark:border-gray-950">
+          <span
+            style={{ padding: '2px 6px', top: '-4px', right: '-4px' }}
+            className="absolute text-[10px] font-bold bg-amber-500 text-white rounded-full border-2 border-[var(--bg-base)]"
+          >
             {totalCount}
           </span>
         </button>
 
-        {/* Popover / Sheet Drawer */}
+        {/* Popover Drawer */}
         {mounted && (
           <div
-            className={`absolute bottom-16 right-0 w-80 max-h-[70vh] flex flex-col bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border border-gray-200/80 dark:border-gray-800/80 rounded-2xl shadow-2xl z-50 p-4 ${
+            style={{ padding: '16px', bottom: '60px', right: '0px', width: '320px', maxHeight: '70vh' }}
+            className={`absolute flex flex-col bg-[var(--bg-surface)] backdrop-blur-xl border border-[var(--border-default)] rounded-2xl shadow-2xl z-50 ${
               open
-                ? "animate-in fade-in zoom-in-95 slide-in-from-bottom-3 duration-150 ease-out"
-                : "animate-out fade-out zoom-out-95 slide-out-to-bottom-3 duration-150 ease-in fill-mode-forwards"
+                ? 'animate-in fade-in zoom-in-95 slide-in-from-bottom-3 duration-150 ease-out'
+                : 'animate-out fade-out zoom-out-95 slide-out-to-bottom-3 duration-150 ease-in fill-mode-forwards'
             }`}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100 dark:border-gray-800">
+            <div style={{ marginBottom: '12px', paddingBottom: '8px' }} className="flex items-center justify-between border-b border-[var(--border-default)]">
               <div className="flex items-center gap-2">
                 {hasToc ? (
-                  <BookOpen size={16} className="text-blue-500" />
+                  <BookOpen size={16} className="text-[var(--accent)]" />
                 ) : (
-                  <MessageSquare size={14} className="text-amber-500" />
+                  <MessageSquare size={16} className="text-amber-500" />
                 )}
-                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
                   {hasToc
                     ? showSuggestions
                       ? `Оглавление и предложения (${totalCount})`
@@ -206,12 +229,13 @@ export default function TableOfContents({
               </div>
               <button
                 onClick={() => setOpen(false)}
-                className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                style={{ padding: '4px' }}
+                className="rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
               >
                 <X size={16} />
               </button>
             </div>
-            <div className="overflow-y-auto flex-1 pr-1 custom-scrollbar">
+            <div style={{ paddingRight: '4px' }} className="overflow-y-auto flex-1 custom-scrollbar">
               {hasToc && <TocList />}
               {showSuggestions && <SuggestionsList />}
             </div>

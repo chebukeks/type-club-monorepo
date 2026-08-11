@@ -1,12 +1,12 @@
 import { useState, useRef, useMemo, useEffect } from "react";
 import { MessageCircleMore } from "lucide-react";
 import { toggleMark } from "prosemirror-commands";
-import { TextSelection, NodeSelection } from "prosemirror-state";
+import { TextSelection, NodeSelection, Selection } from "prosemirror-state";
 import { deleteTable } from "prosemirror-tables";
 import type { EditorView } from "prosemirror-view";
 
 import { EditorCore, schema, tableEditPluginKey } from "@type-club/editor";
-import type { EditorMode, CollaborationConfig, TocItem } from "@type-club/editor";
+import type { EditorMode, CollaborationConfig, TocItem, SuggestionItem } from "@type-club/editor";
 import AddNoteModal from "./AddNoteModal";
 
 export type { EditorMode } from "@type-club/editor";
@@ -48,7 +48,7 @@ interface MarkdownEditorProps {
   userId?: number;
   userNickname?: string;
   suggestionModeActive?: boolean;
-  onTocUpdate?: (toc: TocItem[]) => void;
+  onTocUpdate?: (toc: TocItem[], suggestions?: SuggestionItem[]) => void;
 }
 
 export function MarkdownEditor({
@@ -120,6 +120,74 @@ export function MarkdownEditor({
     };
     window.addEventListener("editor-scroll-to", handler);
     return () => window.removeEventListener("editor-scroll-to", handler);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { pos, toPos } = (e as CustomEvent<{ pos: number; toPos?: number }>).detail;
+      const view = viewRef.current;
+      if (!view || view.isDestroyed) return;
+
+      // Set caret / selection in ProseMirror and focus editor
+      try {
+        const docSize = view.state.doc.content.size;
+        const targetPos = Math.min(Math.max(1, pos), docSize);
+        let selection;
+        if (toPos && toPos > targetPos && toPos <= docSize) {
+          selection = TextSelection.create(view.state.doc, targetPos, toPos);
+        } else {
+          selection = Selection.near(view.state.doc.resolve(targetPos));
+        }
+
+        const tr = view.state.tr.setSelection(selection);
+        view.dispatch(tr);
+        view.focus();
+      } catch { /* ignore selection errors */ }
+
+      // Smoothly scroll camera so suggestion lands in upper third of viewport (~25% height)
+      try {
+        let domNode: Node | null = null;
+        try {
+          domNode = view.nodeDOM(pos);
+        } catch {}
+        if (!domNode) {
+          try {
+            domNode = view.domAtPos(pos).node;
+          } catch {}
+        }
+
+        const el = domNode instanceof Element ? domNode : domNode?.parentElement;
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          const targetOffset = window.innerHeight * 0.25;
+
+          let scrollParent: Element | null = el.parentElement;
+          while (scrollParent && scrollParent !== document.body && scrollParent !== document.documentElement) {
+            const overflowY = window.getComputedStyle(scrollParent).overflowY;
+            if ((overflowY === "auto" || overflowY === "scroll") && scrollParent.scrollHeight > scrollParent.clientHeight) {
+              break;
+            }
+            scrollParent = scrollParent.parentElement;
+          }
+
+          if (scrollParent && scrollParent !== document.body && scrollParent !== document.documentElement) {
+            const parentRect = scrollParent.getBoundingClientRect();
+            const relativeTop = rect.top - parentRect.top;
+            scrollParent.scrollTo({
+              top: scrollParent.scrollTop + relativeTop - targetOffset,
+              behavior: "smooth",
+            });
+          } else {
+            window.scrollTo({
+              top: window.scrollY + rect.top - targetOffset,
+              behavior: "smooth",
+            });
+          }
+        }
+      } catch { /* ignore scroll errors */ }
+    };
+    window.addEventListener("editor-scroll-to-suggestion", handler);
+    return () => window.removeEventListener("editor-scroll-to-suggestion", handler);
   }, []);
 
   const handleAddNoteSubmit = (noteText: string) => {

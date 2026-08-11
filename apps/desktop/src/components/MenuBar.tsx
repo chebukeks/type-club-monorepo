@@ -1,7 +1,69 @@
 import { useState, useRef, useEffect } from 'react'
+import { ChevronRight } from 'lucide-react'
 import { useEditor } from '../context/EditorContext'
 import { generateExportHtml } from '@type-club/editor'
 import type { Tab, ThemeMode, FocusMode } from '../types'
+
+function RadioIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-shrink-0">
+      <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.5" className={active ? 'text-[var(--accent)]' : 'text-[var(--text-dim)]'} />
+      {active && <circle cx="7" cy="7" r="3" fill="currentColor" className="text-[var(--accent)]" />}
+    </svg>
+  )
+}
+
+function AnimatedMenu({
+  isOpen,
+  children,
+  className = '',
+  style,
+  onMouseEnter,
+  onMouseLeave,
+  isSubmenu = false
+}: {
+  isOpen: boolean
+  children: React.ReactNode
+  className?: string
+  style?: React.CSSProperties
+  onMouseEnter?: () => void
+  onMouseLeave?: () => void
+  isSubmenu?: boolean
+}) {
+  const [mounted, setMounted] = useState(isOpen)
+
+  useEffect(() => {
+    if (isOpen) {
+      setMounted(true)
+    } else {
+      if (isSubmenu) {
+        setMounted(false)
+      } else {
+        const timer = setTimeout(() => setMounted(false), 100)
+        return () => clearTimeout(timer)
+      }
+    }
+  }, [isOpen, isSubmenu])
+
+  if (!mounted) return null
+
+  return (
+    <div
+      style={style}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      className={`${className} ${
+        isOpen
+          ? 'animate-in fade-in zoom-in-95 duration-100 ease-out'
+          : isSubmenu
+            ? ''
+            : 'animate-out fade-out zoom-out-95 duration-100 ease-in fill-mode-forwards'
+      }`}
+    >
+      {children}
+    </div>
+  )
+}
 
 export function MenuBar() {
   const {
@@ -12,7 +74,7 @@ export function MenuBar() {
     setTheme, refreshTab, setFocusMode,
     getRecentFiles, getRecentFolders, clearRecentFiles, clearRecentFolders,
     removeRecentFile, removeRecentFolder,
-    toggleSidebar, toggleTabBar,
+    toggleSidebar, toggleTabBar, setTocLayoutMode, setStatsLayoutMode,
   } = useEditor()
   const { activeTabId, tabs, folderPath, theme, focusMode } = state
   const [openMenu, setOpenMenu] = useState<string | null>(null)
@@ -152,7 +214,7 @@ export function MenuBar() {
 
   const itemCls = (enabled: boolean) => `menu-item ${enabled ? 'enabled' : 'disabled'}`
 
-  const sep = <div className="border-t border-[var(--border-strong)] my-1" />
+  const sep = <div className="border-t border-[var(--border-default)] my-1.5 mx-2 opacity-80" />
 
   const menuBtnCls = (name: string) =>
     `rounded transition-colors ${openMenu === name ? 'bg-[var(--bg-active)] text-white' : 'hover:bg-[var(--bg-active)]'}`
@@ -166,193 +228,254 @@ export function MenuBar() {
       {/* === FILE === */}
       <div className="relative">
         <button onClick={() => toggleMenu('file')} className={menuBtnCls('file')} style={{ padding: '2px 12px' }}>File</button>
-        {openMenu === 'file' && (
-          <div className="absolute top-full left-0 mt-1 min-w-[240px] w-max py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50">
-            <div className={itemCls(!!folderPath)} onClick={folderPath ? handleCreateFile : undefined}>
-              <span>Создать файл</span><span className="text-[11px] text-[var(--text-dim)]">Ctrl+N</span>
-            </div>
-            <div className={itemCls(!!folderPath)} onClick={folderPath ? handleCreateFolder : undefined}>
-              <span>Создать папку</span><span className="text-[11px] text-[var(--text-dim)]">Ctrl+Shift+N</span>
-            </div>
-            {sep}
-            <div className={itemCls(true)} onClick={handleOpenFile}>
-              <span>Открыть файл</span><span className="text-[11px] text-[var(--text-dim)]">Ctrl+O</span>
-            </div>
-            <div className={itemCls(true)} onClick={handleOpenFolder}>
-              <span>Открыть папку</span><span className="text-[11px] text-[var(--text-dim)]">Ctrl+Shift+O</span>
-            </div>
-            {sep}
-            {/* Недавние файлы */}
-            <div
-              className="menu-item enabled relative"
-              onMouseEnter={() => { setSubmenu('recentFiles'); loadRecent() }}
-              onMouseLeave={() => setSubmenu(null)}
-            >
-              <span>Недавние файлы</span>
-              <span className="text-[11px]">▸</span>
-              {submenu === 'recentFiles' && (
-                <div className="absolute left-full top-0 ml-0.5 w-72 py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50"
-                  onMouseEnter={() => setSubmenu('recentFiles')} onMouseLeave={() => setSubmenu(null)}
-                >
-                  {recentFiles.length === 0 ? (
-                    <div className="px-4 py-2 text-[12px] text-[var(--text-dim)] italic">Пусто</div>
-                  ) : (
-                    <>
-                      {recentFiles.map((fp) => (
-                        <div key={fp} className={`${itemCls(true)} group`}>
-                          <span className="truncate text-[12px] flex-1" onClick={() => handleOpenRecent(fp)}>{fp.replace(/^.*[\\/]/, '')}</span>
-                          <span className="text-[10px] text-[var(--text-dim)] truncate ml-auto mr-1" style={{ maxWidth: '140px' }} onClick={() => handleOpenRecent(fp)}>{fp}</span>
-                          <button
-                            className="opacity-0 group-hover:opacity-100 text-[var(--text-dim)] hover:text-[var(--text-danger)] px-1 text-[14px] leading-none flex-shrink-0"
-                            onClick={(e) => { e.stopPropagation(); removeRecentFile(fp); setRecentFiles(prev => prev.filter(f => f !== fp)) }}
-                          >×</button>
-                        </div>
-                      ))}
-                      {sep}
-                      <div className={itemCls(true)} onClick={() => { clearRecentFiles(); setRecentFiles([]) }}>
-                        <span className="text-[var(--text-dim)]">Очистить</span>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-            {/* Недавние папки */}
-            <div
-              className="menu-item enabled relative"
-              onMouseEnter={() => { setSubmenu('recentFolders'); loadRecent() }}
-              onMouseLeave={() => setSubmenu(null)}
-            >
-              <span>Недавние папки</span>
-              <span className="text-[11px]">▸</span>
-              {submenu === 'recentFolders' && (
-                <div className="absolute left-full top-0 ml-0.5 w-72 py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50"
-                  onMouseEnter={() => setSubmenu('recentFolders')} onMouseLeave={() => setSubmenu(null)}
-                >
-                  {recentFolders.length === 0 ? (
-                    <div className="px-4 py-2 text-[12px] text-[var(--text-dim)] italic">Пусто</div>
-                  ) : (
-                    <>
-                      {recentFolders.map((fp) => (
-                        <div key={fp} className={`${itemCls(true)} group`}>
-                          <span className="truncate text-[12px] flex-1" onClick={() => handleOpenRecentFolder(fp)}>{fp.replace(/^.*[\\/]/, '')}</span>
-                          <span className="text-[10px] text-[var(--text-dim)] truncate ml-auto mr-1" style={{ maxWidth: '140px' }} onClick={() => handleOpenRecentFolder(fp)}>{fp}</span>
-                          <button
-                            className="opacity-0 group-hover:opacity-100 text-[var(--text-dim)] hover:text-[var(--text-danger)] px-1 text-[14px] leading-none flex-shrink-0"
-                            onClick={(e) => { e.stopPropagation(); removeRecentFolder(fp); setRecentFolders(prev => prev.filter(f => f !== fp)) }}
-                          >×</button>
-                        </div>
-                      ))}
-                      {sep}
-                      <div className={itemCls(true)} onClick={() => { clearRecentFolders(); setRecentFolders([]) }}>
-                        <span className="text-[var(--text-dim)]">Очистить</span>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-            {sep}
-            <div className={itemCls(!!activeTabId)} onClick={activeTabId ? handleSave : undefined}>
-              <span>Сохранить</span><span className="text-[11px] text-[var(--text-dim)]">Ctrl+S</span>
-            </div>
-            <div className={itemCls(!!activeTabId)} onClick={activeTabId ? handleSaveAs : undefined}>
-              <span>Сохранить как...</span><span className="text-[11px] text-[var(--text-dim)]">Ctrl+Shift+S</span>
-            </div>
-            {sep}
-            <div className={itemCls(!!activeTabId)} onClick={activeTabId ? handleExportHtml : undefined}>
-              <span>Export to HTML...</span>
-            </div>
-            <div className={itemCls(!!activeTabId)} onClick={activeTabId ? handleExportPdf : undefined}>
-              <span>Export to PDF...</span>
-            </div>
+        <AnimatedMenu isOpen={openMenu === 'file'} className="absolute top-full left-0 mt-1 min-w-[240px] w-max py-1 bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-50">
+          <div className={itemCls(!!folderPath)} onClick={folderPath ? handleCreateFile : undefined}>
+            <span>Создать файл</span><span className="text-[11px] text-[var(--text-dim)]">Ctrl+N</span>
           </div>
-        )}
+          <div className={itemCls(!!folderPath)} onClick={folderPath ? handleCreateFolder : undefined}>
+            <span>Создать папку</span><span className="text-[11px] text-[var(--text-dim)]">Ctrl+Shift+N</span>
+          </div>
+          {sep}
+          <div className={itemCls(true)} onClick={handleOpenFile}>
+            <span>Открыть файл</span><span className="text-[11px] text-[var(--text-dim)]">Ctrl+O</span>
+          </div>
+          <div className={itemCls(true)} onClick={handleOpenFolder}>
+            <span>Открыть папку</span><span className="text-[11px] text-[var(--text-dim)]">Ctrl+Shift+O</span>
+          </div>
+          {sep}
+          {/* Недавние файлы */}
+          <div
+            className="menu-item enabled relative"
+            onMouseEnter={() => { setSubmenu('recentFiles'); loadRecent() }}
+            onMouseLeave={() => setSubmenu(null)}
+          >
+            <span>Недавние файлы</span>
+            <ChevronRight size={14} className="text-[var(--text-dim)]" />
+            <AnimatedMenu
+              isOpen={submenu === 'recentFiles'}
+              isSubmenu
+              onMouseEnter={() => setSubmenu('recentFiles')}
+              onMouseLeave={() => setSubmenu(null)}
+              className="absolute left-full top-0 ml-0.5 w-72 py-1 bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-50"
+            >
+              {recentFiles.length === 0 ? (
+                <div className="px-4 py-2 text-[12px] text-[var(--text-dim)] italic">Пусто</div>
+              ) : (
+                <>
+                  {recentFiles.map((fp) => (
+                    <div key={fp} className={`${itemCls(true)} group`}>
+                      <span className="truncate text-[12px] flex-1" onClick={() => handleOpenRecent(fp)}>{fp.replace(/^.*[\\/]/, '')}</span>
+                      <span className="text-[10px] text-[var(--text-dim)] truncate ml-auto mr-1" style={{ maxWidth: '140px' }} onClick={() => handleOpenRecent(fp)}>{fp}</span>
+                      <button
+                        className="opacity-0 group-hover:opacity-100 text-[var(--text-dim)] hover:text-[var(--text-danger)] px-1 text-[14px] leading-none flex-shrink-0"
+                        onClick={(e) => { e.stopPropagation(); removeRecentFile(fp); setRecentFiles(prev => prev.filter(f => f !== fp)) }}
+                      >×</button>
+                    </div>
+                  ))}
+                  {sep}
+                  <div className={itemCls(true)} onClick={() => { clearRecentFiles(); setRecentFiles([]) }}>
+                    <span className="text-[var(--text-dim)]">Очистить</span>
+                  </div>
+                </>
+              )}
+            </AnimatedMenu>
+          </div>
+          {/* Недавние папки */}
+          <div
+            className="menu-item enabled relative"
+            onMouseEnter={() => { setSubmenu('recentFolders'); loadRecent() }}
+            onMouseLeave={() => setSubmenu(null)}
+          >
+            <span>Недавние папки</span>
+            <ChevronRight size={14} className="text-[var(--text-dim)]" />
+            <AnimatedMenu
+              isOpen={submenu === 'recentFolders'}
+              isSubmenu
+              onMouseEnter={() => setSubmenu('recentFolders')}
+              onMouseLeave={() => setSubmenu(null)}
+              className="absolute left-full top-0 ml-0.5 w-72 py-1 bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-50"
+            >
+              {recentFolders.length === 0 ? (
+                <div className="px-4 py-2 text-[12px] text-[var(--text-dim)] italic">Пусто</div>
+              ) : (
+                <>
+                  {recentFolders.map((fp) => (
+                    <div key={fp} className={`${itemCls(true)} group`}>
+                      <span className="truncate text-[12px] flex-1" onClick={() => handleOpenRecentFolder(fp)}>{fp.replace(/^.*[\\/]/, '')}</span>
+                      <span className="text-[10px] text-[var(--text-dim)] truncate ml-auto mr-1" style={{ maxWidth: '140px' }} onClick={() => handleOpenRecentFolder(fp)}>{fp}</span>
+                      <button
+                        className="opacity-0 group-hover:opacity-100 text-[var(--text-dim)] hover:text-[var(--text-danger)] px-1 text-[14px] leading-none flex-shrink-0"
+                        onClick={(e) => { e.stopPropagation(); removeRecentFolder(fp); setRecentFolders(prev => prev.filter(f => f !== fp)) }}
+                      >×</button>
+                    </div>
+                  ))}
+                  {sep}
+                  <div className={itemCls(true)} onClick={() => { clearRecentFolders(); setRecentFolders([]) }}>
+                    <span className="text-[var(--text-dim)]">Очистить</span>
+                  </div>
+                </>
+              )}
+            </AnimatedMenu>
+          </div>
+          {sep}
+          <div className={itemCls(!!activeTabId)} onClick={activeTabId ? handleSave : undefined}>
+            <span>Сохранить</span><span className="text-[11px] text-[var(--text-dim)]">Ctrl+S</span>
+          </div>
+          <div className={itemCls(!!activeTabId)} onClick={activeTabId ? handleSaveAs : undefined}>
+            <span>Сохранить как...</span><span className="text-[11px] text-[var(--text-dim)]">Ctrl+Shift+S</span>
+          </div>
+          {sep}
+          <div className={itemCls(!!activeTabId)} onClick={activeTabId ? handleExportHtml : undefined}>
+            <span>Export to HTML...</span>
+          </div>
+          <div className={itemCls(!!activeTabId)} onClick={activeTabId ? handleExportPdf : undefined}>
+            <span>Export to PDF...</span>
+          </div>
+        </AnimatedMenu>
       </div>
 
       {/* === EDIT (заглушка) === */}
       <div className="relative">
         <button onClick={() => toggleMenu('edit')} className={menuBtnCls('edit')} style={{ padding: '2px 12px' }}>Edit</button>
-        {openMenu === 'edit' && (
-          <div className="absolute top-full left-0 mt-1 w-48 py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50">
-            <div className="px-4 py-3 text-[12px] text-[var(--text-dim)] text-center italic">Пока ничего</div>
-          </div>
-        )}
+        <AnimatedMenu isOpen={openMenu === 'edit'} className="absolute top-full left-0 mt-1 w-48 py-1 bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-50">
+          <div className="px-4 py-3 text-[12px] text-[var(--text-dim)] text-center italic">Пока ничего</div>
+        </AnimatedMenu>
       </div>
 
       {/* === VIEW === */}
       <div className="relative">
         <button onClick={() => toggleMenu('view')} className={menuBtnCls('view')} style={{ padding: '2px 12px' }}>View</button>
-        {openMenu === 'view' && (
-          <div className="absolute top-full left-0 mt-1 min-w-[240px] w-max py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50">
-            {/* Обновить */}
-            <div className={itemCls(!!activeTabId)} onClick={activeTabId ? handleRefresh : undefined}>
-              <span>Обновить</span><span className="text-[11px] text-[var(--text-dim)]">F5</span>
-            </div>
-            {/* Боковая панель */}
-            <div className={itemCls(true)} onClick={() => { closeMenu(); toggleSidebar() }}>
-              <span>{state.sidebarOpen ? 'Свернуть панель' : 'Показать панель'}</span><span className="text-[11px] text-[var(--text-dim)]">Ctrl+Shift+B</span>
-            </div>
-            {/* Панель вкладок */}
-            <div className={itemCls(true)} onClick={() => { closeMenu(); toggleTabBar() }}>
-              <span>{state.tabBarOpen ? 'Скрыть вкладки' : 'Показать вкладки'}</span>
-            </div>
-            {sep}
+        <AnimatedMenu isOpen={openMenu === 'view'} className="absolute top-full left-0 mt-1 min-w-[240px] w-max py-1 bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-50">
+          {/* Обновить */}
+          <div className={itemCls(!!activeTabId)} onClick={activeTabId ? handleRefresh : undefined}>
+            <span>Обновить</span><span className="text-[11px] text-[var(--text-dim)]">F5</span>
+          </div>
+          {/* Боковая панель */}
+          <div className={itemCls(true)} onClick={() => { closeMenu(); toggleSidebar() }}>
+            <span>{state.sidebarOpen ? 'Свернуть панель' : 'Показать панель'}</span><span className="text-[11px] text-[var(--text-dim)]">Ctrl+Shift+B</span>
+          </div>
+          {/* Панель вкладок */}
+          <div className={itemCls(true)} onClick={() => { closeMenu(); toggleTabBar() }}>
+            <span>{state.tabBarOpen ? 'Скрыть вкладки' : 'Показать вкладки'}</span>
+          </div>
+          {sep}
 
-            {/* Тема — подменю */}
-            <div
-              className="menu-item enabled relative"
+          {/* Тема — подменю */}
+          <div
+            className="menu-item enabled relative"
+            onMouseEnter={() => setSubmenu('theme')}
+            onMouseLeave={() => setSubmenu(null)}
+          >
+            <span>Тема</span>
+            <ChevronRight size={14} className="text-[var(--text-dim)]" />
+            <AnimatedMenu
+              isOpen={submenu === 'theme'}
+              isSubmenu
               onMouseEnter={() => setSubmenu('theme')}
               onMouseLeave={() => setSubmenu(null)}
+              className="absolute left-full top-0 ml-0.5 w-44 py-1 bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-50"
             >
-              <span>Тема</span>
-              <span className="text-[11px]">▸</span>
-              {submenu === 'theme' && (
-                <div className="absolute left-full top-0 ml-0.5 w-44 py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50"
-                  onMouseEnter={() => setSubmenu('theme')} onMouseLeave={() => setSubmenu(null)}
-                >
-                  <div className={`${itemCls(true)} gap-2`} onClick={() => handleSetTheme('light')}>
-                    <span>{theme === 'light' ? '●' : '○'} Светлая</span>
-                  </div>
-                  <div className={`${itemCls(true)} gap-2`} onClick={() => handleSetTheme('dark')}>
-                    <span>{theme === 'dark' ? '●' : '○'} Тёмная</span>
-                  </div>
-                  <div className={`${itemCls(true)} gap-2`} onClick={() => handleSetTheme('system')}>
-                    <span>{theme === 'system' ? '●' : '○'} Системная</span>
-                  </div>
-                </div>
-              )}
-            </div>
+              <div className={`${itemCls(true)} gap-2`} onClick={() => handleSetTheme('light')}>
+                <RadioIcon active={theme === 'light'} />
+                <span>Светлая</span>
+              </div>
+              <div className={`${itemCls(true)} gap-2`} onClick={() => handleSetTheme('dark')}>
+                <RadioIcon active={theme === 'dark'} />
+                <span>Тёмная</span>
+              </div>
+              <div className={`${itemCls(true)} gap-2`} onClick={() => handleSetTheme('system')}>
+                <RadioIcon active={theme === 'system'} />
+                <span>Системная</span>
+              </div>
+            </AnimatedMenu>
+          </div>
 
-            {/* Акцентировать — подменю */}
-            <div
-              className="menu-item enabled relative"
+          {/* Акцентировать — подменю */}
+          <div
+            className="menu-item enabled relative"
+            onMouseEnter={() => setSubmenu('focus')}
+            onMouseLeave={() => setSubmenu(null)}
+          >
+            <span>Акцентировать</span>
+            <ChevronRight size={14} className="text-[var(--text-dim)]" />
+            <AnimatedMenu
+              isOpen={submenu === 'focus'}
+              isSubmenu
               onMouseEnter={() => setSubmenu('focus')}
               onMouseLeave={() => setSubmenu(null)}
+              className="absolute left-full top-0 ml-0.5 w-52 py-1 bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-50"
             >
-              <span>Акцентировать</span>
-              <span className="text-[11px]">▸</span>
-              {submenu === 'focus' && (
-                <div className="absolute left-full top-0 ml-0.5 w-52 py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50"
-                  onMouseEnter={() => setSubmenu('focus')} onMouseLeave={() => setSubmenu(null)}
-                >
-                  <div className={`${itemCls(true)} gap-2`} onClick={() => handleSetFocusMode('none')}>
-                    <span>{focusMode === 'none' ? '●' : '○'} Ничего</span>
-                  </div>
-                  <div className={`${itemCls(true)} gap-2`} onClick={() => handleSetFocusMode('paragraph')}>
-                    <span>{focusMode === 'paragraph' ? '●' : '○'} Абзац</span>
-                  </div>
-                  <div className={`${itemCls(true)} gap-2`} onClick={() => handleSetFocusMode('lines')}>
-                    <span>{focusMode === 'lines' ? '●' : '○'} Три строчки</span>
-                  </div>
-                  <div className={`${itemCls(true)} gap-2`} onClick={() => handleSetFocusMode('sentence')}>
-                    <span>{focusMode === 'sentence' ? '●' : '○'} Тек. предложение</span>
-                  </div>
-                </div>
-              )}
-            </div>
+              <div className={`${itemCls(true)} gap-2`} onClick={() => handleSetFocusMode('none')}>
+                <RadioIcon active={focusMode === 'none'} />
+                <span>Ничего</span>
+              </div>
+              <div className={`${itemCls(true)} gap-2`} onClick={() => handleSetFocusMode('paragraph')}>
+                <RadioIcon active={focusMode === 'paragraph'} />
+                <span>Абзац</span>
+              </div>
+              <div className={`${itemCls(true)} gap-2`} onClick={() => handleSetFocusMode('lines')}>
+                <RadioIcon active={focusMode === 'lines'} />
+                <span>Три строчки</span>
+              </div>
+              <div className={`${itemCls(true)} gap-2`} onClick={() => handleSetFocusMode('sentence')}>
+                <RadioIcon active={focusMode === 'sentence'} />
+                <span>Тек. предложение</span>
+              </div>
+            </AnimatedMenu>
           </div>
-        )}
+
+          {/* Положение оглавления — подменю */}
+          <div
+            className="menu-item enabled relative"
+            onMouseEnter={() => setSubmenu('tocLayout')}
+            onMouseLeave={() => setSubmenu(null)}
+          >
+            <span>Положение оглавления</span>
+            <ChevronRight size={14} className="text-[var(--text-dim)]" />
+            <AnimatedMenu
+              isOpen={submenu === 'tocLayout'}
+              isSubmenu
+              onMouseEnter={() => setSubmenu('tocLayout')}
+              onMouseLeave={() => setSubmenu(null)}
+              className="absolute left-full top-0 ml-0.5 w-60 py-1 bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-50"
+            >
+              <div className={`${itemCls(true)} gap-2`} onClick={() => { closeMenu(); setTocLayoutMode('separate') }}>
+                <RadioIcon active={state.tocLayoutMode === 'separate'} />
+                <span>В сайдбаре</span>
+              </div>
+              <div className={`${itemCls(true)} gap-2`} onClick={() => { closeMenu(); setTocLayoutMode('combined') }}>
+                <RadioIcon active={state.tocLayoutMode === 'combined'} />
+                <span>Справа от документа</span>
+              </div>
+            </AnimatedMenu>
+          </div>
+
+          {/* Положение статистики — подменю */}
+          <div
+            className="menu-item enabled relative"
+            onMouseEnter={() => setSubmenu('statsLayout')}
+            onMouseLeave={() => setSubmenu(null)}
+          >
+            <span>Положение статистики</span>
+            <ChevronRight size={14} className="text-[var(--text-dim)]" />
+            <AnimatedMenu
+              isOpen={submenu === 'statsLayout'}
+              isSubmenu
+              onMouseEnter={() => setSubmenu('statsLayout')}
+              onMouseLeave={() => setSubmenu(null)}
+              className="absolute left-full top-0 ml-0.5 w-60 py-1 bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-50"
+            >
+              <div className={`${itemCls(true)} gap-2`} onClick={() => { closeMenu(); setStatsLayoutMode('right') }}>
+                <RadioIcon active={state.statsLayoutMode === 'right'} />
+                <span>Справа от документа</span>
+              </div>
+              <div className={`${itemCls(true)} gap-2`} onClick={() => { closeMenu(); setStatsLayoutMode('sidebar') }}>
+                <RadioIcon active={state.statsLayoutMode === 'sidebar'} />
+                <span>В сайдбаре</span>
+              </div>
+            </AnimatedMenu>
+          </div>
+        </AnimatedMenu>
       </div>
     </div>
   )

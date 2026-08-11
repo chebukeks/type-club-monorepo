@@ -8,7 +8,7 @@ import PublishModal, { generateRandomSlug } from "../components/PublishModal";
 import TableOfContents from "../components/TableOfContents";
 import { useAuth } from "../context/AuthContext";
 import { useCollaboration } from "../hooks/useCollaboration";
-import type { TocItem } from "@type-club/editor";
+import type { TocItem, SuggestionItem } from "@type-club/editor";
 
 export default function Editor() {
   const { id } = useParams<{ id: string }>();
@@ -31,6 +31,29 @@ export default function Editor() {
   const [userRole, setUserRole] = useState<"author" | "co_author" | "editor" | null>(null);
   const [suggestionModeActive, setSuggestionModeActive] = useState(initialSuggest);
   const [toc, setToc] = useState<TocItem[]>([]);
+  const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  const docScale = 1.0;
+  const docHalfWidth = 430 * docScale;
+  const leftPos = containerWidth / 2 + docHalfWidth + 16;
+  const rightPos = 24;
+  const availableWidth = containerWidth - rightPos - leftPos;
+
+  const showRightSidebar = availableWidth >= 180 && containerWidth >= 900;
 
   const { user } = useAuth();
   const collab = useCollaboration(articleId, user ?? null, userRole);
@@ -164,21 +187,40 @@ export default function Editor() {
         }}
       />
 
-      <MarkdownEditor
-        content={content}
-        editorMode={editorMode}
-        onChange={setContent}
-        textZoom={100}
-        documentZoom={100}
-        collaboration={collab.config ?? undefined}
-        userRole={userRole}
-        userId={user?.id}
-        userNickname={user?.nickname}
-        suggestionModeActive={suggestionModeActive}
-        onTocUpdate={setToc}
-      />
+      <div ref={containerRef} className="flex-1 relative flex flex-col overflow-hidden">
+        <MarkdownEditor
+          content={content}
+          editorMode={editorMode}
+          onChange={setContent}
+          textZoom={100}
+          documentZoom={100}
+          collaboration={collab.config ?? undefined}
+          userRole={userRole}
+          userId={user?.id}
+          userNickname={user?.nickname}
+          suggestionModeActive={suggestionModeActive}
+          onTocUpdate={(t, s) => {
+            setToc(t);
+            if (s) setSuggestions(s);
+          }}
+        />
 
-      <TableOfContents toc={toc} />
+        {showRightSidebar ? (
+          <div
+            style={{
+              left: `${leftPos}px`,
+              right: "24px",
+              top: "16px",
+              bottom: "24px",
+            }}
+            className="absolute z-30 pointer-events-auto"
+          >
+            <TableOfContents variant="sidebar" toc={toc} suggestions={suggestions} isEditor={true} />
+          </div>
+        ) : (
+          <TableOfContents variant="floating" toc={toc} suggestions={suggestions} isEditor={true} />
+        )}
+      </div>
 
       {showPublish && (
         <PublishModal

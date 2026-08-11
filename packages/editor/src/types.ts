@@ -14,6 +14,15 @@ export interface TocItem {
   pos: number
 }
 
+export interface SuggestionItem {
+  id: string
+  type: 'insert' | 'delete' | 'note'
+  authorName: string
+  text: string
+  pos: number
+  toPos?: number
+}
+
 export interface EditorProps {
   content: string
   editorMode: EditorMode
@@ -24,7 +33,7 @@ export interface EditorProps {
   onEditorView?: (view: EditorView) => void
   className?: string
   focusMode?: FocusMode
-  onTocUpdate?: (toc: TocItem[]) => void
+  onTocUpdate?: (toc: TocItem[], suggestions?: SuggestionItem[]) => void
   extraPlugins?: Plugin[]
   containerStyle?: React.CSSProperties
   collaboration?: CollaborationConfig

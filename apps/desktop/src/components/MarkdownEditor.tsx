@@ -5,7 +5,7 @@
  */
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { toggleMark } from 'prosemirror-commands'
-import { Plugin, TextSelection, NodeSelection } from 'prosemirror-state'
+import { Plugin, TextSelection, NodeSelection, Selection } from 'prosemirror-state'
 import { deleteTable } from 'prosemirror-tables'
 import type { EditorView } from 'prosemirror-view'
 
@@ -13,16 +13,47 @@ import { EditorCore, injectEditorStyles, schema, tableEditPluginKey } from '@typ
 import { useEditor } from '../context/EditorContext'
 import { useAuth } from '../context/AuthContext'
 import { useCollaboration } from '../hooks/useCollaboration'
+import { ChevronRight } from 'lucide-react'
 import { articlesApi, collaborationApi } from '../api'
 import { SearchBar, RawSearchBar, searchPlugin } from './SearchBar'
 import { AddNoteModal } from './AddNoteModal'
+import TableOfContents from './TableOfContents'
+import { StatsToast } from './StatsToast'
+import type { SuggestionItem } from '@type-club/editor'
+
+import { Monitor, Type, FileText } from 'lucide-react'
 
 export function MarkdownEditor() {
   const { state, dispatch, setTextZoom, setDocumentZoom } = useEditor()
   const [editorView, setEditorView] = useState<EditorView | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [containerWidth, setContainerWidth] = useState(0)
+  const [suggestions, setSuggestions] = useState<SuggestionItem[]>([])
   const [showSearch, setShowSearch] = useState(false)
   const lastWheelTimeRef = useRef(0)
+
+  const [zoomToast, setZoomToast] = useState<{ type: 'app' | 'text' | 'document'; percent: number } | null>(null)
+  const zoomToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const showZoomToast = useCallback((type: 'app' | 'text' | 'document', percent: number) => {
+    setZoomToast({ type, percent })
+    if (zoomToastTimerRef.current) clearTimeout(zoomToastTimerRef.current)
+    zoomToastTimerRef.current = setTimeout(() => {
+      setZoomToast(null)
+    }, 1500)
+  }, [])
+
+  useEffect(() => {
+    if (!containerRef.current) return
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width)
+      }
+    })
+    observer.observe(containerRef.current)
+    return () => observer.disconnect()
+  }, [])
 
   // Raw mode: data URI placeholders
   const [rawContent, setRawContent] = useState<string | null>(null)
@@ -151,14 +182,24 @@ export function MarkdownEditor() {
         if (now - lastWheelTimeRef.current < 30) return
         lastWheelTimeRef.current = now
         const delta = e.deltaY < 0 ? 10 : -10
-        if (e.altKey) setDocumentZoom(state.documentZoom + delta)
-        else if (e.shiftKey) setTextZoom(state.textZoom + delta)
-        else setDocumentZoom(state.documentZoom + delta)
+        if (e.altKey) {
+          const next = Math.max(50, Math.min(300, state.documentZoom + delta))
+          setDocumentZoom(next)
+          showZoomToast('document', next)
+        } else if (e.shiftKey) {
+          const next = Math.max(50, Math.min(200, state.textZoom + delta))
+          setTextZoom(next)
+          showZoomToast('text', next)
+        } else {
+          const next = Math.max(50, Math.min(300, state.documentZoom + delta))
+          setDocumentZoom(next)
+          showZoomToast('document', next)
+        }
       }
     }
     window.addEventListener('wheel', onWheel, { passive: false })
     return () => window.removeEventListener('wheel', onWheel)
-  }, [state.documentZoom, state.textZoom, setDocumentZoom, setTextZoom])
+  }, [state.documentZoom, state.textZoom, setDocumentZoom, setTextZoom, showZoomToast])
 
   // ── Zoom: keyboard shortcuts ──
   useEffect(() => {
@@ -177,23 +218,24 @@ export function MarkdownEditor() {
 
         if (e.altKey && !e.shiftKey) {
           e.preventDefault()
-          if (isZero) setDocumentZoom(100)
-          else setDocumentZoom(state.documentZoom + (isPlus ? 10 : -10))
+          const next = isZero ? 100 : Math.max(50, Math.min(300, state.documentZoom + (isPlus ? 10 : -10)))
+          setDocumentZoom(next)
+          showZoomToast('document', next)
         } else if (e.shiftKey && !e.altKey) {
           e.preventDefault()
-          if (isZero) setTextZoom(100)
-          else setTextZoom(state.textZoom + (isPlus ? 10 : -10))
+          const next = isZero ? 100 : Math.max(50, Math.min(200, state.textZoom + (isPlus ? 10 : -10)))
+          setTextZoom(next)
+          showZoomToast('text', next)
         } else if (!e.shiftKey && !e.altKey) {
           e.preventDefault()
-          if (isZero) window.api?.zoomReset?.()
-          else if (isPlus) window.api?.zoomIn?.()
-          else window.api?.zoomOut?.()
+          const pct = isZero ? window.api?.zoomReset?.() : isPlus ? window.api?.zoomIn?.() : window.api?.zoomOut?.()
+          if (pct != null) showZoomToast('app', pct)
         }
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [state.textZoom, state.documentZoom, setTextZoom, setDocumentZoom])
+  }, [state.textZoom, state.documentZoom, setTextZoom, setDocumentZoom, showZoomToast])
 
   const activeTabId = activeTab?.id
   // ── Content handlers ──
@@ -360,14 +402,57 @@ export function MarkdownEditor() {
       const { pos } = (e as CustomEvent<{ pos: number }>).detail
       if (!editorView || editorView.isDestroyed) return
       try {
-        const domNode = editorView.nodeDOM(pos)
-        if (domNode instanceof Element) {
-          domNode.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        let domNode: Node | null = null
+        try { domNode = editorView.nodeDOM(pos) } catch {}
+        if (!domNode) {
+          try { domNode = editorView.domAtPos(pos).node } catch {}
+        }
+        const el = domNode instanceof Element ? domNode : domNode?.parentElement
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' })
         }
       } catch { /* ignore */ }
     }
     window.addEventListener('editor-scroll-to', handler)
     return () => window.removeEventListener('editor-scroll-to', handler)
+  }, [editorView])
+
+  // ── TOC scroll-to-suggestion event ──
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { pos, toPos } = (e as CustomEvent<{ pos: number; toPos?: number }>).detail
+      if (!editorView || editorView.isDestroyed) return
+
+      try {
+        const docSize = editorView.state.doc.content.size
+        const targetPos = Math.min(Math.max(1, pos), docSize)
+        let selection
+        if (toPos && toPos > targetPos && toPos <= docSize) {
+          selection = TextSelection.create(editorView.state.doc, targetPos, toPos)
+        } else {
+          selection = Selection.near(editorView.state.doc.resolve(targetPos))
+        }
+
+        const tr = editorView.state.tr.setSelection(selection)
+        editorView.dispatch(tr)
+        editorView.focus()
+      } catch { /* ignore selection errors */ }
+
+      try {
+        let domNode: Node | null = null
+        try { domNode = editorView.nodeDOM(pos) } catch {}
+        if (!domNode) {
+          try { domNode = editorView.domAtPos(pos).node } catch {}
+        }
+
+        const el = domNode instanceof Element ? domNode : domNode?.parentElement
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+      } catch { /* ignore scroll errors */ }
+    }
+    window.addEventListener('editor-scroll-to-suggestion', handler)
+    return () => window.removeEventListener('editor-scroll-to-suggestion', handler)
   }, [editorView])
 
   // ── Context menu ──
@@ -431,6 +516,18 @@ export function MarkdownEditor() {
     setCtxMenu({ x: e.clientX, y: e.clientY })
   }
 
+  const [ctxMenuMounted, setCtxMenuMounted] = useState(false)
+  const [savedCtxMenuStyle, setSavedCtxMenuStyle] = useState<React.CSSProperties | null>(null)
+
+  useEffect(() => {
+    if (ctxMenu) {
+      setCtxMenuMounted(true)
+    } else {
+      const timer = setTimeout(() => setCtxMenuMounted(false), 100)
+      return () => clearTimeout(timer)
+    }
+  }, [ctxMenu])
+
   const closeCtxMenu = () => {
     setCtxMenu(null)
     setCtxSubmenu(null)
@@ -473,17 +570,24 @@ export function MarkdownEditor() {
 
   // Вычисление позиции меню с учётом viewport
   const ctxMenuStyle = useMemo((): React.CSSProperties | null => {
-    if (!ctxMenu) return null
+    if (!ctxMenu) return savedCtxMenuStyle
     const menuHeight = ctxSubmenu === 'table' ? 300 : ctxSubmenu === 'code' ? 260 : 400
     const vh = window.innerHeight
     const fitsBelow = ctxMenu.y + menuHeight <= vh - 10
-    return {
+    const st = {
       top: fitsBelow ? ctxMenu.y : undefined,
       bottom: fitsBelow ? undefined : vh - ctxMenu.y,
       left: Math.min(ctxMenu.x, window.innerWidth - 270),
       minWidth: ctxSubmenu === 'table' ? '260px' : ctxSubmenu === 'code' ? '250px' : '230px',
     }
-  }, [ctxMenu, ctxSubmenu])
+    return st
+  }, [ctxMenu, ctxSubmenu, savedCtxMenuStyle])
+
+  useEffect(() => {
+    if (ctxMenu) {
+      setSavedCtxMenuStyle(ctxMenuStyle)
+    }
+  }, [ctxMenu, ctxMenuStyle])
 
   const applyFormat = (markName: string) => {
     if (!editorView) return
@@ -577,15 +681,19 @@ export function MarkdownEditor() {
     { label: 'Спойлер', hotkey: 'Ctrl+Shift+S', command: 'spoiler' },
   ]
 
-  const sep = <div className="border-t border-[var(--border-strong)] my-1" />
+  const sep = <div className="border-t border-[var(--border-default)] my-1.5 mx-2 opacity-80" />
 
-  const ctxMenuItem = (label: string, hotkey?: string, onClick?: () => void, extraClass?: string) => (
+  const ctxMenuItem = (label: string, hotkey?: React.ReactNode, onClick?: () => void, extraClass?: string) => (
     <div
       className={`menu-item enabled ${extraClass || ''}`}
       onClick={onClick}
     >
       <span>{label}</span>
-      {hotkey && <span className="text-[11px] text-[var(--text-dim)]">{hotkey}</span>}
+      {hotkey && (
+        typeof hotkey === 'string'
+          ? <span className="text-[11px] text-[var(--text-dim)]">{hotkey}</span>
+          : hotkey
+      )}
     </div>
   )
 
@@ -629,9 +737,18 @@ export function MarkdownEditor() {
     dispatch({ type: 'SAVE_SCROLL_POSITION', payload: { tabId: activeTabId, scrollTop: st } })
   }, [activeTabId, dispatch])
 
+  const docScale = (state.documentZoom || 100) / 100
+  const docHalfWidth = 430 * docScale
+  const leftPos = containerWidth / 2 + docHalfWidth + 16
+  const rightPos = 32
+  const availableWidth = containerWidth - rightPos - leftPos
+
+  const showRightSidebar = availableWidth >= 180 && containerWidth >= 900
+
   return (
     <div
-      className="flex-1 flex flex-col overflow-hidden bg-[var(--bg-base)] rounded-[inherit]"
+      ref={containerRef}
+      className="flex-1 flex flex-col overflow-hidden bg-[var(--bg-base)] rounded-[inherit] relative"
       onContextMenu={handleContextMenu}
       onClick={() => closeCtxMenu()}
     >
@@ -659,16 +776,21 @@ export function MarkdownEditor() {
         onEditorView={(v) => setEditorView(v)}
         className={state.typewriterMode ? 'typewriter-mode' : ''}
         focusMode={state.focusMode}
-        onTocUpdate={handleTocUpdate}
+        onTocUpdate={(tocItems, sugItems) => {
+          handleTocUpdate(tocItems)
+          if (sugItems) setSuggestions(sugItems)
+        }}
         extraPlugins={[typewriterPlugin, searchPlugin]}
         containerStyle={containerStyle}
         scrollTop={activeTab?.scrollTop}
         onScroll={handleScroll}
       />
 
-      {ctxMenu && ctxTable !== null && (
+      {ctxMenuMounted && ctxTable !== null && (
         <div
-          className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
+          className={`fixed bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)] ${
+            ctxMenu ? 'animate-in fade-in zoom-in-95 duration-100 ease-out' : 'animate-out fade-out zoom-out-95 duration-100 ease-in fill-mode-forwards'
+          }`}
           style={ctxMenuStyle!}
           onContextMenu={(e) => e.preventDefault()}
           onClick={(e) => e.stopPropagation()}
@@ -684,9 +806,11 @@ export function MarkdownEditor() {
         </div>
       )}
 
-      {ctxMenu && !ctxSubmenu && ctxTable === null && (
+      {ctxMenuMounted && !ctxSubmenu && ctxTable === null && (
         <div
-          className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
+          className={`fixed bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)] ${
+            ctxMenu ? 'animate-in fade-in zoom-in-95 duration-100 ease-out' : 'animate-out fade-out zoom-out-95 duration-100 ease-in fill-mode-forwards'
+          }`}
           style={ctxMenuStyle!}
           onContextMenu={(e) => e.preventDefault()}
           onClick={(e) => e.stopPropagation()}
@@ -708,8 +832,8 @@ export function MarkdownEditor() {
                 </div>
               ))}
               {sep}
-              {ctxMenuItem('Создать таблицу...', '▸', () => setCtxSubmenu('table'))}
-              {ctxMenuItem('Создать блок кода...', '▸', () => setCtxSubmenu('code'))}
+              {ctxMenuItem('Создать таблицу...', <ChevronRight size={14} className="text-[var(--text-dim)]" />, () => setCtxSubmenu('table'))}
+              {ctxMenuItem('Создать блок кода...', <ChevronRight size={14} className="text-[var(--text-dim)]" />, () => setCtxSubmenu('code'))}
               {ctxMenuItem('Создать блок математики', undefined, insertMathBlock)}
             </>
           )}
@@ -725,9 +849,11 @@ export function MarkdownEditor() {
         </div>
       )}
 
-      {ctxMenu && ctxSubmenu === 'table' && (
+      {ctxMenuMounted && ctxSubmenu === 'table' && (
         <div
-          className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
+          className={`fixed bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)] ${
+            ctxMenu ? 'animate-in fade-in zoom-in-95 duration-100 ease-out' : 'animate-out fade-out zoom-out-95 duration-100 ease-in fill-mode-forwards'
+          }`}
           style={ctxMenuStyle!}
           onContextMenu={(e) => e.preventDefault()}
           onClick={(e) => e.stopPropagation()}
@@ -753,9 +879,11 @@ export function MarkdownEditor() {
         </div>
       )}
 
-      {ctxMenu && ctxSubmenu === 'code' && (
+      {ctxMenuMounted && ctxSubmenu === 'code' && (
         <div
-          className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
+          className={`fixed bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)] ${
+            ctxMenu ? 'animate-in fade-in zoom-in-95 duration-100 ease-out' : 'animate-out fade-out zoom-out-95 duration-100 ease-in fill-mode-forwards'
+          }`}
           style={ctxMenuStyle!}
           onContextMenu={(e) => e.preventDefault()}
           onClick={(e) => e.stopPropagation()}
@@ -774,7 +902,7 @@ export function MarkdownEditor() {
                 onBlur={() => setTimeout(() => setShowLangDropdown(false), 200)}
               />
               {showLangDropdown && (
-                <div className="absolute left-0 right-0 top-full mt-0.5 max-h-40 overflow-y-auto bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded shadow-lg z-[60]">
+                <div className="absolute left-0 right-0 top-full mt-0.5 max-h-40 overflow-y-auto bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-[60] animate-in fade-in zoom-in-95 duration-100 ease-out">
                   {LANGUAGES.filter(l => !codeLang || l.label.toLowerCase().includes(codeLang.toLowerCase()) || l.value.includes(codeLang)).map((l) => (
                     <div
                       key={l.value}
@@ -808,6 +936,54 @@ export function MarkdownEditor() {
         onClose={() => setShowAddNoteModal(false)}
         onSubmit={handleAddNoteSubmit}
       />
+
+      {zoomToast && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-full border border-[var(--border-strong)] bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-lg backdrop-blur-md text-xs animate-in fade-in zoom-in-95 duration-150"
+          style={{ padding: '6px 14px' }}
+        >
+          {zoomToast.type === 'app' && <Monitor size={14} className="text-[var(--accent)] shrink-0" />}
+          {zoomToast.type === 'text' && <Type size={14} className="text-[var(--accent)] shrink-0" />}
+          {zoomToast.type === 'document' && <FileText size={14} className="text-[var(--accent)] shrink-0" />}
+          <span>
+            {zoomToast.type === 'app' && `Интерфейс: ${zoomToast.percent}%`}
+            {zoomToast.type === 'text' && `Текст: ${zoomToast.percent}%`}
+            {zoomToast.type === 'document' && `Документ: ${zoomToast.percent}%`}
+          </span>
+        </div>
+      )}
+
+      {showRightSidebar ? (
+        <div
+          style={{
+            left: `${leftPos}px`,
+            right: '32px',
+            maxWidth: '280px',
+            top: '16px',
+            bottom: (state.showStats && state.statsLayoutMode === 'right') ? '84px' : '24px',
+          }}
+          className="absolute z-30 pointer-events-auto"
+        >
+          <TableOfContents
+            variant="sidebar"
+            toc={state.activeToc}
+            suggestions={suggestions}
+            tocLayoutMode={state.tocLayoutMode}
+          />
+        </div>
+      ) : (
+        <TableOfContents
+          variant="floating"
+          toc={state.activeToc}
+          suggestions={suggestions}
+          tocLayoutMode={state.tocLayoutMode}
+          showStats={state.showStats}
+        />
+      )}
+
+      {state.showStats && state.statsLayoutMode === 'right' && (
+        <StatsToast mode="right" containerWidth={containerWidth} />
+      )}
     </div>
   )
 }

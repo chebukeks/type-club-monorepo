@@ -172,15 +172,18 @@ contextBridge.exposeInMainWorld('api', {
   /** Увеличить масштаб интерфейса */
   zoomIn: () => {
     webFrame.setZoomLevel(webFrame.getZoomLevel() + 0.5)
+    return Math.round(webFrame.getZoomFactor() * 100)
   },
 
   /** Уменьшить масштаб интерфейса */
   zoomOut: () => {
     webFrame.setZoomLevel(webFrame.getZoomLevel() - 0.5)
+    return Math.round(webFrame.getZoomFactor() * 100)
   },
 
   /** Сбросить масштаб интерфейса */
   zoomReset: () => {
     webFrame.setZoomLevel(0)
+    return 100
   },
 })

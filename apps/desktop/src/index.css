@@ -247,6 +247,17 @@ body {
   background: var(--scrollbar-thumb-hover);
 }
 
+/* Адаптивное отображение оглавления на полях */
+@media (min-width: 1320px) {
+  .right-toc-sidebar { display: block !important; }
+  .right-toc-floating-button { display: none !important; }
+}
+
+@media (max-width: 1319px) {
+  .right-toc-sidebar { display: none !important; }
+  .right-toc-floating-button { display: block !important; }
+}
+
 .select-none {
   user-select: none;
   -webkit-user-select: none;
@@ -271,12 +282,15 @@ body {
 
 /* Пункты выпадающих меню */
 .menu-item {
-  padding: 6px 14px;
+  margin: 1px 4px;
+  padding: 6px 10px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 16px;
   white-space: nowrap;
+  border-radius: 8px;
+  transition: background 0.12s ease-out, color 0.12s ease-out;
 }
 
 .menu-item.enabled {
@@ -305,7 +319,10 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: modalOverlayFade 0.15s ease-out forwards;
 }
 
 /* Панель модального окна */
@@ -316,8 +333,21 @@ body {
   padding: 20px 24px;
   background: var(--bg-elevated);
   border: 1px solid var(--border-strong);
-  border-radius: 14px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  animation: modalScale 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes modalOverlayFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalScale {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 /* Заголовок модального окна */
@@ -505,8 +535,8 @@ body {
 .autocomplete-input-wrap { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--border-default); border-radius: 6px; background: var(--bg-base); }
 .autocomplete-icon { color: var(--text-dim); flex-shrink: 0; }
 .autocomplete-input { flex: 1; border: none; outline: none; background: transparent; font-size: 13px; color: var(--text-primary); }
-.autocomplete-dropdown { position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px; background: var(--bg-elevated); border: 1px solid var(--border-strong); border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 100; overflow: hidden; }
-.autocomplete-item { padding: 8px 12px; font-size: 13px; cursor: pointer; color: var(--text-primary); }
+.autocomplete-dropdown { position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px; background: var(--bg-elevated); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid var(--border-strong); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,0.25); z-index: 100; overflow: hidden; }
+.autocomplete-item { padding: 8px 12px; font-size: 13px; cursor: pointer; color: var(--text-primary); transition: background 0.12s ease-out; }
 .autocomplete-item:hover, .autocomplete-item.selected { background: var(--menu-hover-bg); }
 
 /* ── Titlebar badge ── */

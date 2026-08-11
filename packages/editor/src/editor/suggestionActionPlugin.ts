@@ -22,6 +22,7 @@ class SuggestionActionView {
     to: number;
     node?: PMNode;
   } | null = null;
+  currentPos: number | null = null;
 
   constructor(view: EditorView, userRole?: "author" | "co_author" | "editor" | null) {
     this.view = view;
@@ -76,6 +77,17 @@ class SuggestionActionView {
     // Click handler on editor to ensure clicking on suggestion activates it
     this.handleClick = this.handleClick.bind(this);
     view.dom.addEventListener("click", this.handleClick);
+
+    // Scroll and resize handlers to keep popup attached during and after scrolling
+    this.handleScroll = this.handleScroll.bind(this);
+    window.addEventListener("scroll", this.handleScroll, true);
+    window.addEventListener("resize", this.handleScroll);
+  }
+
+  handleScroll() {
+    if (this.currentTarget && this.currentPos !== null) {
+      this.updatePosition();
+    }
   }
 
   handleClick(e: MouseEvent) {
@@ -174,8 +186,21 @@ class SuggestionActionView {
   }
 
   showPopupAt(pos: number) {
+    this.currentPos = pos;
+    this.updatePosition();
+  }
+
+  updatePosition() {
+    if (this.currentPos === null || !this.currentTarget) return;
     try {
-      const coords = this.view.coordsAtPos(pos);
+      const coords = this.view.coordsAtPos(this.currentPos);
+
+      // If target position is vertically outside current viewport, hide popup until scrolled into view
+      if (coords.bottom < 0 || coords.top > window.innerHeight) {
+        this.popup.style.display = "none";
+        return;
+      }
+
       this.popup.style.display = "flex";
 
       const popupWidth = this.popup.offsetWidth || 180;
@@ -202,6 +227,7 @@ class SuggestionActionView {
   hidePopup() {
     this.popup.style.display = "none";
     this.currentTarget = null;
+    this.currentPos = null;
   }
 
   handleAccept() {
@@ -252,6 +278,8 @@ class SuggestionActionView {
 
   destroy() {
     this.view.dom.removeEventListener("click", this.handleClick);
+    window.removeEventListener("scroll", this.handleScroll, true);
+    window.removeEventListener("resize", this.handleScroll);
     if (this.popup.parentNode) {
       this.popup.parentNode.removeChild(this.popup);
     }

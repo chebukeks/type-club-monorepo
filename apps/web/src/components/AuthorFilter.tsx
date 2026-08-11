@@ -105,7 +105,7 @@ export default function AuthorFilter({ value, onChange }: Props) {
         className="w-full h-10 pl-9 pr-3 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-sm outline-none focus:border-blue-400 dark:focus:border-blue-600 transition-colors"
       />
       {showDropdown && (
-        <div className="absolute top-full left-0 right-0 mt-1 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-lg overflow-hidden z-20">
+        <div className="absolute top-full left-0 right-0 mt-1 rounded-xl border border-gray-200/80 dark:border-gray-800/80 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl shadow-2xl overflow-hidden z-20 animate-in fade-in zoom-in-95 duration-100 ease-out">
           {suggestions.length === 0 ? (
             <div className="px-3 py-2 text-sm text-gray-400">No users found</div>
           ) : (

@@ -20,11 +20,18 @@ export function SettingsPopup({ onClose }: SettingsPopupProps) {
     window.api.getSpellcheck().then(setSpellcheckState).catch(() => { })
   }, [])
 
+  const [closing, setClosing] = useState(false)
+
+  const handleClose = () => {
+    setClosing(true)
+    setTimeout(onClose, 100)
+  }
+
   // Закрытие при клике вне
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
-        onClose()
+        handleClose()
       }
     }
     // Немного отложим, чтобы клик по шестерёнке не закрывал сразу
@@ -55,7 +62,11 @@ export function SettingsPopup({ onClose }: SettingsPopupProps) {
   return (
     <div
       ref={popupRef}
-      className="absolute right-0 top-full mt-1 w-max min-w-[240px] py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50 text-[13px] text-[var(--text-secondary)] select-none"
+      className={`absolute right-0 top-full mt-1 w-max min-w-[240px] py-1 bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-50 text-[13px] text-[var(--text-secondary)] select-none ${
+        closing
+          ? 'animate-out fade-out zoom-out-95 duration-100 ease-in fill-mode-forwards'
+          : 'animate-in fade-in zoom-in-95 duration-100 ease-out'
+      }`}
     >
       {/* Заголовок */}
       <div className="menu-item enabled" style={{ cursor: 'default' }}>
@@ -68,7 +79,7 @@ export function SettingsPopup({ onClose }: SettingsPopupProps) {
         </span>
       </div>
 
-      <div className="border-t border-[var(--border-strong)] my-1" />
+      <div className="border-t border-[var(--border-default)] my-1.5 mx-2 opacity-80" />
 
       {/* Автосохранение */}
       <div className="menu-item enabled" onClick={handleAutosaveToggle}>
@@ -82,7 +93,7 @@ export function SettingsPopup({ onClose }: SettingsPopupProps) {
         <ToggleSwitch enabled={spellcheck} />
       </div>
 
-      <div className="border-t border-[var(--border-strong)] my-1" />
+      <div className="border-t border-[var(--border-default)] my-1.5 mx-2 opacity-80" />
 
       {/* Режим печатной машинки */}
       <div className="menu-item enabled" onClick={() => setTypewriterMode(!state.typewriterMode)}>
@@ -90,7 +101,7 @@ export function SettingsPopup({ onClose }: SettingsPopupProps) {
         <ToggleSwitch enabled={state.typewriterMode} />
       </div>
 
-      <div className="border-t border-[var(--border-strong)] my-1" />
+      <div className="border-t border-[var(--border-default)] my-1.5 mx-2 opacity-80" />
 
       {/* Статистика */}
       <div className="menu-item enabled" onClick={() => setShowStats(!state.showStats)}>

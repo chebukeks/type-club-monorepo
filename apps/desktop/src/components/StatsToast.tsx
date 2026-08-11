@@ -1,14 +1,20 @@
 /**
  * StatsToast.tsx — Плавающая плашка статистики текста.
- * Компактный режим: счётчик символов в правом нижнем углу.
- * При наведении: полная статистика + кнопка задать ограничение.
- * Стилизация: единый дизайн с dropdown-меню (MenuBar) + кастомный селект.
+ * Поддерживает 2 режима расположения:
+ * 1) 'right': Справа от документа, ширина совпадает с оглавлением над ним, не сжимается меньше 180px.
+ * 2) 'sidebar': Внизу сайдбара с отступами 12px, при раскрытии расширяется вправо.
  */
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useEditor } from '../context/EditorContext'
 import type { LimitType } from '../types'
 
-export function StatsToast() {
+interface StatsToastProps {
+  mode?: 'right' | 'sidebar'
+  sidebarWidth?: number
+  containerWidth?: number
+}
+
+export function StatsToast({ mode = 'right', sidebarWidth = 240, containerWidth }: StatsToastProps) {
   const { state, setWordLimit } = useEditor()
   const { tabs, activeTabId, wordLimit } = state
   const activeTab = activeTabId ? tabs.find((t) => t.id === activeTabId) : null
@@ -17,9 +23,30 @@ export function StatsToast() {
   const [limitInputValue, setLimitInputValue] = useState('')
   const [limitInputType, setLimitInputType] = useState<LimitType>('chars')
   const [isSelectOpen, setIsSelectOpen] = useState(false)
+  const [rightPaneWidth, setRightPaneWidth] = useState(containerWidth || 1200)
 
   const inputRef = useRef<HTMLInputElement>(null)
   const selectRef = useRef<HTMLDivElement>(null)
+  const toastRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (containerWidth) {
+      setRightPaneWidth(containerWidth)
+    }
+  }, [containerWidth])
+
+  // Измерение ширины правой панели для режима 'right'
+  useEffect(() => {
+    const parent = toastRef.current?.parentElement
+    if (!parent) return
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setRightPaneWidth(entry.contentRect.width)
+      }
+    })
+    ro.observe(parent)
+    return () => ro.disconnect()
+  }, [])
 
   // Вычисление статистики
   const stats = useMemo(() => {
@@ -86,9 +113,48 @@ export function StatsToast() {
     if (e.key === 'Escape') { setShowLimitInput(false); setLimitInputValue('') }
   }
 
+  // Расчёт геометрии для режима 'right'
+  const docScale = (state.documentZoom || 100) / 100
+  const docHalfWidth = 430 * docScale
+  const leftPos = rightPaneWidth / 2 + docHalfWidth + 16
+  const rightPos = 32
+  const availableWidth = rightPaneWidth - rightPos - leftPos
+  const targetWidth = Math.min(280, Math.max(180, availableWidth))
+
+  const isSidebar = mode === 'sidebar'
+  const isConstrained = availableWidth < 180
+
+  const sbWidth = sidebarWidth || 240
+  const collapsedSidebarWidth = sbWidth - 24
+  const expandedSidebarWidth = Math.max(240, collapsedSidebarWidth)
+
+  const collapsedRightWidth = isConstrained ? 180 : targetWidth
+  const expandedRightWidth = Math.max(240, collapsedRightWidth)
+
+  const outerStyle: React.CSSProperties = isSidebar
+    ? {
+        position: 'absolute',
+        bottom: '24px',
+        left: '12px',
+        width: isExpanded ? 'max-content' : `${collapsedSidebarWidth}px`,
+        minWidth: isExpanded ? `${expandedSidebarWidth}px` : 'auto',
+        maxWidth: isExpanded ? '360px' : `${collapsedSidebarWidth}px`,
+        zIndex: 40,
+      }
+    : {
+        position: 'absolute',
+        bottom: '24px',
+        right: '32px',
+        width: isExpanded ? 'max-content' : `${collapsedRightWidth}px`,
+        minWidth: isExpanded ? `${expandedRightWidth}px` : `${collapsedRightWidth}px`,
+        maxWidth: '360px',
+        zIndex: 30,
+      }
+
   return (
     <div
-      className="absolute bottom-6 right-8 z-30"
+      ref={toastRef}
+      style={outerStyle}
       onMouseEnter={() => setIsExpanded(true)}
       onMouseLeave={() => {
         setIsExpanded(false)
@@ -98,21 +164,21 @@ export function StatsToast() {
       }}
     >
       <div
-        className={`bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg transition-all duration-200 overflow-visible ${isExpanded ? 'py-1' : ''}`}
-        style={{ minWidth: isExpanded ? '240px' : 'auto' }}
+        className={`bg-[var(--bg-surface)] backdrop-blur-xl border border-[var(--border-default)] rounded-xl shadow-xl transition-all duration-200 ease-out overflow-hidden ${isExpanded ? 'py-1' : ''}`}
+        style={{ width: '100%' }}
       >
         {/* Компактный вид / Заголовок раскрытого вида */}
         <div
-          className="text-center whitespace-nowrap cursor-default select-none transition-all duration-200 px-5 text-[13px]"
+          className="text-center whitespace-nowrap cursor-default select-none transition-all duration-200 text-[13px] truncate"
           style={{ color: wordLimit.enabled ? limitColor : 'var(--text-muted)', padding: '12px' }}
         >
           {compactText}
         </div>
 
-        {/* Раскрытый вид */}
-        {isExpanded && (
-          <>
-            <div className="border-t border-[var(--border-strong)] my-1" />
+        {/* Раскрытый вид с плавным открытием/закрытием */}
+        <div className={`grid transition-all duration-200 ease-out ${isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+          <div className="overflow-hidden">
+            <div className="border-t border-[var(--border-default)] my-1.5 mx-2 opacity-80" />
 
             {/* Подробная статистика */}
             <div className="menu-item" style={{ cursor: 'default' }}>
@@ -138,7 +204,7 @@ export function StatsToast() {
               </span>
             </div>
 
-            <div className="border-t border-[var(--border-strong)] my-1" />
+            <div className="border-t border-[var(--border-default)] my-1.5 mx-2 opacity-80" />
 
             {/* Ограничение */}
             {!showLimitInput ? (
@@ -230,8 +296,8 @@ export function StatsToast() {
                 </button>
               </div>
             )}
-          </>
-        )}
+          </div>
+        </div>
       </div>
     </div>
   )

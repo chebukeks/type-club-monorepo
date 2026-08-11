@@ -81,7 +81,7 @@ function AppLayout() {
       <TitleBar />
 
       {/* Основная область: сайдбар + ручка ресайза + редактор */}
-      <div className="flex flex-1 overflow-hidden bg-[var(--bg-surface)]">
+      <div className="flex flex-1 overflow-hidden bg-[var(--bg-surface)] relative">
         {/* Левая панель — файловый проводник */}
         {state.sidebarOpen && <Sidebar width={sidebarWidth} />}
 
@@ -94,14 +94,18 @@ function AppLayout() {
           />
         )}
 
-        {/* Правая панель — вкладки + редактор + StatsToast */}
+        {/* Правая панель — вкладки + редактор */}
         <div className="relative flex flex-col flex-1 overflow-hidden p-2 pt-0 bg-[var(--bg-surface)]">
           {state.tabBarOpen && <TabBar />}
           <div className="flex-1 overflow-hidden rounded-xl border border-[var(--border-default)] shadow-xs bg-[var(--bg-base)] flex flex-col relative isolate" style={{ backgroundClip: 'padding-box' }}>
             <MarkdownEditor />
           </div>
-          {state.showStats && <StatsToast />}
         </div>
+
+        {/* Плашка статистики в сайдбаре */}
+        {state.showStats && state.statsLayoutMode === 'sidebar' && state.sidebarOpen && (
+          <StatsToast mode="sidebar" sidebarWidth={sidebarWidth} />
+        )}
       </div>
     </div>
   )

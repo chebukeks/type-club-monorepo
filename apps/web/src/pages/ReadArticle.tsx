@@ -176,14 +176,23 @@ export default function ReadArticle() {
       </div>
 
       {/* Desktop ToC sidebar in right margin without displacing centered article */}
-      <div className="hidden xl:block absolute left-[calc(100%+2.5rem)] top-8 h-full pointer-events-none">
-        <div className="sticky top-24 pointer-events-auto">
+      <div
+        style={{
+          left: "calc(50vw + 408px)",
+          right: "max(24px, calc(50vw - 384px - 280px - 24px))",
+          maxWidth: "280px",
+          minWidth: "180px",
+          top: "80px",
+        }}
+        className="right-toc-sidebar fixed z-30 pointer-events-none"
+      >
+        <div className="sticky top-20 pointer-events-auto w-full">
           <TableOfContents variant="sidebar" toc={toc} />
         </div>
       </div>
 
       {/* Mobile / Tablet floating ToC button */}
-      <TableOfContents variant="floating" toc={toc} className="xl:hidden" />
+      <TableOfContents variant="floating" toc={toc} className="right-toc-floating-button" />
     </div>
   );
 }

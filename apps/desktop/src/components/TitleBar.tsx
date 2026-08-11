@@ -20,11 +20,18 @@ const modes: { key: EditorMode; label: string }[] = [
 
 function ProfileMenuPopup({ user, logout, onClose }: { user: { nickname: string; id: number }; logout: () => void; onClose: () => void }) {
   const popupRef = useRef<HTMLDivElement>(null)
+  const [closing, setClosing] = useState(false)
 
+  const handleClose = () => {
+    setClosing(true)
+    setTimeout(onClose, 100)
+  }
+
+  // Закрытие при клике вне
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
-        onClose()
+        handleClose()
       }
     }
     const timer = setTimeout(() => {
@@ -39,12 +46,16 @@ function ProfileMenuPopup({ user, logout, onClose }: { user: { nickname: string;
   return (
     <div
       ref={popupRef}
-      className="absolute right-0 top-full mt-1 w-52 py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50 flex flex-col text-[13px] text-[var(--text-secondary)]"
+      className={`absolute right-0 top-full mt-1 w-52 py-1 bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-50 flex flex-col text-[13px] text-[var(--text-secondary)] ${
+        closing
+          ? 'animate-out fade-out zoom-out-95 duration-100 ease-in fill-mode-forwards'
+          : 'animate-in fade-in zoom-in-95 duration-100 ease-out'
+      }`}
     >
       <button
         className="menu-item enabled flex items-center justify-between"
         onClick={() => {
-          onClose()
+          handleClose()
           window.api.openExternal(`${config.siteUrl}/${user.nickname}`)
         }}
       >
@@ -71,7 +82,7 @@ function ProfileMenuPopup({ user, logout, onClose }: { user: { nickname: string;
         </svg>
       </button>
 
-      <div className="border-t border-[var(--border-strong)] my-1" />
+      <div className="border-t border-[var(--border-default)] my-1.5 mx-2 opacity-80" />
 
       <button
         className="menu-item enabled"

@@ -23,6 +23,12 @@ export interface TocItem {
 /** Режим цветовой темы */
 export type ThemeMode = 'light' | 'dark' | 'system';
 
+/** Режим отображения оглавления и предложений */
+export type TocLayoutMode = 'separate' | 'combined';
+
+/** Режим расположения статистики (справа от документа или в сайдбаре) */
+export type StatsLayoutMode = 'right' | 'sidebar';
+
 /** Режим редактирования */
 export type EditorMode = 'raw' | 'seamless' | 'preview';
 
@@ -105,6 +111,10 @@ export interface AppState {
   sidebarOpen: boolean;
   /** Отображение панели вкладок открыта/свёрнута */
   tabBarOpen: boolean;
+  /** Режим расположения оглавления и предложений (раздельно или вместе) */
+  tocLayoutMode: TocLayoutMode;
+  /** Режим расположения плашки статистики (справа от документа или в сайдбаре) */
+  statsLayoutMode: StatsLayoutMode;
 }
 
 /** Действия для редьюсера состояния */
@@ -122,6 +132,7 @@ export type AppAction =
   | { type: 'RENAME_TAB_PATHS'; payload: { oldPath: string; newPath: string } }
   | { type: 'SET_ACTIVE_EXPLORER_PATH'; payload: { path: string | null } }
   | { type: 'SET_THEME'; payload: { theme: ThemeMode } }
+  | { type: 'SET_TOC_LAYOUT_MODE'; payload: { mode: TocLayoutMode } }
   | { type: 'SET_EDITOR_MODE'; payload: { mode: EditorMode } }
   | { type: 'REFRESH_TAB'; payload: { tabId: string } }
   | { type: 'SET_AUTOSAVE'; payload: { enabled: boolean } }
@@ -142,7 +153,8 @@ export type AppAction =
   | { type: 'TOGGLE_SIDEBAR' }
   | { type: 'SET_SIDEBAR_OPEN'; payload: { open: boolean } }
   | { type: 'TOGGLE_TAB_BAR' }
-  | { type: 'SET_TAB_BAR_OPEN'; payload: { open: boolean } };
+  | { type: 'SET_TAB_BAR_OPEN'; payload: { open: boolean } }
+  | { type: 'SET_STATS_LAYOUT_MODE'; payload: { mode: StatsLayoutMode } };
 
 
 /** API, доступный из Renderer-процесса через contextBridge */
@@ -184,11 +196,11 @@ export interface IElectronAPI {
   /** Подтвердить закрытие окна (разрешить) */
   confirmClose: () => void;
   /** Увеличить масштаб интерфейса */
-  zoomIn: () => void;
+  zoomIn: () => number;
   /** Уменьшить масштаб интерфейса */
-  zoomOut: () => void;
+  zoomOut: () => number;
   /** Сбросить масштаб интерфейса */
-  zoomReset: () => void;
+  zoomReset: () => number;
 }
 
 declare global {

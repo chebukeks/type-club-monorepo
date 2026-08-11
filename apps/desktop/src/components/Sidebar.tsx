@@ -99,6 +99,31 @@ export function Sidebar({ width }: { width: number }) {
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, path: string, type: 'file' | 'folder', name: string } | null>(null)
   const [onlineMenu, setOnlineMenu] = useState<{ x: number, y: number, article: ArticleListItem } | null>(null)
 
+  const [savedCtxMenu, setSavedCtxMenu] = useState<typeof contextMenu>(null)
+  const [savedOnlineMenu, setSavedOnlineMenu] = useState<typeof onlineMenu>(null)
+  const [contextMenuMounted, setContextMenuMounted] = useState(false)
+  const [onlineMenuMounted, setOnlineMenuMounted] = useState(false)
+
+  useEffect(() => {
+    if (contextMenu) {
+      setSavedCtxMenu(contextMenu)
+      setContextMenuMounted(true)
+    } else {
+      const timer = setTimeout(() => setContextMenuMounted(false), 100)
+      return () => clearTimeout(timer)
+    }
+  }, [contextMenu])
+
+  useEffect(() => {
+    if (onlineMenu) {
+      setSavedOnlineMenu(onlineMenu)
+      setOnlineMenuMounted(true)
+    } else {
+      const timer = setTimeout(() => setOnlineMenuMounted(false), 100)
+      return () => clearTimeout(timer)
+    }
+  }, [onlineMenu])
+
   useEffect(() => {
     const handleGlobalClick = () => { setContextMenu(null); setOnlineMenu(null) }
     if (contextMenu || onlineMenu) {
@@ -408,93 +433,101 @@ export function Sidebar({ width }: { width: number }) {
       </div>
 
       {/* Context menu — local */}
-      {contextMenu && (
-        <div
-          className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
-          style={{ top: contextMenu.y, left: contextMenu.x, minWidth: '160px' }}
-          onContextMenu={(e) => e.preventDefault()}
-        >
-          {contextMenu.path === '__empty__' ? (
-            <>
-              <button className="menu-item enabled" onClick={() => { startCreating('file'); setContextMenu(null) }}>
-                Создать файл
-              </button>
-              <button className="menu-item enabled" onClick={() => { startCreating('folder'); setContextMenu(null) }}>
-                Создать папку
-              </button>
-            </>
-          ) : contextMenu.path === '__online_empty__' ? (
-            <button className="menu-item enabled" onClick={() => { startCreating('file'); setContextMenu(null) }}>
-              Создать статью
-            </button>
-          ) : (
-            <>
-              <button className="menu-item enabled" onClick={() => { startRenaming(contextMenu.path, contextMenu.type); setContextMenu(null) }}>
-                Переименовать
-              </button>
-              <button className="menu-item enabled" onClick={() => {
-                navigator.clipboard.writeText(contextMenu.path)
-                setContextMenu(null)
-              }}>
-                Копировать путь
-              </button>
-              {contextMenu.type === 'file' && (
-                <button className="menu-item enabled" onClick={async () => {
-                  try {
-                    const content = await window.api.readFile(contextMenu.path)
-                    const sep = contextMenu.path.includes('/') ? '/' : '\\'
-                    const ext = contextMenu.name.includes('.') ? contextMenu.name.substring(contextMenu.name.lastIndexOf('.')) : ''
-                    const baseName = ext ? contextMenu.name.substring(0, contextMenu.name.lastIndexOf('.')) : contextMenu.name
-                    const dir = contextMenu.path.substring(0, contextMenu.path.lastIndexOf(sep))
-                    const copyPath = dir + sep + baseName + ' копия' + ext
-                    await window.api.writeFile(copyPath, content)
-                    refreshFileTree()
-                  } catch (err) { console.error('Ошибка копированиея файла:', err) }
-                  setContextMenu(null)
-                }}>
-                  Создать копию
-                </button>
-              )}
-              <div className="border-t border-[var(--border-strong)] my-1" />
-              <button className="menu-item enabled" style={{ color: 'var(--text-danger)' }} onClick={() => { deleteItem(contextMenu.path, contextMenu.type, contextMenu.name); setContextMenu(null) }}>
-                Удалить
-              </button>
-              <div className="border-t border-[var(--border-strong)] my-1" />
-              <button className="menu-item enabled" onClick={() => { showInExplorer(contextMenu.path); setContextMenu(null) }}>
-                Открыть в проводнике
-              </button>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Context menu — online articles */}
-      {onlineMenu && (() => {
-        const isAuthor = !onlineMenu.article.my_roles || onlineMenu.article.my_roles.includes('author')
+      {contextMenuMounted && (savedCtxMenu || contextMenu) && (() => {
+        const menu = contextMenu || savedCtxMenu!
         return (
           <div
-            className="fixed bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-xl shadow-lg z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)]"
-            style={{ top: onlineMenu.y, left: onlineMenu.x, minWidth: '160px' }}
+            className={`fixed bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)] ${
+              contextMenu ? 'animate-in fade-in zoom-in-95 duration-100 ease-out' : 'animate-out fade-out zoom-out-95 duration-100 ease-in fill-mode-forwards'
+            }`}
+            style={{ top: menu.y, left: menu.x, minWidth: '160px' }}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            {menu.path === '__empty__' ? (
+              <>
+                <button className="menu-item enabled" onClick={() => { startCreating('file'); setContextMenu(null) }}>
+                  Создать файл
+                </button>
+                <button className="menu-item enabled" onClick={() => { startCreating('folder'); setContextMenu(null) }}>
+                  Создать папку
+                </button>
+              </>
+            ) : menu.path === '__online_empty__' ? (
+              <button className="menu-item enabled" onClick={() => { startCreating('file'); setContextMenu(null) }}>
+                Создать статью
+              </button>
+            ) : (
+              <>
+                <button className="menu-item enabled" onClick={() => { startRenaming(menu.path, menu.type); setContextMenu(null) }}>
+                  Переименовать
+                </button>
+                <button className="menu-item enabled" onClick={() => {
+                  navigator.clipboard.writeText(menu.path)
+                  setContextMenu(null)
+                }}>
+                  Копировать путь
+                </button>
+                {menu.type === 'file' && (
+                  <button className="menu-item enabled" onClick={async () => {
+                    try {
+                      const content = await window.api.readFile(menu.path)
+                      const sep = menu.path.includes('/') ? '/' : '\\'
+                      const ext = menu.name.includes('.') ? menu.name.substring(menu.name.lastIndexOf('.')) : ''
+                      const baseName = ext ? menu.name.substring(0, menu.name.lastIndexOf('.')) : menu.name
+                      const dir = menu.path.substring(0, menu.path.lastIndexOf(sep))
+                      const copyPath = dir + sep + baseName + ' копия' + ext
+                      await window.api.writeFile(copyPath, content)
+                      refreshFileTree()
+                    } catch (err) { console.error('Ошибка копированиея файла:', err) }
+                    setContextMenu(null)
+                  }}>
+                    Создать копию
+                  </button>
+                )}
+                <div className="border-t border-[var(--border-default)] my-1.5 mx-2 opacity-80" />
+                <button className="menu-item enabled" style={{ color: 'var(--text-danger)' }} onClick={() => { deleteItem(menu.path, menu.type, menu.name); setContextMenu(null) }}>
+                  Удалить
+                </button>
+                <div className="border-t border-[var(--border-default)] my-1.5 mx-2 opacity-80" />
+                <button className="menu-item enabled" onClick={() => { showInExplorer(menu.path); setContextMenu(null) }}>
+                  Открыть в проводнике
+                </button>
+              </>
+            )}
+          </div>
+        )
+      })()}
+
+      {/* Context menu — online articles */}
+      {onlineMenuMounted && (onlineMenu || savedOnlineMenu) && (() => {
+        const menu = onlineMenu || savedOnlineMenu!
+        const isAuthor = !menu.article.my_roles || menu.article.my_roles.includes('author')
+        return (
+          <div
+            className={`fixed bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)] ${
+              onlineMenu ? 'animate-in fade-in zoom-in-95 duration-100 ease-out' : 'animate-out fade-out zoom-out-95 duration-100 ease-in fill-mode-forwards'
+            }`}
+            style={{ top: menu.y, left: menu.x, minWidth: '160px' }}
             onContextMenu={(e) => e.preventDefault()}
           >
             {isAuthor && (
               <button className="menu-item enabled" onClick={() => {
-                startRenaming(`__online__/${onlineMenu.article.id}`, 'file')
+                startRenaming(`__online__/${menu.article.id}`, 'file')
                 setOnlineMenu(null)
               }}>
                 Переименовать
               </button>
             )}
             <button className="menu-item enabled" onClick={() => {
-              const authorNick = onlineMenu.article.author_nickname || onlineUsername
-              navigator.clipboard.writeText(`${config.siteUrl}/${authorNick}/${onlineMenu.article.slug}`)
+              const authorNick = menu.article.author_nickname || onlineUsername
+              navigator.clipboard.writeText(`${config.siteUrl}/${authorNick}/${menu.article.slug}`)
               setOnlineMenu(null)
             }}>
               Копировать ссылку
             </button>
             {isAuthor && (
               <button className="menu-item enabled" onClick={() => {
-                duplicateOnlineArticle(onlineMenu.article.id)
+                duplicateOnlineArticle(menu.article.id)
                 setOnlineMenu(null)
               }}>
                 Создать копию
@@ -502,19 +535,19 @@ export function Sidebar({ width }: { width: number }) {
             )}
             {isAuthor && (
               <>
-                <div className="border-t border-[var(--border-strong)] my-1" />
+                <div className="border-t border-[var(--border-default)] my-1.5 mx-2 opacity-80" />
                 <button className="menu-item enabled" style={{ color: 'var(--text-danger)' }} onClick={() => {
-                  deleteOnlineArticle(onlineMenu.article.id)
+                  deleteOnlineArticle(menu.article.id)
                   setOnlineMenu(null)
                 }}>
                   Удалить
                 </button>
               </>
             )}
-            <div className="border-t border-[var(--border-strong)] my-1" />
+            <div className="border-t border-[var(--border-default)] my-1.5 mx-2 opacity-80" />
             <button className="menu-item enabled" onClick={() => {
-              const authorNick = onlineMenu.article.author_nickname || onlineUsername
-              window.api.openExternal(`${config.siteUrl}/${authorNick}/${onlineMenu.article.slug}`)
+              const authorNick = menu.article.author_nickname || onlineUsername
+              window.api.openExternal(`${config.siteUrl}/${authorNick}/${menu.article.slug}`)
               setOnlineMenu(null)
             }}>
               Открыть в браузере
@@ -522,10 +555,10 @@ export function Sidebar({ width }: { width: number }) {
             <button className="menu-item enabled" onClick={async () => {
               try {
                 const { articlesApi } = await import('../api')
-                const article = await articlesApi.get(onlineMenu.article.id)
+                const article = await articlesApi.get(menu.article.id)
                 await window.api.saveFileAs(
                   article.content,
-                  onlineMenu.article.title + '.md'
+                  menu.article.title + '.md'
                 )
               } catch (err) { console.error('Ошибка скачивания:', err) }
               setOnlineMenu(null)
@@ -570,8 +603,8 @@ function OnlineArticleItem({ article, activeTabArticleId, activeToc, onOpen, onC
     <div>
       <div className={`w-full flex items-center gap-1.5 text-[13px] rounded transition-colors group ${
         isActive ? 'bg-[var(--bg-hover)] text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
-      }`} style={{ paddingLeft: isActive && activeToc.length > 0 ? '8px' : '26px', paddingRight: '1px' }}>
-        {isActive && activeToc.length > 0 && (
+      }`} style={{ paddingLeft: isActive && state.tocLayoutMode === 'separate' && activeToc.length > 0 ? '8px' : '26px', paddingRight: '8px' }}>
+        {isActive && state.tocLayoutMode === 'separate' && activeToc.length > 0 && (
           <button onClick={() => setIsTocOpen(!isTocOpen)} className="p-1 rounded hover:bg-[var(--border-default)]">
             <svg width="10" height="10" viewBox="0 0 12 12" className={`transition-transform text-[var(--text-dim)] ${isTocOpen ? 'rotate-90' : ''}`} fill="currentColor">
               <path d="M4 2l4 4-4 4z" />
@@ -599,8 +632,8 @@ function OnlineArticleItem({ article, activeTabArticleId, activeToc, onOpen, onC
           )}
         </button>
       </div>
-      {isActive && isTocOpen && activeToc.length > 0 && (
-        <div className="mt-0.5">
+      <div className={`grid transition-all duration-200 ease-out ${isActive && state.tocLayoutMode === 'separate' && isTocOpen && activeToc.length > 0 ? 'grid-rows-[1fr] opacity-100 mt-0.5' : 'grid-rows-[0fr] opacity-0'}`}>
+        <div className="overflow-hidden">
           {activeToc.map((toc) => (
             <button
               key={toc.id}
@@ -617,7 +650,7 @@ function OnlineArticleItem({ article, activeTabArticleId, activeToc, onOpen, onC
             </button>
           ))}
         </div>
-      )}
+      </div>
     </div>
   )
 }
@@ -931,8 +964,8 @@ function FileTreeItem({ entry, depth, onFileClick, onContextMenu, activeFilePath
           onDrop={handleDrop}
           className={`w-full flex items-center gap-1.5 text-[13px] rounded transition-colors group ${
             isDragOver ? 'bg-[var(--accent)] text-white' : isActiveFile ? 'bg-[var(--bg-hover)] text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
-          }`} style={{ paddingLeft: `${depth * 12 + (isActiveFile && activeToc.length > 0 ? 8 : 26)}px`, paddingRight: '1px' }}>
-          {isActiveFile && activeToc.length > 0 && (
+          }`} style={{ paddingLeft: `${depth * 12 + (isActiveFile && state.tocLayoutMode === 'separate' && activeToc.length > 0 ? 8 : 26)}px`, paddingRight: '8px' }}>
+          {isActiveFile && state.tocLayoutMode === 'separate' && activeToc.length > 0 && (
             <button onClick={() => setIsTocOpen(!isTocOpen)} className={`p-1 rounded ${isDragOver ? 'hover:bg-white/20' : 'hover:bg-[var(--border-default)]'}`}>
               <svg width="10" height="10" viewBox="0 0 12 12" className={`transition-transform flex-shrink-0 ${isDragOver ? 'text-white' : 'text-[var(--text-dim)]'} ${isTocOpen ? 'rotate-90' : ''}`} fill="currentColor">
                 <path d="M4 2l4 4-4 4z" />
@@ -954,8 +987,8 @@ function FileTreeItem({ entry, depth, onFileClick, onContextMenu, activeFilePath
         </button>
       </div>
       )}
-      {isActiveFile && isTocOpen && activeToc.length > 0 && (
-        <div className="mt-0.5">
+      <div className={`grid transition-all duration-200 ease-out ${isActiveFile && state.tocLayoutMode === 'separate' && isTocOpen && activeToc.length > 0 ? 'grid-rows-[1fr] opacity-100 mt-0.5' : 'grid-rows-[0fr] opacity-0'}`}>
+        <div className="overflow-hidden">
           {activeToc.map((toc) => (
             <button
               key={toc.id}
@@ -972,7 +1005,7 @@ function FileTreeItem({ entry, depth, onFileClick, onContextMenu, activeFilePath
             </button>
           ))}
         </div>
-      )}
+      </div>
     </div>
   )
 }

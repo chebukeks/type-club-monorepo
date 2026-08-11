@@ -2,7 +2,7 @@
  * EditorContext.tsx — Централизованное управление состоянием приложения.
  */
 import React, { createContext, useContext, useReducer, useCallback, useEffect, useRef } from 'react'
-import type { AppState, AppAction, FileEntry, ThemeMode, EditorMode, WordLimit, FocusMode } from '../types'
+import type { AppState, AppAction, FileEntry, ThemeMode, EditorMode, WordLimit, FocusMode, TocLayoutMode, StatsLayoutMode } from '../types'
 import { articlesApi } from '../api'
 
 // ============================================================
@@ -31,6 +31,8 @@ const initialState: AppState = {
   onlineArticles: [] as import('../api').ArticleListItem[],
   sidebarOpen: true,
   tabBarOpen: true,
+  tocLayoutMode: 'combined',
+  statsLayoutMode: 'right',
 }
 
 // ============================================================
@@ -133,6 +135,10 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, activeExplorerPath: action.payload.path }
     case 'SET_THEME':
       return { ...state, theme: action.payload.theme }
+    case 'SET_TOC_LAYOUT_MODE':
+      return { ...state, tocLayoutMode: action.payload.mode }
+    case 'SET_STATS_LAYOUT_MODE':
+      return { ...state, statsLayoutMode: action.payload.mode }
     case 'SET_EDITOR_MODE':
       return { ...state, editorMode: action.payload.mode }
     case 'REFRESH_TAB':
@@ -259,6 +265,8 @@ interface EditorContextValue {
   setSidebarOpen: (open: boolean) => void
   toggleTabBar: () => void
   setTabBarOpen: (open: boolean) => void
+  setTocLayoutMode: (mode: TocLayoutMode) => void
+  setStatsLayoutMode: (mode: StatsLayoutMode) => void
 }
 
 const EditorContext = createContext<EditorContextValue | null>(null)
@@ -274,6 +282,12 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         const theme = savedTheme || 'dark'
         dispatch({ type: 'SET_THEME', payload: { theme } })
         applyThemeToDOM(theme)
+
+        const savedTocLayoutMode = await window.api.storeGet('tocLayoutMode') as TocLayoutMode | undefined
+        if (savedTocLayoutMode) dispatch({ type: 'SET_TOC_LAYOUT_MODE', payload: { mode: savedTocLayoutMode } })
+
+        const savedStatsLayoutMode = await window.api.storeGet('statsLayoutMode') as StatsLayoutMode | undefined
+        if (savedStatsLayoutMode) dispatch({ type: 'SET_STATS_LAYOUT_MODE', payload: { mode: savedStatsLayoutMode } })
 
         const savedAutosave = await window.api.storeGet('autosave') as boolean | undefined
         dispatch({ type: 'SET_AUTOSAVE', payload: { enabled: savedAutosave !== false } })
@@ -936,6 +950,16 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: 'SET_TAB_BAR_OPEN', payload: { open } })
   }, [])
 
+  const setTocLayoutMode = useCallback(async (mode: TocLayoutMode) => {
+    dispatch({ type: 'SET_TOC_LAYOUT_MODE', payload: { mode } })
+    try { await window.api.storeSet('tocLayoutMode', mode) } catch (e) { /* ignore */ }
+  }, [])
+
+  const setStatsLayoutMode = useCallback(async (mode: StatsLayoutMode) => {
+    dispatch({ type: 'SET_STATS_LAYOUT_MODE', payload: { mode } })
+    try { await window.api.storeSet('statsLayoutMode', mode) } catch (e) { /* ignore */ }
+  }, [])
+
   return (
     <EditorContext.Provider value={{
       state, dispatch,
@@ -957,6 +981,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       downloadOnlineArticle, setSidebarMode,
       toggleSidebar, setSidebarOpen,
       toggleTabBar, setTabBarOpen,
+      setTocLayoutMode, setStatsLayoutMode,
     }}>
       {children}
     </EditorContext.Provider>

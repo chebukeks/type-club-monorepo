@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { MessageCircleMore, X } from "lucide-react";
 
 interface AddNoteModalProps {
@@ -48,7 +49,7 @@ export function AddNoteModal({ isOpen, onClose, onSubmit }: AddNoteModalProps) {
     }
   };
 
-  return (
+  return createPortal(
     <div
       className="modal-overlay"
       style={{ zIndex: 99999 }}
@@ -96,6 +97,7 @@ export function AddNoteModal({ isOpen, onClose, onSubmit }: AddNoteModalProps) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
