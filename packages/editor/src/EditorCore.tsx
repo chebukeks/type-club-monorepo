@@ -174,7 +174,7 @@ export function EditorCore({
           createSuggestionPlugin({
             active: true,
             authorId: userId ?? 0,
-            authorName: userNickname || (isEditorRole ? "Советчик" : "Автор"),
+            authorName: userNickname || (isEditorRole ? "Advisor" : "Author"),
             color: isEditorRole ? "#3b82f6" : "#10b981",
           })
         );

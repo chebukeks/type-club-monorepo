@@ -24,7 +24,7 @@ import type { SuggestionItem } from '@type-club/editor'
 import { Monitor, Type, FileText } from 'lucide-react'
 
 export function MarkdownEditor() {
-  const { state, dispatch, setTextZoom, setDocumentZoom } = useEditor()
+  const { state, dispatch, setTextZoom, setDocumentZoom, t } = useEditor()
   const [editorView, setEditorView] = useState<EditorView | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -135,7 +135,7 @@ export function MarkdownEditor() {
     const noteNode = editorView.state.schema.nodes.suggestion_note.create({
       noteId: crypto.randomUUID(),
       sugAuthorId: user?.id ?? 0,
-      sugAuthorName: user?.nickname || 'Советчик',
+      sugAuthorName: user?.nickname || t('editor.advisor'),
       sugColor: '#f59e0b',
       noteText: noteText.trim(),
       sugCreatedAt: new Date().toISOString(),
@@ -144,7 +144,7 @@ export function MarkdownEditor() {
     tr.setMeta('suggestionAction', true)
     editorView.dispatch(tr)
     editorView.focus()
-  }, [editorView, user])
+  }, [editorView, user, t])
 
   const collab = useCollaboration(articleId, user, userRole)
   const suggestionModeActive = articleId != null && (activeTab?.suggestionMode ?? false)
@@ -465,29 +465,10 @@ export function MarkdownEditor() {
   const [showLangDropdown, setShowLangDropdown] = useState(false)
   const langDropdownRef = useRef<HTMLDivElement>(null)
 
-  const LANGUAGES = [
-    { label: 'Без языка', value: '' },
-    { label: 'JavaScript', value: 'javascript' },
-    { label: 'TypeScript', value: 'typescript' },
-    { label: 'Python', value: 'python' },
-    { label: 'Bash', value: 'bash' },
-    { label: 'HTML', value: 'html' },
-    { label: 'CSS', value: 'css' },
-    { label: 'JSON', value: 'json' },
-    { label: 'SQL', value: 'sql' },
-    { label: 'Rust', value: 'rust' },
-    { label: 'Go', value: 'go' },
-    { label: 'Java', value: 'java' },
-    { label: 'C++', value: 'cpp' },
-    { label: 'C', value: 'c' },
-    { label: 'Ruby', value: 'ruby' },
-    { label: 'PHP', value: 'php' },
-    { label: 'YAML', value: 'yaml' },
-    { label: 'XML', value: 'xml' },
-    { label: 'Diff', value: 'diff' },
-    { label: 'Markdown', value: 'markdown' },
-    { label: 'Dockerfile', value: 'dockerfile' },
-    { label: 'GraphQL', value: 'graphql' },
+  const CODE_LANGUAGES = [
+    'javascript', 'typescript', 'python', 'bash', 'html', 'css', 'json', 'sql',
+    'rust', 'go', 'java', 'cpp', 'c', 'ruby', 'php', 'yaml', 'xml', 'diff',
+    'markdown', 'dockerfile', 'graphql'
   ]
 
   const handleContextMenu = (e: React.MouseEvent) => {
@@ -643,27 +624,23 @@ export function MarkdownEditor() {
   }
 
   const insertTable = () => {
-    const headerCells = Array.from({ length: tableCols }, () =>
-      schema.nodes.table_header.create(null, schema.nodes.paragraph.create())
-    )
-    const bodyRows = Array.from({ length: tableRows - 1 }, () =>
-      schema.nodes.table_row.create(
-        null,
-        Array.from({ length: tableCols }, () =>
-          schema.nodes.table_cell.create(null, schema.nodes.paragraph.create())
-        )
-      )
-    )
-    const table = schema.nodes.table.create(null, [
-      schema.nodes.table_row.create(null, headerCells),
-      ...bodyRows,
-    ])
+    const rowsNode = []
+    for (let r = 0; r < tableRows; r++) {
+      const cellsNode = []
+      for (let c = 0; c < tableCols; c++) {
+        const isHeader = r === 0
+        const cellType = isHeader ? schema.nodes.table_header : schema.nodes.table_cell
+        const text = isHeader ? t('editor.table.header', { col: c + 1 }) : t('editor.table.cell', { col: c + 1 })
+        cellsNode.push(cellType.createAndFill({}, schema.nodes.paragraph.create({}, schema.text(text)))!)
+      }
+      rowsNode.push(schema.nodes.table_row.create({}, cellsNode))
+    }
+    const table = schema.nodes.table.create({}, rowsNode)
     insertBlockNode(table)
   }
 
-  const insertCodeBlock = (lang?: string) => {
-    const language = lang !== undefined ? lang : codeLang
-    const codeBlock = schema.nodes.code_block.create({ params: language || '' })
+  const insertCodeBlock = (lang = codeLang) => {
+    const codeBlock = schema.nodes.code_block.create({ params: lang }, schema.text(' '))
     insertBlockNode(codeBlock)
   }
 
@@ -673,12 +650,12 @@ export function MarkdownEditor() {
   }
 
   const formatItems = [
-    { label: 'Жирный', hotkey: 'Ctrl+B', command: 'strong' },
-    { label: 'Курсив', hotkey: 'Ctrl+I', command: 'em' },
-    { label: 'Код', hotkey: 'Ctrl+E', command: 'code' },
-    { label: 'Зачёркнутый', hotkey: 'Ctrl+Shift+X', command: 's' },
-    { label: 'Выделение', hotkey: 'Ctrl+Shift+H', command: 'highlight' },
-    { label: 'Спойлер', hotkey: 'Ctrl+Shift+S', command: 'spoiler' },
+    { label: t('editor.format.bold'), hotkey: 'Ctrl+B', command: 'strong' },
+    { label: t('editor.format.italic'), hotkey: 'Ctrl+I', command: 'em' },
+    { label: t('editor.format.code'), hotkey: 'Ctrl+E', command: 'code' },
+    { label: t('editor.format.strikethrough'), hotkey: 'Ctrl+Shift+X', command: 's' },
+    { label: t('editor.format.highlight'), hotkey: 'Ctrl+Shift+H', command: 'highlight' },
+    { label: t('editor.format.spoiler'), hotkey: 'Ctrl+Shift+S', command: 'spoiler' },
   ]
 
   const sep = <div className="border-t border-[var(--border-default)] my-1.5 mx-2 opacity-80" />
@@ -721,14 +698,22 @@ export function MarkdownEditor() {
       for (let c = 0; c < tableCols; c++) {
         cells.push(
           <td key={c} className={`border border-[var(--border-strong)] px-2 py-0.5 text-[11px] ${r === 0 ? 'font-semibold bg-[var(--menu-hover-bg)]' : ''}`}>
-            {r === 0 ? `Заголовок ${c + 1}` : `Ячейка ${c + 1}`}
+            {r === 0 ? t('editor.table.header', { col: c + 1 }) : t('editor.table.cell', { col: c + 1 })}
           </td>
         )
       }
       rows.push(<tr key={r}>{cells}</tr>)
     }
     return rows
-  }, [tableCols, tableRows])
+  }, [tableCols, tableRows, t])
+
+  const languagesList = useMemo(() => [
+    { label: t('editor.noLanguage'), value: '' },
+    ...CODE_LANGUAGES.map((lang) => ({
+      label: lang.charAt(0).toUpperCase() + lang.slice(1),
+      value: lang,
+    }))
+  ], [t])
 
   const isSuggestionActive = articleId != null && (userRole === 'editor' || suggestionModeActive) && state.editorMode === 'seamless'
 
@@ -795,12 +780,12 @@ export function MarkdownEditor() {
           onContextMenu={(e) => e.preventDefault()}
           onClick={(e) => e.stopPropagation()}
         >
-          {ctxMenuItem('Копировать таблицу', undefined, handleTableCopy)}
+          {ctxMenuItem(t('editor.table.copy'), undefined, handleTableCopy)}
           {!isSuggestionActive && (
             <>
-              {ctxMenuItem('Вырезать таблицу', undefined, handleTableCut)}
-              {ctxMenuItem('Редактировать таблицу', undefined, handleTableEdit)}
-              {ctxMenuItem('Удалить таблицу', undefined, handleTableDelete)}
+              {ctxMenuItem(t('editor.table.cut'), undefined, handleTableCut)}
+              {ctxMenuItem(t('editor.table.edit'), undefined, handleTableEdit)}
+              {ctxMenuItem(t('editor.table.delete'), undefined, handleTableDelete)}
             </>
           )}
         </div>
@@ -815,9 +800,9 @@ export function MarkdownEditor() {
           onContextMenu={(e) => e.preventDefault()}
           onClick={(e) => e.stopPropagation()}
         >
-          {ctxMenuItem('Копировать', 'Ctrl+C', () => handleClipboard('copy'))}
-          {ctxMenuItem('Вырезать', 'Ctrl+X', () => handleClipboard('cut'))}
-          {ctxMenuItem('Вставить', 'Ctrl+V', () => handleClipboard('paste'))}
+          {ctxMenuItem(t('editor.menu.copy'), 'Ctrl+C', () => handleClipboard('copy'))}
+          {ctxMenuItem(t('editor.menu.cut'), 'Ctrl+X', () => handleClipboard('cut'))}
+          {ctxMenuItem(t('editor.menu.paste'), 'Ctrl+V', () => handleClipboard('paste'))}
           {!isSuggestionActive && (
             <>
               {sep}
@@ -832,15 +817,15 @@ export function MarkdownEditor() {
                 </div>
               ))}
               {sep}
-              {ctxMenuItem('Создать таблицу...', <ChevronRight size={14} className="text-[var(--text-dim)]" />, () => setCtxSubmenu('table'))}
-              {ctxMenuItem('Создать блок кода...', <ChevronRight size={14} className="text-[var(--text-dim)]" />, () => setCtxSubmenu('code'))}
-              {ctxMenuItem('Создать блок математики', undefined, insertMathBlock)}
+              {ctxMenuItem(t('editor.menu.createTable'), <ChevronRight size={14} className="text-[var(--text-dim)]" />, () => setCtxSubmenu('table'))}
+              {ctxMenuItem(t('editor.menu.createCodeBlock'), <ChevronRight size={14} className="text-[var(--text-dim)]" />, () => setCtxSubmenu('code'))}
+              {ctxMenuItem(t('editor.menu.createMathBlock'), undefined, insertMathBlock)}
             </>
           )}
           {isSuggestionActive && (
             <>
               {sep}
-              {ctxMenuItem('Создать примечание', 'Ctrl+Q', () => {
+              {ctxMenuItem(t('editor.menu.createNote'), 'Ctrl+Q', () => {
                 closeCtxMenu()
                 setShowAddNoteModal(true)
               })}
@@ -858,10 +843,10 @@ export function MarkdownEditor() {
           onContextMenu={(e) => e.preventDefault()}
           onClick={(e) => e.stopPropagation()}
         >
-          {ctxMenuItem('← Назад', undefined, () => setCtxSubmenu(null))}
+          {ctxMenuItem(t('common.back'), undefined, () => setCtxSubmenu(null))}
           {sep}
-          {numInput('Столбцы', tableCols, setTableCols)}
-          {numInput('Строки', tableRows, setTableRows)}
+          {numInput(t('editor.table.columns'), tableCols, setTableCols)}
+          {numInput(t('editor.table.rows'), tableRows, setTableRows)}
           {sep}
           <div className="overflow-x-auto" style={{ padding: '8px 20px' }}>
             <table className="w-full border-collapse border border-[var(--border-strong)]">
@@ -874,7 +859,7 @@ export function MarkdownEditor() {
               className="w-full py-1.5 rounded text-white text-sm font-medium hover:opacity-90"
               style={{ backgroundColor: 'var(--accent)' }}
               onClick={insertTable}
-            >Создать</button>
+            >{t('common.create')}</button>
           </div>
         </div>
       )}
@@ -888,14 +873,14 @@ export function MarkdownEditor() {
           onContextMenu={(e) => e.preventDefault()}
           onClick={(e) => e.stopPropagation()}
         >
-          {ctxMenuItem('← Назад', undefined, () => setCtxSubmenu(null))}
+          {ctxMenuItem(t('common.back'), undefined, () => setCtxSubmenu(null))}
           {sep}
           <div style={{ padding: '8px 20px' }}>
-            <span className="text-xs text-[var(--text-dim)]">Язык</span>
+            <span className="text-xs text-[var(--text-dim)]">{t('editor.code.language')}</span>
             <div className="relative mt-1" ref={langDropdownRef}>
               <input
                 className="w-full bg-[var(--bg-base)] border border-[var(--border-strong)] rounded px-2 py-1 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--text-dim)]"
-                placeholder="Без языка"
+                placeholder={t('editor.noLanguage')}
                 value={codeLang}
                 onChange={(e) => setCodeLang(e.target.value)}
                 onFocus={() => setShowLangDropdown(true)}
@@ -903,7 +888,7 @@ export function MarkdownEditor() {
               />
               {showLangDropdown && (
                 <div className="absolute left-0 right-0 top-full mt-0.5 max-h-40 overflow-y-auto bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-[60] animate-in fade-in zoom-in-95 duration-100 ease-out">
-                  {LANGUAGES.filter(l => !codeLang || l.label.toLowerCase().includes(codeLang.toLowerCase()) || l.value.includes(codeLang)).map((l) => (
+                  {languagesList.filter(l => !codeLang || l.label.toLowerCase().includes(codeLang.toLowerCase()) || l.value.includes(codeLang)).map((l) => (
                     <div
                       key={l.value}
                       className="menu-item enabled text-xs"
@@ -920,12 +905,12 @@ export function MarkdownEditor() {
               className="flex-1 py-1.5 rounded text-white text-sm font-medium hover:opacity-90"
               style={{ backgroundColor: 'var(--accent)' }}
               onClick={() => insertCodeBlock()}
-            >Создать</button>
+            >{t('common.create')}</button>
             {codeLang && (
               <button
                 className="flex-1 py-1.5 rounded bg-[var(--bg-base)] border border-[var(--border-strong)] text-[var(--text-secondary)] text-sm hover:bg-[var(--menu-hover-bg)]"
                 onClick={() => insertCodeBlock('')}
-              >Без языка</button>
+              >{t('editor.noLanguage')}</button>
             )}
           </div>
         </div>

@@ -7,33 +7,15 @@ import type { EditorView } from "prosemirror-view";
 
 import { EditorCore, schema, tableEditPluginKey } from "@type-club/editor";
 import type { EditorMode, CollaborationConfig, TocItem, SuggestionItem } from "@type-club/editor";
+import { useLanguage } from "../context/LanguageContext";
 import AddNoteModal from "./AddNoteModal";
 
 export type { EditorMode } from "@type-club/editor";
 
-const LANGUAGES = [
-  { label: "Без языка", value: "" },
-  { label: "JavaScript", value: "javascript" },
-  { label: "TypeScript", value: "typescript" },
-  { label: "Python", value: "python" },
-  { label: "Bash", value: "bash" },
-  { label: "HTML", value: "html" },
-  { label: "CSS", value: "css" },
-  { label: "JSON", value: "json" },
-  { label: "SQL", value: "sql" },
-  { label: "Rust", value: "rust" },
-  { label: "Go", value: "go" },
-  { label: "Java", value: "java" },
-  { label: "C++", value: "cpp" },
-  { label: "C", value: "c" },
-  { label: "Ruby", value: "ruby" },
-  { label: "PHP", value: "php" },
-  { label: "YAML", value: "yaml" },
-  { label: "XML", value: "xml" },
-  { label: "Diff", value: "diff" },
-  { label: "Markdown", value: "markdown" },
-  { label: "Dockerfile", value: "dockerfile" },
-  { label: "GraphQL", value: "graphql" },
+const CODE_LANGUAGES = [
+  "javascript", "typescript", "python", "bash", "html", "css", "json", "sql",
+  "rust", "go", "java", "cpp", "c", "ruby", "php", "yaml", "xml", "diff",
+  "markdown", "dockerfile", "graphql"
 ];
 
 interface MarkdownEditorProps {
@@ -65,6 +47,7 @@ export function MarkdownEditor({
   suggestionModeActive,
   onTocUpdate,
 }: MarkdownEditorProps) {
+  const { t } = useLanguage();
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
   const [ctxSubmenu, setCtxSubmenu] = useState<"table" | "code" | null>(null);
   const [ctxTable, setCtxTable] = useState<number | null>(null);
@@ -91,7 +74,7 @@ export function MarkdownEditor({
         const domNode = viewRef.current.nodeDOM(pos);
         if (domNode instanceof Element) {
           const rect = domNode.getBoundingClientRect();
-          const targetOffset = window.innerHeight * 0.25; // upper third of viewport
+          const targetOffset = window.innerHeight * 0.25;
 
           let scrollParent: Element | null = domNode.parentElement;
           while (scrollParent && scrollParent !== document.body && scrollParent !== document.documentElement) {
@@ -102,7 +85,7 @@ export function MarkdownEditor({
             scrollParent = scrollParent.parentElement;
           }
 
-          if (scrollParent && scrollParent !== document.body && scrollParent !== document.documentElement) {
+          if (scrollParent) {
             const parentRect = scrollParent.getBoundingClientRect();
             const relativeTop = rect.top - parentRect.top;
             scrollParent.scrollTo({
@@ -110,13 +93,16 @@ export function MarkdownEditor({
               behavior: "smooth",
             });
           } else {
+            const absoluteTop = rect.top + window.scrollY;
             window.scrollTo({
-              top: window.scrollY + rect.top - targetOffset,
+              top: Math.max(0, absoluteTop - targetOffset),
               behavior: "smooth",
             });
           }
         }
-      } catch { /* ignore */ }
+      } catch (err) {
+        console.error("Scroll to TOC position failed:", err);
+      }
     };
     window.addEventListener("editor-scroll-to", handler);
     return () => window.removeEventListener("editor-scroll-to", handler);
@@ -124,44 +110,32 @@ export function MarkdownEditor({
 
   useEffect(() => {
     const handler = (e: Event) => {
-      const { pos, toPos } = (e as CustomEvent<{ pos: number; toPos?: number }>).detail;
-      const view = viewRef.current;
-      if (!view || view.isDestroyed) return;
-
-      // Set caret / selection in ProseMirror and focus editor
+      const { pos } = (e as CustomEvent<{ pos: number; toPos: number; item: SuggestionItem }>).detail;
+      if (!viewRef.current || viewRef.current.isDestroyed) return;
       try {
-        const docSize = view.state.doc.content.size;
-        const targetPos = Math.min(Math.max(1, pos), docSize);
-        let selection;
-        if (toPos && toPos > targetPos && toPos <= docSize) {
-          selection = TextSelection.create(view.state.doc, targetPos, toPos);
-        } else {
-          selection = Selection.near(view.state.doc.resolve(targetPos));
-        }
-
-        const tr = view.state.tr.setSelection(selection);
-        view.dispatch(tr);
+        const view = viewRef.current;
         view.focus();
-      } catch { /* ignore selection errors */ }
 
-      // Smoothly scroll camera so suggestion lands in upper third of viewport (~25% height)
-      try {
-        let domNode: Node | null = null;
-        try {
-          domNode = view.nodeDOM(pos);
-        } catch {}
-        if (!domNode) {
-          try {
-            domNode = view.domAtPos(pos).node;
-          } catch {}
+        const maxPos = view.state.doc.content.size;
+        const validPos = Math.min(Math.max(0, pos), maxPos);
+
+        const $pos = view.state.doc.resolve(validPos);
+        let sel: Selection;
+        if ($pos.nodeAfter && $pos.nodeAfter.isInline) {
+          sel = TextSelection.create(view.state.doc, validPos);
+        } else if ($pos.nodeAfter && !$pos.nodeAfter.isInline) {
+          sel = NodeSelection.create(view.state.doc, validPos);
+        } else {
+          sel = TextSelection.create(view.state.doc, validPos);
         }
+        view.dispatch(view.state.tr.setSelection(sel).scrollIntoView());
 
-        const el = domNode instanceof Element ? domNode : domNode?.parentElement;
-        if (el) {
-          const rect = el.getBoundingClientRect();
+        const domNode = view.nodeDOM(validPos);
+        if (domNode instanceof Element) {
+          const rect = domNode.getBoundingClientRect();
           const targetOffset = window.innerHeight * 0.25;
 
-          let scrollParent: Element | null = el.parentElement;
+          let scrollParent: Element | null = domNode.parentElement;
           while (scrollParent && scrollParent !== document.body && scrollParent !== document.documentElement) {
             const overflowY = window.getComputedStyle(scrollParent).overflowY;
             if ((overflowY === "auto" || overflowY === "scroll") && scrollParent.scrollHeight > scrollParent.clientHeight) {
@@ -170,7 +144,7 @@ export function MarkdownEditor({
             scrollParent = scrollParent.parentElement;
           }
 
-          if (scrollParent && scrollParent !== document.body && scrollParent !== document.documentElement) {
+          if (scrollParent) {
             const parentRect = scrollParent.getBoundingClientRect();
             const relativeTop = rect.top - parentRect.top;
             scrollParent.scrollTo({
@@ -178,13 +152,16 @@ export function MarkdownEditor({
               behavior: "smooth",
             });
           } else {
+            const absoluteTop = rect.top + window.scrollY;
             window.scrollTo({
-              top: window.scrollY + rect.top - targetOffset,
+              top: Math.max(0, absoluteTop - targetOffset),
               behavior: "smooth",
             });
           }
         }
-      } catch { /* ignore scroll errors */ }
+      } catch (err) {
+        console.error("Scroll to suggestion failed:", err);
+      }
     };
     window.addEventListener("editor-scroll-to-suggestion", handler);
     return () => window.removeEventListener("editor-scroll-to-suggestion", handler);
@@ -197,7 +174,7 @@ export function MarkdownEditor({
     const noteNode = view.state.schema.nodes.suggestion_note.create({
       noteId: crypto.randomUUID(),
       sugAuthorId: userId ?? 0,
-      sugAuthorName: userNickname || "Советчик",
+      sugAuthorName: userNickname || t('editor.advisor'),
       sugColor: "#f59e0b",
       noteText: noteText.trim(),
       sugCreatedAt: new Date().toISOString(),
@@ -248,7 +225,9 @@ export function MarkdownEditor({
             return;
           }
         }
-      } catch { /* ignore */ }
+      } catch {
+        // click outside editor content
+      }
     }
 
     setCtxMenu({ x: e.clientX, y: e.clientY });
@@ -256,132 +235,138 @@ export function MarkdownEditor({
 
   const handleTableCopy = () => {
     const view = viewRef.current;
-    if (!view || ctxTable == null) return;
-    const tr = view.state.tr.setSelection(NodeSelection.create(view.state.doc, ctxTable));
-    view.dispatch(tr);
-    view.dom.focus();
-    document.execCommand("copy");
+    if (!view || ctxTable === null) return;
+    const node = view.state.doc.nodeAt(ctxTable);
+    if (node) {
+      navigator.clipboard.writeText(JSON.stringify(node.toJSON()));
+    }
     closeCtxMenu();
   };
 
   const handleTableCut = () => {
     const view = viewRef.current;
-    if (!view || ctxTable == null) return;
-    const tr = view.state.tr.setSelection(NodeSelection.create(view.state.doc, ctxTable));
-    view.dispatch(tr);
-    view.dom.focus();
-    document.execCommand("copy");
-    deleteTable(view.state, view.dispatch);
-    view.focus();
+    if (!view || ctxTable === null) return;
+    const node = view.state.doc.nodeAt(ctxTable);
+    if (node) {
+      navigator.clipboard.writeText(JSON.stringify(node.toJSON()));
+      const tr = view.state.tr.delete(ctxTable, ctxTable + node.nodeSize);
+      view.dispatch(tr);
+    }
     closeCtxMenu();
   };
 
   const handleTableEdit = () => {
     const view = viewRef.current;
-    if (!view || ctxTable == null) return;
-    view.dispatch(view.state.tr.setMeta(tableEditPluginKey, ctxTable));
-    view.focus();
+    if (!view || ctxTable === null) return;
+    const state = view.state;
+    const tr = state.tr.setMeta(tableEditPluginKey, { openAt: ctxTable });
+    view.dispatch(tr);
     closeCtxMenu();
   };
 
   const handleTableDelete = () => {
     const view = viewRef.current;
-    if (!view || ctxTable == null) return;
-    deleteTable(view.state, view.dispatch);
+    if (!view || ctxTable === null) return;
+    const { state, dispatch } = view;
+    const tr = state.tr.setSelection(NodeSelection.create(state.doc, ctxTable));
+    dispatch(tr);
+    deleteTable(view.state, dispatch);
+    closeCtxMenu();
+  };
+
+  const handleClipboard = async (action: "copy" | "cut" | "paste") => {
+    const view = viewRef.current;
+    closeCtxMenu();
+    if (!view) return;
     view.focus();
-    closeCtxMenu();
-  };
-
-  const applyFormat = (markName: string) => {
-    const view = viewRef.current;
-    if (!view) return;
-    const mark = (schema.marks as Record<string, unknown>)[markName];
-    if (mark) {
-      toggleMark(mark as import("prosemirror-model").MarkType)(view.state, view.dispatch);
-      view.focus();
-    }
-    closeCtxMenu();
-  };
-
-  const handleClipboard = (action: "copy" | "cut" | "paste") => {
-    const view = viewRef.current;
-    if (!view) return;
-    view.dom.focus();
-    document.execCommand(action);
-    closeCtxMenu();
-  };
-
-  const insertBlockNode = (blockNode: import("prosemirror-model").Node) => {
-    const view = viewRef.current;
-    if (!view) return;
-    const { $head } = view.state.selection;
-
-    let blockDepth = -1;
-    for (let d = $head.depth; d >= 0; d--) {
-      const name = $head.node(d).type.name;
-      if (name === "paragraph" || name === "heading" || name === "code_block" || name === "math_block") {
-        blockDepth = d;
-        break;
+    if (action === "copy") {
+      document.execCommand("copy");
+    } else if (action === "cut") {
+      document.execCommand("cut");
+    } else if (action === "paste") {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          const { from, to } = view.state.selection;
+          view.dispatch(view.state.tr.insertText(text, from, to));
+        }
+      } catch {
+        document.execCommand("paste");
       }
     }
-    if (blockDepth === -1) return;
+  };
 
-    const blockStart = $head.before(blockDepth);
-    const blockEnd = $head.after(blockDepth);
-    const blockNodeAt = view.state.doc.nodeAt($head.before(blockDepth));
-    const isEmpty = !blockNodeAt || blockNodeAt.textContent.trim() === "";
-
-    if (isEmpty) {
-      const tr = view.state.tr.replaceWith(blockStart, blockEnd, blockNode);
-      tr.setSelection(TextSelection.near(tr.doc.resolve(blockStart + 1)));
-      view.dispatch(tr);
-    } else {
-      const tr = view.state.tr.insert(blockEnd, blockNode);
-      tr.setSelection(TextSelection.near(tr.doc.resolve(blockEnd + 1)));
-      view.dispatch(tr);
-    }
-
-    view.focus();
+  const applyFormat = (command: string) => {
+    const view = viewRef.current;
     closeCtxMenu();
+    if (!view) return;
+    view.focus();
+    const markType = (schema.marks as any)[command];
+    if (markType) {
+      toggleMark(markType)(view.state, view.dispatch);
+    }
+  };
+
+  const insertBlockNode = (node: any) => {
+    const view = viewRef.current;
+    closeCtxMenu();
+    if (!view) return;
+    view.focus();
+    const { state, dispatch } = view;
+    const { $from } = state.selection;
+
+    let targetDepth = $from.depth;
+    while (targetDepth > 1 && $from.node(targetDepth).type.name !== "table") {
+      targetDepth--;
+    }
+    const targetNode = $from.node(targetDepth);
+    const isEmptyParagraph =
+      targetNode.type.name === "paragraph" && targetNode.content.size === 0;
+
+    let tr = state.tr;
+    if (isEmptyParagraph && targetDepth > 0) {
+      const pos = $from.before(targetDepth);
+      tr = tr.replaceWith(pos, pos + targetNode.nodeSize, node);
+    } else {
+      const insertPos = $from.after(Math.min(targetDepth, $from.depth));
+      tr = tr.insert(insertPos, node);
+    }
+    dispatch(tr.scrollIntoView());
   };
 
   const insertTable = () => {
-    const headerCells = Array.from({ length: tableCols }, () =>
-      schema.nodes.table_header.create(null, schema.nodes.paragraph.create())
-    );
-    const bodyRows = Array.from({ length: tableRows - 1 }, () =>
-      schema.nodes.table_row.create(
-        null,
-        Array.from({ length: tableCols }, () =>
-          schema.nodes.table_cell.create(null, schema.nodes.paragraph.create())
-        )
-      )
-    );
-    const table = schema.nodes.table.create(null, [
-      schema.nodes.table_row.create(null, headerCells),
-      ...bodyRows,
-    ]);
+    const rowsNode = [];
+    for (let r = 0; r < tableRows; r++) {
+      const cellsNode = [];
+      for (let c = 0; c < tableCols; c++) {
+        const isHeader = r === 0;
+        const cellType = isHeader ? schema.nodes.table_header : schema.nodes.table_cell;
+        const text = isHeader ? t('editor.table.header', { col: c + 1 }) : t('editor.table.cell', { col: c + 1 });
+        cellsNode.push(cellType.createAndFill({}, schema.nodes.paragraph.create({}, schema.text(text)))!);
+      }
+      rowsNode.push(schema.nodes.table_row.create({}, cellsNode));
+    }
+    const table = schema.nodes.table.create({}, rowsNode);
     insertBlockNode(table);
   };
 
-  const insertCodeBlock = (lang?: string) => {
-    const language = lang !== undefined ? lang : codeLang;
-    const codeBlock = schema.nodes.code_block.create({ params: language || "" });
+  const insertCodeBlock = (lang = codeLang) => {
+    const codeBlock = schema.nodes.code_block.create({ params: lang }, schema.text(" "));
     insertBlockNode(codeBlock);
   };
 
   const insertMathBlock = () => {
-    const mathBlock = schema.nodes.math_block.create();
+    const mathBlock = schema.nodes.math_block.create({}, schema.text("E = mc^2"));
     insertBlockNode(mathBlock);
   };
 
   const formatItems = [
-    { label: "Жирный", hotkey: "Ctrl+B", command: "strong" },
-    { label: "Курсив", hotkey: "Ctrl+I", command: "em" },
-    { label: "Код", hotkey: "Ctrl+E", command: "code" },
-    { label: "Зачёркнутый", hotkey: "Ctrl+Shift+X", command: "s" },
-    { label: "Выделение", hotkey: "Ctrl+Shift+H", command: "highlight" },
-    { label: "Спойлер", hotkey: "Ctrl+Shift+S", command: "spoiler" },
+    { label: t('editor.format.bold'), hotkey: "Ctrl+B", command: "strong" },
+    { label: t('editor.format.italic'), hotkey: "Ctrl+I", command: "em" },
+    { label: t('editor.format.code'), hotkey: "Ctrl+E", command: "code" },
+    { label: t('editor.format.strikethrough'), hotkey: "Ctrl+Shift+X", command: "s" },
+    { label: t('editor.format.highlight'), hotkey: "Ctrl+Shift+H", command: "highlight" },
+    { label: t('editor.format.spoiler'), hotkey: "Ctrl+Shift+S", command: "spoiler" },
   ];
 
   const btnClass = "flex items-center justify-between w-full px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 text-left";
@@ -411,14 +396,22 @@ export function MarkdownEditor({
       for (let c = 0; c < tableCols; c++) {
         cells.push(
           <td key={c} className={`border border-gray-300 dark:border-gray-600 px-2 py-0.5 text-[11px] ${r === 0 ? "font-semibold bg-gray-100 dark:bg-gray-800" : ""}`}>
-            {r === 0 ? `Заголовок ${c + 1}` : `Ячейка ${c + 1}`}
+            {r === 0 ? t('editor.table.header', { col: c + 1 }) : t('editor.table.cell', { col: c + 1 })}
           </td>
         );
       }
       rows.push(<tr key={r}>{cells}</tr>);
     }
     return rows;
-  }, [tableCols, tableRows]);
+  }, [tableCols, tableRows, t]);
+
+  const languagesList = useMemo(() => [
+    { label: t('editor.noLanguage'), value: "" },
+    ...CODE_LANGUAGES.map((lang) => ({
+      label: lang.charAt(0).toUpperCase() + lang.slice(1),
+      value: lang,
+    }))
+  ], [t]);
 
   return (
     <div
@@ -450,18 +443,18 @@ export function MarkdownEditor({
           onClick={(e) => e.stopPropagation()}
         >
           <button className={btnClass} onClick={handleTableCopy}>
-            <span>Копировать таблицу</span>
+            <span>{t('editor.table.copy')}</span>
           </button>
           {!isSuggestionActive && (
             <>
               <button className={btnClass} onClick={handleTableCut}>
-                <span>Вырезать таблицу</span>
+                <span>{t('editor.table.cut')}</span>
               </button>
               <button className={btnClass} onClick={handleTableEdit}>
-                <span>Редактировать таблицу</span>
+                <span>{t('editor.table.edit')}</span>
               </button>
               <button className={btnClass} onClick={handleTableDelete}>
-                <span>Удалить таблицу</span>
+                <span>{t('editor.table.delete')}</span>
               </button>
             </>
           )}
@@ -476,15 +469,15 @@ export function MarkdownEditor({
           onClick={(e) => e.stopPropagation()}
         >
           <button className={btnClass} onClick={() => handleClipboard("copy")}>
-            <span>Копировать</span>
+            <span>{t('editor.menu.copy')}</span>
             <span className="text-xs text-gray-400">Ctrl+C</span>
           </button>
           <button className={btnClass} onClick={() => handleClipboard("cut")}>
-            <span>Вырезать</span>
+            <span>{t('editor.menu.cut')}</span>
             <span className="text-xs text-gray-400">Ctrl+X</span>
           </button>
           <button className={btnClass} onClick={() => handleClipboard("paste")}>
-            <span>Вставить</span>
+            <span>{t('editor.menu.paste')}</span>
             <span className="text-xs text-gray-400">Ctrl+V</span>
           </button>
           {!isSuggestionActive && (
@@ -502,15 +495,15 @@ export function MarkdownEditor({
               ))}
               <div className={sepClass} />
               <button className={btnClass} onClick={() => setCtxSubmenu("table")}>
-                <span>Создать таблицу...</span>
+                <span>{t('editor.menu.createTable')}</span>
                 <span className="text-xs text-gray-400">▸</span>
               </button>
               <button className={btnClass} onClick={() => setCtxSubmenu("code")}>
-                <span>Создать блок кода...</span>
+                <span>{t('editor.menu.createCodeBlock')}</span>
                 <span className="text-xs text-gray-400">▸</span>
               </button>
               <button className={btnClass} onClick={insertMathBlock}>
-                <span>Создать блок математики</span>
+                <span>{t('editor.menu.createMathBlock')}</span>
               </button>
             </>
           )}
@@ -526,7 +519,7 @@ export function MarkdownEditor({
               >
                 <div className="flex items-center gap-1.5">
                   <MessageCircleMore size={14} className="text-amber-500 shrink-0" />
-                  <span>Создать примечание</span>
+                  <span>{t('editor.menu.createNote')}</span>
                 </div>
                 <span className="text-xs text-gray-400">Ctrl+Q</span>
               </button>
@@ -543,11 +536,11 @@ export function MarkdownEditor({
           onClick={(e) => e.stopPropagation()}
         >
           <button className={btnClass} onClick={() => setCtxSubmenu(null)}>
-            <span>← Назад</span>
+            <span>{t('common.back')}</span>
           </button>
           <div className={sepClass} />
-          {numInput("Столбцы", tableCols, setTableCols)}
-          {numInput("Строки", tableRows, setTableRows)}
+          {numInput(t('editor.table.columns'), tableCols, setTableCols)}
+          {numInput(t('editor.table.rows'), tableRows, setTableRows)}
           <div className={sepClass} />
           <div className="px-2 py-1 overflow-x-auto">
             <table className="w-full border-collapse">
@@ -559,7 +552,7 @@ export function MarkdownEditor({
             <button
               className="w-full py-1.5 rounded bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
               onClick={insertTable}
-            >Создать</button>
+            >{t('common.create')}</button>
           </div>
         </div>
       )}
@@ -572,15 +565,15 @@ export function MarkdownEditor({
           onClick={(e) => e.stopPropagation()}
         >
           <button className={btnClass} onClick={() => setCtxSubmenu(null)}>
-            <span>← Назад</span>
+            <span>{t('common.back')}</span>
           </button>
           <div className={sepClass} />
           <div className="px-5 py-2">
-            <span className="text-xs text-gray-500 dark:text-gray-400">Язык</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">{t('editor.code.language')}</span>
             <div className="relative mt-1.5">
               <input
                 className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-sm text-gray-700 dark:text-gray-300 outline-none focus:border-gray-400"
-                placeholder="Без языка"
+                placeholder={t('editor.noLanguage')}
                 value={codeLang}
                 onChange={(e) => setCodeLang(e.target.value)}
                 onFocus={() => setShowLangDropdown(true)}
@@ -588,7 +581,7 @@ export function MarkdownEditor({
               />
               {showLangDropdown && (
                 <div className="absolute left-0 right-0 top-full mt-0.5 max-h-40 overflow-y-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded shadow-lg z-[60]">
-                  {LANGUAGES.filter(l => !codeLang || l.label.toLowerCase().includes(codeLang.toLowerCase()) || l.value.includes(codeLang)).map((l) => (
+                  {languagesList.filter(l => !codeLang || l.label.toLowerCase().includes(codeLang.toLowerCase()) || l.value.includes(codeLang)).map((l) => (
                     <div
                       key={l.value}
                       className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 ${l.value === codeLang ? "text-gray-900 dark:text-gray-100" : "text-gray-600 dark:text-gray-400"}`}
@@ -604,12 +597,12 @@ export function MarkdownEditor({
             <button
               className="flex-1 py-1.5 rounded bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
               onClick={() => insertCodeBlock()}
-            >Создать</button>
+            >{t('common.create')}</button>
             {codeLang && (
               <button
                 className="flex-1 py-1.5 rounded bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm hover:bg-gray-200 dark:hover:bg-gray-700"
                 onClick={() => insertCodeBlock("")}
-              >Без языка</button>
+              >{t('editor.noLanguage')}</button>
             )}
           </div>
         </div>

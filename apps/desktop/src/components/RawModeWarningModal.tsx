@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { AlertTriangle, X } from 'lucide-react'
+import { useEditor } from '../context/EditorContext'
 
 interface RawModeWarningModalProps {
   onConfirm: () => void
@@ -9,6 +10,7 @@ interface RawModeWarningModalProps {
 export const STORAGE_KEY_HIDE_RAW_WARNING = 'typeclub_hide_raw_collab_warning'
 
 export function RawModeWarningModal({ onConfirm, onCancel }: RawModeWarningModalProps) {
+  const { t } = useEditor()
   const [dontShowAgain, setDontShowAgain] = useState(false)
   const overlayMouseDownRef = useRef(false)
 
@@ -40,7 +42,7 @@ export function RawModeWarningModal({ onConfirm, onCancel }: RawModeWarningModal
         <div className="modal-header" style={{ marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f59e0b' }}>
             <AlertTriangle size={20} />
-            <h3 className="modal-title" style={{ fontSize: '15px', fontWeight: 600 }}>Переход в Raw-режим</h3>
+            <h3 className="modal-title" style={{ fontSize: '15px', fontWeight: 600 }}>{t('rawWarning.title')}</h3>
           </div>
           <button onClick={onCancel} className="modal-close">
             <X size={18} />
@@ -53,8 +55,7 @@ export function RawModeWarningModal({ onConfirm, onCancel }: RawModeWarningModal
           lineHeight: '1.6',
           marginBottom: '16px',
         }}>
-          В Raw-режиме совместная работа приостанавливается: ваши изменения зафиксируются локально и отправятся соавторам только после возврата в режим <strong style={{ color: 'var(--text-primary)' }}>Seamless</strong> или <strong style={{ color: 'var(--text-primary)' }}>Preview</strong>.
-          Изменения соавторов, сделанные в это время, могут быть перезаписаны.
+          {t('rawWarning.message1')} {t('rawWarning.message2')}
         </p>
 
         <label style={{
@@ -71,15 +72,15 @@ export function RawModeWarningModal({ onConfirm, onCancel }: RawModeWarningModal
             onChange={(e) => setDontShowAgain(e.target.checked)}
             style={{ width: '15px', height: '15px', accentColor: 'var(--accent)', cursor: 'pointer' }}
           />
-          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Больше не показывать</span>
+          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{t('rawWarning.dontShowAgain')}</span>
         </label>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
           <button className="btn-secondary" onClick={onCancel} style={{ padding: '8px 16px', minWidth: '80px' }}>
-            Отмена
+            {t('common.cancel')}
           </button>
           <button className="btn-primary" onClick={handleConfirm} style={{ width: 'auto', padding: '8px 20px' }}>
-            Перейти в Raw
+            {t('rawWarning.confirm')}
           </button>
         </div>
       </div>

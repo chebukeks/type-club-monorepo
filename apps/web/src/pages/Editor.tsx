@@ -7,6 +7,7 @@ import SiteHeader from "../components/SiteHeader";
 import PublishModal, { generateRandomSlug } from "../components/PublishModal";
 import TableOfContents from "../components/TableOfContents";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
 import { useCollaboration } from "../hooks/useCollaboration";
 import type { TocItem, SuggestionItem } from "@type-club/editor";
 
@@ -14,6 +15,7 @@ export default function Editor() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const isNew = !id;
   const initialSuggest = searchParams.get("mode") === "suggest";
 
@@ -105,7 +107,7 @@ export default function Editor() {
           await articlesApi.update(articleId, { title: titleRef.current });
         } else {
           const defaultSlug = generateRandomSlug();
-          const res = await articlesApi.create({ title: titleRef.current || "Untitled", content: contentRef.current, slug: defaultSlug });
+          const res = await articlesApi.create({ title: titleRef.current || t('common.untitled'), content: contentRef.current, slug: defaultSlug });
           setArticleId(res.id);
           setSlug(res.slug || defaultSlug);
           navigate(`/editor/${res.id}`, { replace: true });
@@ -115,7 +117,7 @@ export default function Editor() {
       }
     }, 5000);
     return () => clearInterval(interval);
-  }, [articleId, navigate]);
+  }, [articleId, navigate, t]);
 
   const handleSave = useCallback(async () => {
     if (articleId) {
@@ -130,20 +132,20 @@ export default function Editor() {
     }
     setSaving(true);
     try {
-      const res = await articlesApi.create({ title: title || "Untitled", content });
+      const res = await articlesApi.create({ title: title || t('common.untitled'), content });
       setArticleId(res.id);
       navigate(`/editor/${res.id}`, { replace: true });
     } catch (err: any) {
-      alert(err.message || "Save failed");
+      alert(err.message || t('common.saveFailed'));
     } finally {
       setSaving(false);
     }
-  }, [articleId, title, content, navigate]);
+  }, [articleId, title, content, navigate, t]);
 
   const handlePublish = useCallback(
     async (newState: string, newSlug: string) => {
       if (!articleId) {
-        const res = await articlesApi.create({ title: title || "Untitled", content, slug: newSlug });
+        const res = await articlesApi.create({ title: title || t('common.untitled'), content, slug: newSlug });
         setArticleId(res.id);
         navigate(`/editor/${res.id}`, { replace: true });
         await articlesApi.update(res.id, { access_state: newState, slug: newSlug });
@@ -155,7 +157,7 @@ export default function Editor() {
         setSlug(newSlug);
       }
     },
-    [articleId, title, content, navigate]
+    [articleId, title, content, navigate, t]
   );
 
   return (

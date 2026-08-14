@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { usersApi, UserProfile as UserProfileType, ArticleListItem } from "../api";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
 import ArticleCard from "../components/ArticleCard";
 import Pagination from "../components/Pagination";
 import { Settings, User } from "lucide-react";
@@ -11,6 +12,7 @@ const PAGE_SIZE = 20;
 export default function UserProfile() {
   const { username } = useParams<{ username: string }>();
   const { user } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<UserProfileType | null>(null);
   const [articles, setArticles] = useState<ArticleListItem[]>([]);
@@ -27,17 +29,17 @@ export default function UserProfile() {
       const p = await usersApi.getProfile(username);
       setProfile(p);
     } catch (err: any) {
-      setError(err.message || "User not found");
+      setError(err.message || t('profile.userNotFound'));
     }
-  }, [username]);
+  }, [username, t]);
 
   const fetchArticles = useCallback(async () => {
     if (!username) return;
     setLoading(true);
     try {
-      const { items, total: t } = await usersApi.getProfileArticles(username, page, PAGE_SIZE);
+      const { items, total: tTotal } = await usersApi.getProfileArticles(username, page, PAGE_SIZE);
       setArticles(items);
-      setTotal(t);
+      setTotal(tTotal);
     } catch {
     } finally {
       setLoading(false);
@@ -55,15 +57,15 @@ export default function UserProfile() {
   if (error) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-20 text-center">
-        <h1 className="text-2xl font-bold mb-2">User not found</h1>
+        <h1 className="text-2xl font-bold mb-2">{t('profile.userNotFound')}</h1>
         <p className="text-gray-500 mb-4">{error}</p>
-        <Link to="/" className="text-blue-600 hover:underline">Go home</Link>
+        <Link to="/" className="text-blue-600 hover:underline">{t('auth.goHome')}</Link>
       </div>
     );
   }
 
   if (!profile) {
-    return <div className="max-w-4xl mx-auto px-4 py-20 text-center text-gray-400">Loading...</div>;
+    return <div className="max-w-4xl mx-auto px-4 py-20 text-center text-gray-400">{t('common.loading')}</div>;
   }
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -94,30 +96,30 @@ export default function UserProfile() {
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex-shrink-0"
               >
                 <Settings size={14} />
-                Settings
+                {t('titlebar.settings')}
               </button>
             )}
           </div>
           <div className="flex items-center gap-5 mt-4 text-sm text-gray-500">
             <span className="flex items-center gap-1">
               <User size={14} />
-              {profile.article_count} articles
+              {t('articles.articlesCount', { count: profile.article_count })}
             </span>
-            <span>{profile.total_views} views</span>
-            <span>{profile.total_likes} likes</span>
+            <span>{t('articles.viewsCount', { count: profile.total_views })}</span>
+            <span>{t('articles.likesCount', { count: profile.total_likes })}</span>
           </div>
         </div>
       </div>
 
       <section>
         <h2 className="text-lg font-semibold mb-4">
-          {isOwner ? "All articles" : "Articles"}
+          {isOwner ? t('profile.allArticles') : t('articles.title')}
         </h2>
         {loading ? (
-          <div className="text-center py-20 text-gray-400">Loading...</div>
+          <div className="text-center py-20 text-gray-400">{t('common.loading')}</div>
         ) : articles.length === 0 ? (
           <div className="text-center py-20 text-gray-400">
-            {isOwner ? "You haven't published any articles yet." : "No published articles."}
+            {isOwner ? t('profile.noArticlesOwner') : t('profile.noArticlesOther')}
           </div>
         ) : (
           <>

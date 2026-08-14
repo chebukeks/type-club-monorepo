@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import { usersApi, UserSuggestion } from "../api";
 import { useDebounce } from "../hooks/useDebounce";
+import { useLanguage } from "../context/LanguageContext";
 
 interface Props {
   value: string | null;
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export default function AuthorFilter({ value, onChange }: Props) {
+  const { t } = useLanguage();
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<UserSuggestion[]>([]);
   const [open, setOpen] = useState(false);
@@ -74,7 +76,7 @@ export default function AuthorFilter({ value, onChange }: Props) {
   if (value) {
     return (
       <div className="flex items-center gap-1.5 h-10 px-3 rounded-lg border border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950 text-sm shrink-0">
-        <span className="text-gray-500">by</span>
+        <span className="text-gray-500">{t('articles.by')}</span>
         <span className="font-medium">{value}</span>
         <button
           onClick={() => onChange(null)}
@@ -101,13 +103,13 @@ export default function AuthorFilter({ value, onChange }: Props) {
         }}
         onFocus={() => setOpen(true)}
         onKeyDown={handleKeyDown}
-        placeholder="Filter by author..."
+        placeholder={t('articles.filterByAuthor')}
         className="w-full h-10 pl-9 pr-3 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-sm outline-none focus:border-blue-400 dark:focus:border-blue-600 transition-colors"
       />
       {showDropdown && (
         <div className="absolute top-full left-0 right-0 mt-1 rounded-xl border border-gray-200/80 dark:border-gray-800/80 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl shadow-2xl overflow-hidden z-20 animate-in fade-in zoom-in-95 duration-100 ease-out">
           {suggestions.length === 0 ? (
-            <div className="px-3 py-2 text-sm text-gray-400">No users found</div>
+            <div className="px-3 py-2 text-sm text-gray-400">{t('articles.noUsersFound')}</div>
           ) : (
             suggestions.map((u, i) => (
               <button

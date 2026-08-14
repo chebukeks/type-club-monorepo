@@ -111,6 +111,8 @@ export interface AppState {
   sidebarOpen: boolean;
   /** Отображение панели вкладок открыта/свёрнута */
   tabBarOpen: boolean;
+  /** Текущий язык интерфейса */
+  language: import('@type-club/editor').Locale;
   /** Режим расположения оглавления и предложений (раздельно или вместе) */
   tocLayoutMode: TocLayoutMode;
   /** Режим расположения плашки статистики (справа от документа или в сайдбаре) */
@@ -132,6 +134,7 @@ export type AppAction =
   | { type: 'RENAME_TAB_PATHS'; payload: { oldPath: string; newPath: string } }
   | { type: 'SET_ACTIVE_EXPLORER_PATH'; payload: { path: string | null } }
   | { type: 'SET_THEME'; payload: { theme: ThemeMode } }
+  | { type: 'SET_LANGUAGE'; payload: { language: import('@type-club/editor').Locale } }
   | { type: 'SET_TOC_LAYOUT_MODE'; payload: { mode: TocLayoutMode } }
   | { type: 'SET_EDITOR_MODE'; payload: { mode: EditorMode } }
   | { type: 'REFRESH_TAB'; payload: { tabId: string } }

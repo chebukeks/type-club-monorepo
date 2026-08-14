@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { articlesApi, collaborationApi, Article } from "../api";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
 import { MarkdownEditor } from "../components/MarkdownEditor";
 import TableOfContents from "../components/TableOfContents";
 import ArticleStats from "../components/ArticleStats";
@@ -12,11 +13,19 @@ import type { TocItem } from "@type-club/editor";
 export default function ReadArticle() {
   const { username, slug } = useParams<{ username: string; slug: string }>();
   const { user } = useAuth();
+  const { t, language } = useLanguage();
   const [article, setArticle] = useState<Article | null>(null);
   const [userRole, setUserRole] = useState<"author" | "co_author" | "editor" | null>(null);
   const [toc, setToc] = useState<TocItem[]>([]);
   const [error, setError] = useState("");
   const navigate = useNavigate();
+
+  const accessLabels: Record<string, string> = {
+    public: t('publish.public'),
+    unlisted: t('publish.unlisted'),
+    private: t('publish.private'),
+    blocked: t('publish.blocked'),
+  };
 
   useEffect(() => {
     if (!username || !slug) return;
@@ -46,15 +55,15 @@ export default function ReadArticle() {
   if (error) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-20 text-center">
-        <h1 className="text-2xl font-bold mb-2">Article not found</h1>
+        <h1 className="text-2xl font-bold mb-2">{t('readArticle.notFound')}</h1>
         <p className="text-gray-500 mb-4">{error}</p>
-        <Link to="/" className="text-blue-600 hover:underline">Go home</Link>
+        <Link to="/" className="text-blue-600 hover:underline">{t('auth.goHome')}</Link>
       </div>
     );
   }
 
   if (!article) {
-    return <div className="max-w-3xl mx-auto px-4 py-20 text-center text-gray-400">Loading...</div>;
+    return <div className="max-w-3xl mx-auto px-4 py-20 text-center text-gray-400">{t('common.loading')}</div>;
   }
 
   const isModerator = user?.role === "moderator";
@@ -76,7 +85,7 @@ export default function ReadArticle() {
   };
 
   const handleDelete = async () => {
-    if (!confirm("Delete this article?")) return;
+    if (!confirm(t('articles.deleteConfirm'))) return;
     try {
       await articlesApi.delete(article.id);
       navigate("/articles");
@@ -92,12 +101,12 @@ export default function ReadArticle() {
               {article.author_nickname}
             </Link>
             <span>·</span>
-            <span>{new Date(article.updated_at).toLocaleDateString()}</span>
+            <span>{new Date(article.updated_at).toLocaleDateString(language === 'ru' ? 'ru-RU' : 'en-US')}</span>
             {article.access_state !== "public" && (
               <>
                 <span>·</span>
-                <span className="capitalize text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800">
-                  {article.access_state}
+                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800">
+                  {accessLabels[article.access_state] || article.access_state}
                 </span>
               </>
             )}
@@ -111,7 +120,7 @@ export default function ReadArticle() {
                   to={`/editor/${article.id}`}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                 >
-                  <Edit size={14} /> Edit
+                  <Edit size={14} /> {t('readArticle.edit')}
                 </Link>
               )}
               {canSuggest && (
@@ -119,7 +128,7 @@ export default function ReadArticle() {
                   to={`/editor/${article.id}?mode=suggest`}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 text-sm font-medium border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/60 transition-colors"
                 >
-                  <Lightbulb size={14} className="text-amber-500" /> Suggest
+                  <Lightbulb size={14} className="text-amber-500" /> {t('readArticle.suggest')}
                 </Link>
               )}
             </div>
@@ -128,28 +137,28 @@ export default function ReadArticle() {
           {isModerator && (
             <div className="flex items-center gap-2 mt-4">
               <span className="inline-flex items-center gap-1 text-xs text-gray-400">
-                <Shield size={12} /> Moderator
+                <Shield size={12} /> {t('articles.moderator')}
               </span>
               {article.access_state === "blocked" ? (
                 <button
                   onClick={handleUnblock}
                   className="px-3 py-1.5 rounded-lg bg-green-100 dark:bg-green-950 text-green-700 text-sm font-medium hover:bg-green-200 dark:hover:bg-green-900 transition-colors"
                 >
-                  Unblock
+                  {t('articles.unblock')}
                 </button>
               ) : (
                 <button
                   onClick={handleBlock}
                   className="px-3 py-1.5 rounded-lg bg-yellow-100 dark:bg-yellow-950 text-yellow-700 text-sm font-medium hover:bg-yellow-200 dark:hover:bg-yellow-900 transition-colors"
                 >
-                  Block
+                  {t('articles.block')}
                 </button>
               )}
               <button
                 onClick={handleDelete}
                 className="px-3 py-1.5 rounded-lg bg-red-100 dark:bg-red-950 text-red-600 text-sm font-medium hover:bg-red-200 dark:hover:bg-red-900 transition-colors"
               >
-                Delete
+                {t('common.delete')}
               </button>
             </div>
           )}

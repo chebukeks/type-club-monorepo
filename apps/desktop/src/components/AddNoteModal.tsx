@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { MessageCircleMore, X } from "lucide-react";
+import { useEditor } from "../context/EditorContext";
 
 interface AddNoteModalProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface AddNoteModalProps {
 }
 
 export function AddNoteModal({ isOpen, onClose, onSubmit }: AddNoteModalProps) {
+  const { t } = useEditor();
   const [text, setText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const overlayMouseDownRef = useRef(false);
@@ -64,7 +66,7 @@ export function AddNoteModal({ isOpen, onClose, onSubmit }: AddNoteModalProps) {
         <div className="modal-header">
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <MessageCircleMore size={18} style={{ color: "#f59e0b" }} />
-            <h3 className="modal-title">Добавить примечание</h3>
+            <h3 className="modal-title">{t('suggestion.addNoteTitle')}</h3>
           </div>
           <button onClick={onClose} className="modal-close">
             <X size={18} />
@@ -77,7 +79,7 @@ export function AddNoteModal({ isOpen, onClose, onSubmit }: AddNoteModalProps) {
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Введите примечание для автора..."
+            placeholder={t('suggestion.addNotePlaceholder')}
             rows={3}
             className="modal-input"
             style={{ width: "100%", resize: "none", marginBottom: "16px" }}
@@ -85,14 +87,14 @@ export function AddNoteModal({ isOpen, onClose, onSubmit }: AddNoteModalProps) {
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
             <button className="btn-secondary" onClick={onClose}>
-              Отмена
+              {t('common.cancel')}
             </button>
             <button
               className="btn-primary"
               onClick={handleSubmit}
               disabled={!text.trim()}
             >
-              Добавить
+              {t('common.create')}
             </button>
           </div>
         </div>

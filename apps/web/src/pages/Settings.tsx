@@ -1,25 +1,27 @@
 import { useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
 import { authApi, usersApi } from "../api";
 
-function nickError(n: string): string | null {
-  const t = n.trim();
-  if (!t) return "Nickname cannot be empty";
-  if (t.length < 2) return "Nickname must be at least 2 characters";
-  if (t.length > 30) return "Nickname is too long (max 30)";
+function nickError(n: string, t: (k: any) => string): string | null {
+  const tr = n.trim();
+  if (!tr) return t('settings.nickEmpty');
+  if (tr.length < 2) return t('settings.nickMinLength');
+  if (tr.length > 30) return t('settings.nickMaxLength');
   return null;
 }
 
-function passError(p: string): string | null {
+function passError(p: string, t: (k: any) => string): string | null {
   if (!p) return null;
-  if (p.length < 6) return "Password must be at least 6 characters";
-  if (p.length > 128) return "Password is too long";
+  if (p.length < 6) return t('auth.passwordMinLength');
+  if (p.length > 128) return t('auth.passwordMaxLength');
   return null;
 }
 
 export default function Settings() {
   const { user, refresh } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [nickname, setNickname] = useState(user?.nickname || "");
   const [bio, setBio] = useState(user?.bio || "");
@@ -37,9 +39,9 @@ export default function Settings() {
 
   if (!user) return null;
 
-  const ne = nickError(nickname);
-  const pe = showPassword ? passError(password) : null;
-  const ce = showPassword && password && password !== confirm ? "Passwords do not match" : null;
+  const ne = nickError(nickname, t);
+  const pe = showPassword ? passError(password, t) : null;
+  const ce = showPassword && password && password !== confirm ? t('auth.passwordsDoNotMatch') : null;
   const canSubmit =
     !ne &&
     !pe &&
@@ -68,9 +70,9 @@ export default function Settings() {
       setPassword("");
       setConfirm("");
       setShowPassword(false);
-      setMsg("Profile updated");
+      setMsg(t('settings.profileUpdated'));
     } catch (err: any) {
-      setError(err.message || "Update failed");
+      setError(err.message || t('settings.uploadFailed'));
     } finally {
       setLoading(false);
     }
@@ -85,7 +87,7 @@ export default function Settings() {
       const result = await usersApi.uploadAvatar(file);
       setAvatarUrl(result.avatar_url);
     } catch (err: any) {
-      setError(err.message || "Upload failed");
+      setError(err.message || t('settings.uploadFailed'));
     } finally {
       setAvatarUploading(false);
     }
@@ -99,7 +101,7 @@ export default function Settings() {
       const res = await authApi.resendVerification();
       setMsg(res.message);
     } catch (err: any) {
-      setError(err.message || "Failed to resend");
+      setError(err.message || t('auth.resetFailed'));
     } finally {
       setResending(false);
     }
@@ -112,9 +114,9 @@ export default function Settings() {
           onClick={() => navigate(`/${user.nickname}`)}
           className="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
         >
-          &larr; Back to profile
+          {t('settings.backToProfile')}
         </button>
-        <h1 className="text-2xl font-bold">Settings</h1>
+        <h1 className="text-2xl font-bold">{t('titlebar.settings')}</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -122,7 +124,7 @@ export default function Settings() {
         {error && <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950 text-red-600 text-sm">{error}</div>}
 
         <div>
-          <label className="block text-sm font-medium mb-1">Avatar</label>
+          <label className="block text-sm font-medium mb-1">{t('settings.avatar')}</label>
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden flex-shrink-0">
               {avatarUrl ? (
@@ -147,14 +149,14 @@ export default function Settings() {
                 disabled={avatarUploading}
                 className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
               >
-                {avatarUploading ? "Uploading..." : "Upload new"}
+                {avatarUploading ? t('settings.uploading') : t('settings.uploadNew')}
               </button>
             </div>
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Nickname</label>
+          <label className="block text-sm font-medium mb-1">{t('settings.nickname')}</label>
           <input
             type="text"
             value={nickname}
@@ -167,24 +169,24 @@ export default function Settings() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Bio</label>
+          <label className="block text-sm font-medium mb-1">{t('settings.bio')}</label>
           <textarea
             value={bio}
             onChange={(e) => setBio(e.target.value)}
             rows={3}
             maxLength={1000}
-            placeholder="Tell readers about yourself..."
+            placeholder={t('settings.bioPlaceholder')}
             className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
           />
           <p className="text-xs text-gray-400 mt-1">{bio.length}/1000</p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Email</label>
+          <label className="block text-sm font-medium mb-1">{t('settings.email')}</label>
           <input type="email" value={user.email} disabled
             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 text-gray-400 cursor-not-allowed" />
           <p className="text-xs text-gray-400 mt-1">
-            {user.email_verified ? "Verified" : "Email not verified"}
+            {user.email_verified ? t('settings.verified') : t('settings.notVerified')}
           </p>
           {!user.email_verified && (
             <button
@@ -193,7 +195,7 @@ export default function Settings() {
               disabled={resending}
               className="mt-2 text-sm text-blue-600 hover:underline disabled:opacity-50"
             >
-              {resending ? "Sending..." : "Resend verification email"}
+              {resending ? t('auth.sending') : t('auth.resendVerification')}
             </button>
           )}
         </div>
@@ -204,12 +206,12 @@ export default function Settings() {
             onClick={() => setShowPassword(true)}
             className="w-full py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >
-            Change Password
+            {t('settings.changePassword')}
           </button>
         ) : (
           <>
             <div>
-              <label className="block text-sm font-medium mb-1">Current Password</label>
+              <label className="block text-sm font-medium mb-1">{t('settings.currentPassword')}</label>
               <input
                 type="password"
                 value={oldPassword}
@@ -217,11 +219,11 @@ export default function Settings() {
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <p className="text-xs text-gray-400 mt-1">
-                <Link to="/forgot-password" className="text-blue-600 hover:underline">I don't remember my password</Link>
+                <Link to="/forgot-password" className="text-blue-600 hover:underline">{t('settings.dontRememberPassword')}</Link>
               </p>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">New Password</label>
+              <label className="block text-sm font-medium mb-1">{t('auth.newPassword')}</label>
               <input
                 type="password"
                 value={password}
@@ -233,7 +235,7 @@ export default function Settings() {
               {pe && password && <p className="text-red-500 text-xs mt-1">{pe}</p>}
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Confirm New Password</label>
+              <label className="block text-sm font-medium mb-1">{t('settings.confirmNewPassword')}</label>
               <input
                 type="password"
                 value={confirm}
@@ -249,7 +251,7 @@ export default function Settings() {
               onClick={() => { setShowPassword(false); setOldPassword(""); setPassword(""); setConfirm(""); }}
               className="text-sm text-gray-500 hover:underline w-full text-center"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
           </>
         )}
@@ -259,7 +261,7 @@ export default function Settings() {
           disabled={loading || !canSubmit}
           className="w-full py-2.5 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
         >
-          {loading ? "Saving..." : "Save Changes"}
+          {loading ? t('settings.uploading') : t('settings.saveChanges')}
         </button>
       </form>
     </div>

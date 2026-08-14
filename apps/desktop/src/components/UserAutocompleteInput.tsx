@@ -1,13 +1,15 @@
 import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
 import { usersApi, type UserSearchResult } from '../api';
 import { Search } from 'lucide-react';
+import { useEditor } from '../context/EditorContext';
 
 interface Props {
   placeholder?: string;
   onSelect: (nickname: string) => void;
 }
 
-export function UserAutocompleteInput({ placeholder = "Поиск пользователя…", onSelect }: Props) {
+export function UserAutocompleteInput({ placeholder, onSelect }: Props) {
+  const { t } = useEditor();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<UserSearchResult[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -15,6 +17,8 @@ export function UserAutocompleteInput({ placeholder = "Поиск пользов
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const effectivePlaceholder = placeholder || t('userAutocomplete.placeholder');
 
   useEffect(() => {
     if (query.trim().length < 2) {
@@ -81,7 +85,7 @@ export function UserAutocompleteInput({ placeholder = "Поиск пользов
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => results.length > 0 && setShowDropdown(true)}
           onKeyDown={handleKeyDown}
-          placeholder={placeholder}
+          placeholder={effectivePlaceholder}
           className="autocomplete-input"
         />
       </div>

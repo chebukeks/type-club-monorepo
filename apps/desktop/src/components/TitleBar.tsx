@@ -19,6 +19,7 @@ const modes: { key: EditorMode; label: string }[] = [
 ]
 
 function ProfileMenuPopup({ user, logout, onClose }: { user: { nickname: string; id: number }; logout: () => void; onClose: () => void }) {
+  const { t } = useEditor()
   const popupRef = useRef<HTMLDivElement>(null)
   const [closing, setClosing] = useState(false)
 
@@ -74,7 +75,7 @@ function ProfileMenuPopup({ user, logout, onClose }: { user: { nickname: string;
           window.api.openExternal(`${config.siteUrl}/settings`)
         }}
       >
-        <span>Настройки профиля</span>
+        <span>{t('settings.profileSettings')}</span>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--text-dim)] shrink-0 ml-2">
           <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
           <polyline points="15 3 21 3 21 9" />
@@ -92,7 +93,7 @@ function ProfileMenuPopup({ user, logout, onClose }: { user: { nickname: string;
           logout()
         }}
       >
-        Выйти из аккаунта
+        {t('auth.logout')}
       </button>
     </div>
   )
@@ -105,7 +106,7 @@ export function TitleBar() {
   const [showCollab, setShowCollab] = useState(false)
   const [showRawWarning, setShowRawWarning] = useState(false)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
-  const { state, dispatch, setEditorMode, toggleSidebar, toggleTabBar } = useEditor()
+  const { state, dispatch, setEditorMode, toggleSidebar, toggleTabBar, t } = useEditor()
   const { user, logout } = useAuth()
   const [modeLoading, setModeLoading] = useState(false)
 
@@ -196,7 +197,7 @@ export function TitleBar() {
               WebkitAppRegion: 'no-drag',
               marginRight: '4px',
             } as React.CSSProperties}
-            title={state.sidebarOpen ? "Свернуть боковую панель (Ctrl+Shift+B)" : "Развернуть боковую панель (Ctrl+Shift+B)"}
+            title={state.sidebarOpen ? t('titlebar.collapseSidebar') : t('titlebar.expandSidebar')}
           >
             {state.sidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
           </button>
@@ -209,7 +210,7 @@ export function TitleBar() {
               WebkitAppRegion: 'no-drag',
               marginRight: '6px',
             } as React.CSSProperties}
-            title={state.tabBarOpen ? "Свернуть панель вкладок" : "Показать панель вкладок"}
+            title={state.tabBarOpen ? t('titlebar.collapseTabBar') : t('titlebar.expandTabBar')}
           >
             {state.tabBarOpen ? <PanelTopClose size={16} /> : <PanelTopOpen size={16} />}
           </button>
@@ -269,7 +270,7 @@ export function TitleBar() {
           <button
             onClick={() => window.dispatchEvent(new Event('editor-open-search'))}
             className="w-9 h-full flex items-center justify-center text-[var(--text-dim)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)] transition-colors"
-            title="Поиск (Ctrl+F)"
+            title={t('titlebar.search')}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="8" />
@@ -282,7 +283,7 @@ export function TitleBar() {
             <button
               onClick={() => setShowCollab(true)}
               className="w-9 h-full flex items-center justify-center text-[var(--text-dim)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)] transition-colors"
-              title="Совместная работа (соавторы и редакторы)"
+              title={t('titlebar.collaboration')}
             >
               <Users size={15} />
             </button>
@@ -293,7 +294,7 @@ export function TitleBar() {
             <button
               onClick={() => dispatch({ type: 'SET_SUGGESTION_MODE', payload: { tabId: activeTab.id, active: !activeTab.suggestionMode } })}
               className={`w-9 h-full flex items-center justify-center transition-colors ${activeTab.suggestionMode ? 'text-amber-500 bg-amber-500/10' : 'text-[var(--text-dim)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)]'}`}
-              title={activeTab.suggestionMode ? "Выключить режим советчика" : "Включить режим советчика"}
+              title={activeTab.suggestionMode ? t('titlebar.turnOffSuggestion') : t('titlebar.turnOnSuggestion')}
             >
               <Lightbulb size={15} />
             </button>
@@ -301,7 +302,7 @@ export function TitleBar() {
 
           {/* Индикатор роли для редактора (только в режиме seamless) */}
           {state.editorMode === 'seamless' && articleId && userRole === 'editor' && (
-            <span className="titlebar-badge" title="Вы редактор этой статьи (режим советчика)">Советчик</span>
+            <span className="titlebar-badge" title={t('titlebar.advisorBadgeTitle')}>{t('titlebar.advisorBadge')}</span>
           )}
 
           {/* Кнопка "Публикация / Поделиться" (для автора или новой статьи) */}
@@ -313,7 +314,7 @@ export function TitleBar() {
                   ? 'text-[var(--accent)] hover:bg-[var(--bg-hover)]'
                   : 'text-[var(--text-dim)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)]'
               }`}
-              title="Настройки публикации на type-club.ru"
+              title={t('titlebar.publishSettings')}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="18" cy="5" r="3" />
@@ -342,7 +343,7 @@ export function TitleBar() {
                   ? 'text-[var(--accent)] hover:bg-[var(--bg-hover)] hover:text-[var(--accent)]'
                   : 'text-[var(--text-dim)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)]'
               }`}
-              title={user ? `Профиль (${user.nickname})` : 'Аккаунт'}
+              title={user ? `${t('titlebar.profile')} (${user.nickname})` : t('titlebar.account')}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -362,7 +363,7 @@ export function TitleBar() {
                   ? 'bg-[var(--bg-active)] text-[var(--text-primary)]'
                   : 'text-[var(--text-dim)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)]'
                 }`}
-              title="Настройки"
+              title={t('titlebar.settings')}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="3" />

@@ -392,6 +392,8 @@ export function RawSearchBar({ textarea, content, onClose, onMatchesChange }: Ra
 // Общая UI-оболочка для обоих режимов
 // ============================================================
 
+import { useEditor } from '../context/EditorContext'
+
 interface SearchBarUIProps {
   inputRef: React.RefObject<HTMLInputElement>
   query: string
@@ -405,13 +407,14 @@ interface SearchBarUIProps {
 }
 
 function SearchBarUI({ inputRef, query, matchCount, currentIdx, onClose, onChange, onKeyDown, onPrev, onNext }: SearchBarUIProps) {
+  const { t } = useEditor()
   return (
     <div className="search-bar" onKeyDown={onKeyDown}>
       <input
         ref={inputRef}
         type="text"
         className="search-input"
-        placeholder="Поиск..."
+        placeholder={t('search.placeholder')}
         value={query}
         onChange={onChange}
         spellCheck={false}
@@ -419,23 +422,23 @@ function SearchBarUI({ inputRef, query, matchCount, currentIdx, onClose, onChang
 
       {/* Счётчик совпадений */}
       <span className="search-count">
-        {query ? (matchCount > 0 ? `${currentIdx + 1} / ${matchCount}` : 'Нет совпадений') : ''}
+        {query ? (matchCount > 0 ? `${currentIdx + 1} / ${matchCount}` : t('search.noMatches')) : ''}
       </span>
 
       {/* Навигация */}
-      <button className="search-nav-btn" onClick={onPrev} disabled={matchCount === 0} title="Предыдущее (Shift+Enter)">
+      <button className="search-nav-btn" onClick={onPrev} disabled={matchCount === 0} title={t('search.previous')}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="18 15 12 9 6 15" />
         </svg>
       </button>
-      <button className="search-nav-btn" onClick={onNext} disabled={matchCount === 0} title="Следующее (Enter)">
+      <button className="search-nav-btn" onClick={onNext} disabled={matchCount === 0} title={t('search.next')}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="6 9 12 15 18 9" />
         </svg>
       </button>
 
       {/* Кнопка закрытия */}
-      <button className="search-nav-btn" onClick={onClose} title="Закрыть (Esc)">
+      <button className="search-nav-btn" onClick={onClose} title={t('search.close')}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <line x1="18" y1="6" x2="6" y2="18" />
           <line x1="6" y1="6" x2="18" y2="18" />

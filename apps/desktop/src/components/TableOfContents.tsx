@@ -21,6 +21,7 @@ export default function TableOfContents({
   showStats = false,
   className = "",
 }: TableOfContentsProps) {
+  const { t, state } = useEditor();
   const [open, setOpen] = useState(false);
   const [activePos, setActivePos] = useState<number | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -80,7 +81,7 @@ export default function TableOfContents({
             } ${fontClass}`}
             title={item.text}
           >
-            <span className="truncate flex-1">{item.text || `Heading ${item.level}`}</span>
+            <span className="truncate flex-1">{item.text || `${t('toc.heading')} ${item.level}`}</span>
           </button>
         );
       })}
@@ -102,7 +103,7 @@ export default function TableOfContents({
         <div style={{ paddingLeft: '4px', marginBottom: '8px' }} className="flex items-center gap-2">
           <MessageSquare size={14} className="text-amber-500" />
           <h4 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-            Предложения ({suggestions.length})
+            {t('toc.suggestions')} ({suggestions.length})
           </h4>
         </div>
       )}
@@ -118,7 +119,7 @@ export default function TableOfContents({
             ? "bg-[rgba(239,68,68,0.15)] text-[#ef4444]"
             : "bg-[rgba(245,158,11,0.15)] text-[#f59e0b]";
 
-          const typeLabel = isInsert ? "Вставка" : isDelete ? "Удаление" : "Примечание";
+          const typeLabel = isInsert ? t('toc.insert') : isDelete ? t('toc.delete') : t('toc.note');
           const Icon = isInsert ? Plus : isDelete ? Minus : FileText;
 
           return (
@@ -143,7 +144,7 @@ export default function TableOfContents({
                 </span>
               </div>
               <p className="text-[var(--text-secondary)] line-clamp-2 leading-relaxed">
-                {sug.text || "(пусто)"}
+                {sug.text || t('toc.empty')}
               </p>
             </button>
           );
@@ -166,7 +167,7 @@ export default function TableOfContents({
               <div style={{ marginBottom: '12px', paddingBottom: '8px' }} className="flex items-center gap-2 border-b border-[var(--border-default)]">
                 <BookOpen size={16} className="text-[var(--accent)]" />
                 <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                  Оглавление ({toc.length})
+                  {t('toc.title')} ({toc.length})
                 </h3>
               </div>
               <TocList />
@@ -178,7 +179,6 @@ export default function TableOfContents({
     );
   }
 
-  const { state } = useEditor();
   const showStatsRight = showStats && state.statsLayoutMode === "right";
   const bottomOffset = showStatsRight ? '80px' : '24px';
 
@@ -190,7 +190,7 @@ export default function TableOfContents({
           onClick={() => setOpen(!open)}
           style={{ padding: '14px' }}
           className="relative rounded-full bg-[var(--accent)] hover:opacity-90 active:scale-95 text-white shadow-xl shadow-[var(--accent)]/20 transition-all duration-200 flex items-center justify-center group"
-          title={hasToc ? "Оглавление и предложения" : "Предложения"}
+          title={hasToc ? t('toc.tocAndSuggestions') : t('toc.suggestions')}
         >
           <List size={20} className="transition-transform group-hover:rotate-6" />
           <span
@@ -222,9 +222,9 @@ export default function TableOfContents({
                 <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
                   {hasToc
                     ? showSuggestions
-                      ? `Оглавление и предложения (${totalCount})`
-                      : `Оглавление (${toc.length})`
-                    : `Предложения (${suggestions.length})`}
+                      ? `${t('toc.tocAndSuggestions')} (${totalCount})`
+                      : `${t('toc.title')} (${toc.length})`
+                    : `${t('toc.suggestions')} (${suggestions.length})`}
                 </h3>
               </div>
               <button

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { List, X, BookOpen, MessageSquare, Plus, Minus, FileText } from "lucide-react";
 import type { TocItem, SuggestionItem } from "@type-club/editor";
+import { useLanguage } from "../context/LanguageContext";
 
 interface TableOfContentsProps {
   toc: TocItem[];
@@ -17,6 +18,7 @@ export default function TableOfContents({
   variant = "floating",
   className = "",
 }: TableOfContentsProps) {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [activePos, setActivePos] = useState<number | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -81,7 +83,7 @@ export default function TableOfContents({
             } ${fontClass}`}
             title={item.text}
           >
-            <span className="truncate flex-1">{item.text || `Heading ${item.level}`}</span>
+            <span className="truncate flex-1">{item.text || `${t('toc.heading')} ${item.level}`}</span>
           </button>
         );
       })}
@@ -94,7 +96,7 @@ export default function TableOfContents({
         <div className="flex items-center gap-2 mb-2 px-1">
           <MessageSquare size={14} className="text-amber-500" />
           <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-            Предложения ({suggestions.length})
+            {t('toc.suggestions')} ({suggestions.length})
           </h4>
         </div>
       )}
@@ -110,7 +112,7 @@ export default function TableOfContents({
             ? "bg-red-100 text-red-700 dark:bg-red-950/80 dark:text-red-400"
             : "bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-400";
 
-          const typeLabel = isInsert ? "Вставка" : isDelete ? "Удаление" : "Примечание";
+          const typeLabel = isInsert ? t('toc.insert') : isDelete ? t('toc.delete') : t('toc.note');
           const Icon = isInsert ? Plus : isDelete ? Minus : FileText;
 
           return (
@@ -134,7 +136,7 @@ export default function TableOfContents({
                 </span>
               </div>
               <p className="text-gray-700 dark:text-gray-300 line-clamp-2 leading-relaxed">
-                {sug.text || "(пусто)"}
+                {sug.text || t('toc.empty')}
               </p>
             </button>
           );
@@ -153,7 +155,7 @@ export default function TableOfContents({
             <>
               <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100 dark:border-gray-800/80">
                 <BookOpen size={16} className="text-blue-500" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Оглавление</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{t('toc.title')}</h3>
               </div>
               <TocList />
             </>
@@ -171,7 +173,7 @@ export default function TableOfContents({
         <button
           onClick={() => setOpen(!open)}
           className="relative p-3.5 rounded-full bg-blue-600 hover:bg-blue-700 active:scale-95 text-white shadow-xl shadow-blue-500/25 transition-all duration-200 flex items-center justify-center group"
-          title="Оглавление и предложения"
+          title={t('toc.tocAndSuggestions')}
         >
           <List size={20} className="transition-transform group-hover:rotate-6" />
           <span className="absolute -top-1 -right-1 px-1.5 py-0.5 text-[10px] font-bold bg-amber-500 text-white rounded-full border-2 border-white dark:border-gray-950">
@@ -199,9 +201,9 @@ export default function TableOfContents({
                 <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   {hasToc
                     ? showSuggestions
-                      ? `Оглавление и предложения (${totalCount})`
-                      : `Оглавление (${toc.length})`
-                    : `Предложения (${suggestions.length})`}
+                      ? `${t('toc.tocAndSuggestions')} (${totalCount})`
+                      : `${t('toc.title')} (${toc.length})`
+                    : `${t('toc.suggestions')} (${suggestions.length})`}
                 </h3>
               </div>
               <button

@@ -25,3 +25,4 @@ export { pastePlugin, pastePluginKey, BLOCK_PASTE_NODES } from "./editor/pastePl
 export { createCollaborationPlugins } from "./editor/collaborationPlugin";
 
 export type { EditorMode, EditorProps, FocusMode, TocItem, SuggestionItem, CollaborationConfig } from "./types";
+export * from "./i18n";

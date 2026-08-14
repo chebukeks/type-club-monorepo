@@ -6,7 +6,7 @@ import { useState, useRef } from 'react'
 import { useEditor } from '../context/EditorContext'
 
 export function TabBar() {
-  const { state, dispatch, closeTab } = useEditor()
+  const { state, dispatch, closeTab, t } = useEditor()
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
   const dragNodeRef = useRef<HTMLDivElement | null>(null)
@@ -109,7 +109,7 @@ export function TabBar() {
                 }
               }}
               className="ml-auto p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-active)] transition-all flex-shrink-0"
-              title="Alt+Click — закрыть другие"
+              title={t('titlebar.tabCloseOthers')}
             >
               <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <line x1="2" y1="2" x2="8" y2="8" />

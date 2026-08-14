@@ -8,7 +8,29 @@ import { Search, X } from 'lucide-react'
 
 export function Sidebar({ width }: { width: number }) {
   const { user } = useAuth()
-  const { state, dispatch, openFolder, openFile, createFile, createFolder, startCreating, setActiveExplorerPath, refreshFileTree, setShowEmptyFolders, startRenaming, deleteItem, showInExplorer, moveItem, setSidebarMode, fetchOnlineArticles, openOnlineArticle, deleteOnlineArticle, renameOnlineArticle, duplicateOnlineArticle } = useEditor()
+  const {
+    state,
+    dispatch,
+    openFolder,
+    openFile,
+    createFile,
+    createFolder,
+    startCreating,
+    setActiveExplorerPath,
+    refreshFileTree,
+    setShowEmptyFolders,
+    startRenaming,
+    deleteItem,
+    showInExplorer,
+    moveItem,
+    setSidebarMode,
+    fetchOnlineArticles,
+    openOnlineArticle,
+    deleteOnlineArticle,
+    renameOnlineArticle,
+    duplicateOnlineArticle,
+    t,
+  } = useEditor()
   const [copied, setCopied] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedRoles, setSelectedRoles] = useState<('author' | 'co_author' | 'editor')[]>(['author', 'co_author', 'editor'])
@@ -144,17 +166,15 @@ export function Sidebar({ width }: { width: number }) {
 
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
   const onlineUsername = user?.nickname || 'username'
-
   return (
-    <div style={{ width: `${width}px`, minWidth: '140px', maxWidth: '500px' }} className="bg-[var(--bg-surface)] flex flex-col h-full flex-shrink-0">
-      {/* Header */}
+    <div style={{ width: `${width}px`, minWidth: '140px', maxWidth: '500px' }} className="bg-[var(--bg-surface)] flex flex-col h-full flex-shrink-0 select-none border-r border-[var(--border-default)]">
       <div
         className="flex items-center justify-between"
         style={{ height: '36px', paddingLeft: '16px', paddingRight: '12px' }}
       >
         <span
           className="text-[11px] font-semibold uppercase tracking-widest text-[var(--text-dim)] truncate cursor-pointer select-none"
-          title={isOnline ? 'Type Club' : (state.folderPath || 'Проводник')}
+          title={isOnline ? 'Type Club' : (state.folderPath || t('sidebar.explorer'))}
           onClick={() => {
             if (!isOnline && state.folderPath) {
               navigator.clipboard.writeText(state.folderPath)
@@ -163,17 +183,16 @@ export function Sidebar({ width }: { width: number }) {
             }
           }}
         >
-          {copied ? 'Скопировано!' : (
-            isOnline ? 'Type Club' : (state.folderPath ? state.folderPath.replace(/^.*[\\/]/, '') : 'Проводник')
+          {copied ? t('common.copied') : (
+            isOnline ? 'Type Club' : (state.folderPath ? state.folderPath.replace(/^.*[\\/]/, '') : t('sidebar.explorer'))
           )}
         </span>
         <div className="flex items-center gap-1.5">
-          {/* Globe toggle — only when logged in */}
           {user && (
             <button
               onClick={() => setSidebarMode(isOnline ? 'local' : 'online')}
               className={`p-1 rounded transition-colors ${isOnline ? 'text-[var(--accent)] bg-[var(--bg-active)]' : 'text-[var(--text-dim)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-muted)]'}`}
-              title={isOnline ? "Локальные файлы" : "Статьи Type Club"}
+              title={isOnline ? t('sidebar.localFiles') : t('sidebar.onlineArticles')}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" />
@@ -188,7 +207,7 @@ export function Sidebar({ width }: { width: number }) {
               <button
                 onClick={() => setShowEmptyFolders(!state.showEmptyFolders)}
                 className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors"
-                title={state.showEmptyFolders ? "Скрыть пустые папки" : "Показывать пустые папки"}
+                title={state.showEmptyFolders ? t('sidebar.hideEmptyFolders') : t('sidebar.showEmptyFolders')}
               >
                 {state.showEmptyFolders ? (
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-eye">
@@ -204,7 +223,7 @@ export function Sidebar({ width }: { width: number }) {
               <button
                 onClick={refreshFileTree}
                 className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors"
-                title="Обновить"
+                title={t('common.refresh')}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-rotate-cw">
                   <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" />
@@ -214,7 +233,7 @@ export function Sidebar({ width }: { width: number }) {
               <button
                 onClick={openFolder}
                 className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors"
-                title="Открыть папку"
+                title={t('sidebar.openFolder')}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-folder-open-icon lucide-folder-open">
                   <path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2" />
@@ -227,7 +246,7 @@ export function Sidebar({ width }: { width: number }) {
             <button
               onClick={fetchOnlineArticles}
               className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors"
-              title="Обновить"
+              title={t('common.refresh')}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" />
@@ -237,18 +256,14 @@ export function Sidebar({ width }: { width: number }) {
         </div>
       </div>
 
-      {/* Поисковый блок */}
-      <div
-        className="shrink-0"
-        style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}
-      >
+      <div className="shrink-0" style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <div className="relative flex items-center">
           <Search size={13} className="absolute text-[var(--text-dim)] pointer-events-none" style={{ left: '10px' }} />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={isOnline ? "Поиск по статьям..." : "Поиск по файлам..."}
+            placeholder={isOnline ? t('sidebar.searchArticles') : t('sidebar.searchFiles')}
             style={{ paddingLeft: '30px', paddingRight: '28px', paddingTop: '6px', paddingBottom: '6px' }}
             className="w-full rounded-xl bg-[var(--bg-input)] border border-[var(--border-default)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)] transition-colors placeholder-[var(--text-dim)]"
           />
@@ -257,7 +272,7 @@ export function Sidebar({ width }: { width: number }) {
               onClick={() => setSearchQuery('')}
               className="absolute text-[var(--text-dim)] hover:text-[var(--text-primary)]"
               style={{ right: '8px', padding: '2px' }}
-              title="Очистить поиск"
+              title={t('sidebar.clearSearch')}
             >
               <X size={12} />
             </button>
@@ -273,7 +288,7 @@ export function Sidebar({ width }: { width: number }) {
                 onChange={() => toggleRoleFilter('author')}
                 className="w-3.5 h-3.5 accent-[var(--accent)] rounded cursor-pointer"
               />
-              <span>Автор</span>
+              <span>{t('sidebar.author')}</span>
             </label>
 
             <label className="flex items-center text-[11px] text-[var(--text-secondary)] cursor-pointer hover:text-[var(--text-primary)]" style={{ gap: '6px' }}>
@@ -283,7 +298,7 @@ export function Sidebar({ width }: { width: number }) {
                 onChange={() => toggleRoleFilter('co_author')}
                 className="w-3.5 h-3.5 accent-[var(--accent)] rounded cursor-pointer"
               />
-              <span>Соавтор</span>
+              <span>{t('sidebar.coAuthor')}</span>
             </label>
 
             <label className="flex items-center text-[11px] text-[var(--text-secondary)] cursor-pointer hover:text-[var(--text-primary)]" style={{ gap: '6px' }}>
@@ -293,7 +308,7 @@ export function Sidebar({ width }: { width: number }) {
                 onChange={() => toggleRoleFilter('editor')}
                 className="w-3.5 h-3.5 accent-[var(--accent)] rounded cursor-pointer"
               />
-              <span>Советчик</span>
+              <span>{t('sidebar.advisor')}</span>
             </label>
           </div>
         )}
@@ -331,7 +346,7 @@ export function Sidebar({ width }: { width: number }) {
               />
             ) : filteredOnlineArticles.length === 0 ? (
               <div style={{ padding: '16px', textAlign: 'center' }} className="text-xs text-[var(--text-dim)] italic">
-                Статьи не найдены
+                {t('sidebar.articlesNotFound')}
               </div>
             ) : (
               <>
@@ -372,7 +387,7 @@ export function Sidebar({ width }: { width: number }) {
             {isLocalSearching ? (
               flatSearchResults.length === 0 ? (
                 <div style={{ padding: '16px', textAlign: 'center' }} className="text-xs text-[var(--text-dim)] italic">
-                  Файлы не найдены
+                  {t('sidebar.filesNotFound')}
                 </div>
               ) : (
                 <div style={{ padding: '4px 6px' }}>
@@ -397,7 +412,11 @@ export function Sidebar({ width }: { width: number }) {
                 </div>
               )
             ) : visibleTree.length === 0 && !state.creating ? (
-              <EmptyState onOpenFolder={openFolder} isFolderOpen={!!state.folderPath} onCreateFile={() => startCreating('file')} />
+              <EmptyState 
+                onOpenFolder={openFolder} 
+                isFolderOpen={!!state.folderPath} 
+                onCreateFile={() => startCreating('file')} 
+              />
             ) : (
               <div className="px-1" onClick={(e) => {
                 if (e.target === e.currentTarget) setActiveExplorerPath(null)
@@ -433,7 +452,7 @@ export function Sidebar({ width }: { width: number }) {
       </div>
 
       {/* Context menu — local */}
-      {contextMenuMounted && (savedCtxMenu || contextMenu) && (() => {
+      {contextMenuMounted && (contextMenu || savedCtxMenu) && (() => {
         const menu = contextMenu || savedCtxMenu!
         return (
           <div
@@ -446,26 +465,26 @@ export function Sidebar({ width }: { width: number }) {
             {menu.path === '__empty__' ? (
               <>
                 <button className="menu-item enabled" onClick={() => { startCreating('file'); setContextMenu(null) }}>
-                  Создать файл
+                  {t('menu.file.newFile')}
                 </button>
                 <button className="menu-item enabled" onClick={() => { startCreating('folder'); setContextMenu(null) }}>
-                  Создать папку
+                  {t('menu.file.newFolder')}
                 </button>
               </>
             ) : menu.path === '__online_empty__' ? (
               <button className="menu-item enabled" onClick={() => { startCreating('file'); setContextMenu(null) }}>
-                Создать статью
+                {t('sidebar.newArticle')}
               </button>
             ) : (
               <>
                 <button className="menu-item enabled" onClick={() => { startRenaming(menu.path, menu.type); setContextMenu(null) }}>
-                  Переименовать
+                  {t('sidebar.rename')}
                 </button>
                 <button className="menu-item enabled" onClick={() => {
                   navigator.clipboard.writeText(menu.path)
                   setContextMenu(null)
                 }}>
-                  Копировать путь
+                  {t('sidebar.copyPath')}
                 </button>
                 {menu.type === 'file' && (
                   <button className="menu-item enabled" onClick={async () => {
@@ -481,16 +500,16 @@ export function Sidebar({ width }: { width: number }) {
                     } catch (err) { console.error('Ошибка копированиея файла:', err) }
                     setContextMenu(null)
                   }}>
-                    Создать копию
+                    {t('sidebar.duplicate')}
                   </button>
                 )}
                 <div className="border-t border-[var(--border-default)] my-1.5 mx-2 opacity-80" />
                 <button className="menu-item enabled" style={{ color: 'var(--text-danger)' }} onClick={() => { deleteItem(menu.path, menu.type, menu.name); setContextMenu(null) }}>
-                  Удалить
+                  {t('common.delete')}
                 </button>
                 <div className="border-t border-[var(--border-default)] my-1.5 mx-2 opacity-80" />
                 <button className="menu-item enabled" onClick={() => { showInExplorer(menu.path); setContextMenu(null) }}>
-                  Открыть в проводнике
+                  {t('sidebar.showInExplorer')}
                 </button>
               </>
             )}
@@ -515,7 +534,7 @@ export function Sidebar({ width }: { width: number }) {
                 startRenaming(`__online__/${menu.article.id}`, 'file')
                 setOnlineMenu(null)
               }}>
-                Переименовать
+                {t('sidebar.rename')}
               </button>
             )}
             <button className="menu-item enabled" onClick={() => {
@@ -523,14 +542,14 @@ export function Sidebar({ width }: { width: number }) {
               navigator.clipboard.writeText(`${config.siteUrl}/${authorNick}/${menu.article.slug}`)
               setOnlineMenu(null)
             }}>
-              Копировать ссылку
+              {t('sidebar.copyLink')}
             </button>
             {isAuthor && (
               <button className="menu-item enabled" onClick={() => {
                 duplicateOnlineArticle(menu.article.id)
                 setOnlineMenu(null)
               }}>
-                Создать копию
+                {t('sidebar.duplicate')}
               </button>
             )}
             {isAuthor && (
@@ -540,7 +559,7 @@ export function Sidebar({ width }: { width: number }) {
                   deleteOnlineArticle(menu.article.id)
                   setOnlineMenu(null)
                 }}>
-                  Удалить
+                  {t('common.delete')}
                 </button>
               </>
             )}
@@ -550,7 +569,7 @@ export function Sidebar({ width }: { width: number }) {
               window.api.openExternal(`${config.siteUrl}/${authorNick}/${menu.article.slug}`)
               setOnlineMenu(null)
             }}>
-              Открыть в браузере
+              {t('sidebar.openInBrowser')}
             </button>
             <button className="menu-item enabled" onClick={async () => {
               try {
@@ -563,7 +582,7 @@ export function Sidebar({ width }: { width: number }) {
               } catch (err) { console.error('Ошибка скачивания:', err) }
               setOnlineMenu(null)
             }}>
-              Скачать
+              {t('sidebar.download')}
             </button>
           </div>
         )
@@ -582,7 +601,7 @@ function OnlineArticleItem({ article, activeTabArticleId, activeToc, onOpen, onC
   onContextMenu: (e: React.MouseEvent) => void
   onRename: (title: string) => void
 }) {
-  const { state, dispatch } = useEditor()
+  const { state, dispatch, t } = useEditor()
   const isActive = activeTabArticleId === article.id
   const isRenaming = state.renaming?.path === `__online__/${article.id}`
   const [isTocOpen, setIsTocOpen] = useState(true)
@@ -625,10 +644,10 @@ function OnlineArticleItem({ article, activeTabArticleId, activeToc, onOpen, onC
           </svg>
           <span className="truncate">{article.title}</span>
           {article.my_roles?.includes('co_author') && (
-            <span className="role-badge co_author ml-auto flex-shrink-0">Соавтор</span>
+            <span className="role-badge co_author ml-auto flex-shrink-0">{t('role.co_author')}</span>
           )}
           {!article.my_roles?.includes('co_author') && article.my_roles?.includes('editor') && (
-            <span className="role-badge editor ml-auto flex-shrink-0">Редактор</span>
+            <span className="role-badge editor ml-auto flex-shrink-0">{t('role.editor')}</span>
           )}
         </button>
       </div>
@@ -660,6 +679,7 @@ function OnlineArticleItem({ article, activeTabArticleId, activeToc, onOpen, onC
 function OnlineCreateInput({ onSubmit, onCancel }: {
   onSubmit: (name: string) => void; onCancel: () => void
 }) {
+  const { t } = useEditor()
   const inputRef = useRef<HTMLInputElement>(null)
   useEffect(() => { inputRef.current?.focus() }, [])
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -675,7 +695,7 @@ function OnlineCreateInput({ onSubmit, onCancel }: {
       </svg>
       <input ref={inputRef} type="text"
         className="flex-1 bg-[var(--bg-hover)] text-[var(--text-primary)] text-[13px] border border-[var(--accent)] rounded px-1.5 py-0.5 outline-none"
-        placeholder="Название статьи..."
+        placeholder={t('sidebar.articleTitlePlaceholder')}
         onKeyDown={handleKeyDown} onBlur={onCancel}
       />
     </div>
@@ -688,6 +708,7 @@ function EmptyState({ onOpenFolder, onCreateFile, isFolderOpen, isOnline, onCrea
   onOpenFolder?: () => void; onCreateFile?: () => void; isFolderOpen?: boolean;
   isOnline?: boolean; onCreateArticle?: () => void;
 }) {
+  const { t } = useEditor()
   if (isOnline) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center" style={{ gap: '20px', padding: '0 24px' }}>
@@ -696,7 +717,7 @@ function EmptyState({ onOpenFolder, onCreateFile, isFolderOpen, isOnline, onCrea
           <line x1="2" y1="12" x2="22" y2="12" />
           <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" />
         </svg>
-        <p style={{ fontSize: '13px', color: 'var(--text-dim)', margin: 0 }}>Нет статей</p>
+        <p style={{ fontSize: '13px', color: 'var(--text-dim)', margin: 0 }}>{t('sidebar.noArticles')}</p>
         {onCreateArticle && (
           <button
             onClick={onCreateArticle}
@@ -708,7 +729,7 @@ function EmptyState({ onOpenFolder, onCreateFile, isFolderOpen, isOnline, onCrea
             onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-hover)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'var(--accent)')}
           >
-            Создать статью
+            {t('sidebar.createArticle')}
           </button>
         )}
       </div>
@@ -720,7 +741,7 @@ function EmptyState({ onOpenFolder, onCreateFile, isFolderOpen, isOnline, onCrea
         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
       </svg>
       <p style={{ fontSize: '13px', color: 'var(--text-dim)', margin: 0 }}>
-        {isFolderOpen ? 'Эта папка пуста' : 'Нет открытой папки'}
+        {isFolderOpen ? t('sidebar.folderEmpty') : t('sidebar.noOpenFolder')}
       </p>
       <button
         onClick={isFolderOpen ? onCreateFile : onOpenFolder}
@@ -732,7 +753,7 @@ function EmptyState({ onOpenFolder, onCreateFile, isFolderOpen, isOnline, onCrea
         onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-hover)')}
         onMouseLeave={e => (e.currentTarget.style.background = 'var(--accent)')}
       >
-        {isFolderOpen ? 'Создать файл' : 'Открыть папку'}
+        {isFolderOpen ? t('sidebar.createFile') : t('sidebar.openFolder')}
       </button>
     </div>
   )
@@ -783,6 +804,7 @@ function InlineRenameInput({ initialValue, depth, iconType = 'file', onSubmit, o
 function InlineCreateInput({ type, depth, onSubmit, onCancel }: {
   type: 'file' | 'folder'; depth: number; onSubmit: (name: string) => void; onCancel: () => void
 }) {
+  const { t } = useEditor()
   const inputRef = useRef<HTMLInputElement>(null)
   useEffect(() => { inputRef.current?.focus() }, [])
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -803,7 +825,7 @@ function InlineCreateInput({ type, depth, onSubmit, onCancel }: {
       )}
       <input ref={inputRef} type="text"
         className="flex-1 bg-[var(--bg-hover)] text-[var(--text-primary)] text-[13px] border border-[var(--accent)] rounded px-1.5 py-0.5 outline-none"
-        placeholder={type === 'folder' ? 'Имя папки...' : 'Имя файла...'}
+        placeholder={type === 'folder' ? t('sidebar.folderNamePlaceholder') : t('sidebar.fileNamePlaceholder')}
         onKeyDown={handleKeyDown} onBlur={onCancel}
       />
     </div>

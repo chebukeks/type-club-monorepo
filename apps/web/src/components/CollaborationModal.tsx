@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react"
 import { X, Copy, Check, Trash2 } from "lucide-react"
 import { collaborationApi, Collaborator, ShareLink } from "../api"
 import UserAutocompleteInput from "./UserAutocompleteInput"
+import { useLanguage } from "../context/LanguageContext"
 
 interface CollaborationModalProps {
   articleId: number | null
@@ -14,6 +15,7 @@ export default function CollaborationModal({
   onClose,
   onBack,
 }: CollaborationModalProps) {
+  const { t } = useLanguage()
   const [editors, setEditors] = useState<Collaborator[]>([])
   const [coAuthors, setCoAuthors] = useState<Collaborator[]>([])
   const [editorInput, setEditorInput] = useState("")
@@ -49,7 +51,7 @@ export default function CollaborationModal({
       clearInput()
       setRefresh((r) => r + 1)
     } catch (err: any) {
-      setError(err.message || "Invite failed")
+      setError(err.message || t('collab.inviteError'))
     } finally {
       setLoading(false)
     }
@@ -61,7 +63,7 @@ export default function CollaborationModal({
       await collaborationApi.remove(articleId, userId)
       setRefresh((r) => r + 1)
     } catch (err: any) {
-      setError(err.message || "Remove failed")
+      setError(err.message || t('collab.removeError'))
     }
   }
 
@@ -72,7 +74,7 @@ export default function CollaborationModal({
       if (role === "editor") setEditorLink(link)
       else setCoAuthorLink(link)
     } catch (err: any) {
-      setError(err.message || "Failed to generate link")
+      setError(err.message || t('collab.createLinkError'))
     }
   }
 
@@ -93,6 +95,7 @@ export default function CollaborationModal({
       <span className="text-gray-700 dark:text-gray-300">{c.nickname}</span>
       <button
         className="p-0.5 rounded hover:bg-red-50 dark:hover:bg-red-950 text-gray-400 hover:text-red-500"
+        title={t('collab.deleteUser')}
         onClick={() => remove(c.user_id)}
       ><Trash2 size={14} /></button>
     </div>
@@ -100,7 +103,7 @@ export default function CollaborationModal({
 
   const linkSection = (label: string, role: "editor" | "co_author", link: ShareLink | null) => (
     <div className="mt-2">
-      <div className={subLabelClass}>Приглашение по ссылке</div>
+      <div className={subLabelClass}>{t('collab.inviteByLink')}</div>
       {link ? (
         <div className="flex gap-2 items-center mt-1">
           <input
@@ -114,20 +117,20 @@ export default function CollaborationModal({
             onClick={() => copyLink(link.url)}
           >
             {copied === link.url ? <Check size={14} /> : <Copy size={14} />}
-            {copied === link.url ? "Скопировано" : "Копировать"}
+            {copied === link.url ? t('collab.copied') : t('collab.copy')}
           </button>
         </div>
       ) : (
         <button
           className="mt-1 w-full py-1.5 rounded bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm hover:bg-gray-200 dark:hover:bg-gray-700"
           onClick={() => generateLink(role)}
-        >Сгенерировать ссылку</button>
+        >{t('collab.generateLink')}</button>
       )}
       {link && (
         <button
           className="mt-1 w-full py-1.5 rounded text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
           onClick={() => generateLink(role)}
-        >Сгенерировать новую (старая перестанет работать)</button>
+        >{t('collab.regenerateLink')}</button>
       )}
     </div>
   )
@@ -139,7 +142,7 @@ export default function CollaborationModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-bold">Совместная работа</h2>
+          <h2 className="text-lg font-bold">{t('collab.title')}</h2>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
             <X size={18} />
           </button>
@@ -153,24 +156,24 @@ export default function CollaborationModal({
 
         {/* --- Block 1: Editors --- */}
         <div>
-          <h3 className={sectionTitleClass}>Редакторы</h3>
+          <h3 className={sectionTitleClass}>{t('collab.editors')}</h3>
           <div className="flex gap-2 mb-2">
             <UserAutocompleteInput
               value={editorInput}
               onChange={setEditorInput}
               onSubmit={() => invite(editorInput, "editor", () => setEditorInput(""))}
-              placeholder="Никнейм пользователя"
+              placeholder={t('collab.inviteEditorPlaceholder')}
             />
             <button
               className={btnClass}
               disabled={loading || !editorInput.trim()}
               onClick={() => invite(editorInput, "editor", () => setEditorInput(""))}
-            >Пригласить</button>
+            >{t('collab.inviteBtn')}</button>
           </div>
           {editors.length > 0 ? memberList(editors) : (
-            <div className="text-xs text-gray-400 dark:text-gray-500 px-2 py-1">Нет приглашённых</div>
+            <div className="text-xs text-gray-400 dark:text-gray-500 px-2 py-1">{t('collab.noInvited')}</div>
           )}
-          {linkSection("редакторов", "editor", editorLink)}
+          {linkSection("editors", "editor", editorLink)}
         </div>
 
         {/* Separator line between Editors and Co-authors */}
@@ -178,24 +181,24 @@ export default function CollaborationModal({
 
         {/* --- Block 2: Co-authors --- */}
         <div>
-          <h3 className={sectionTitleClass}>Соавторы</h3>
+          <h3 className={sectionTitleClass}>{t('collab.coAuthors')}</h3>
           <div className="flex gap-2 mb-2">
             <UserAutocompleteInput
               value={coAuthorInput}
               onChange={setCoAuthorInput}
               onSubmit={() => invite(coAuthorInput, "co_author", () => setCoAuthorInput(""))}
-              placeholder="Никнейм пользователя"
+              placeholder={t('collab.inviteCoAuthorPlaceholder')}
             />
             <button
               className={btnClass}
               disabled={loading || !coAuthorInput.trim()}
               onClick={() => invite(coAuthorInput, "co_author", () => setCoAuthorInput(""))}
-            >Пригласить</button>
+            >{t('collab.inviteBtn')}</button>
           </div>
           {coAuthors.length > 0 ? memberList(coAuthors) : (
-            <div className="text-xs text-gray-400 dark:text-gray-500 px-2 py-1">Нет приглашённых</div>
+            <div className="text-xs text-gray-400 dark:text-gray-500 px-2 py-1">{t('collab.noInvited')}</div>
           )}
-          {linkSection("соавторов", "co_author", coAuthorLink)}
+          {linkSection("coAuthors", "co_author", coAuthorLink)}
         </div>
       </div>
     </div>

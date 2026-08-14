@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Download, Monitor, Terminal, Apple, GitBranch, Clock } from "lucide-react";
+import { useLanguage } from "../context/LanguageContext";
 
 interface FileInfo {
   file: string;
@@ -72,6 +73,7 @@ function ComingSoon({ detail }: { detail: string }) {
 }
 
 export default function DownloadPage() {
+  const { t } = useLanguage();
   const [manifest, setManifest] = useState<Manifest | null>(null);
   const [error, setError] = useState(false);
 
@@ -87,71 +89,66 @@ export default function DownloadPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 md:py-12">
-      <h1 className="text-3xl md:text-4xl font-bold mb-2">Download Type Club</h1>
+      <h1 className="text-3xl md:text-4xl font-bold mb-2">{t('download.title')}</h1>
       {manifest && (
         <p className="text-gray-500 dark:text-gray-400 mb-8">
-          Version {manifest.version} — {manifest.releaseDate}
+          {t('download.versionDate', { version: manifest.version, date: manifest.releaseDate })}
         </p>
       )}
       {error && (
         <p className="text-gray-500 dark:text-gray-400 mb-8">
-          No release available yet. Check back soon.
+          {t('download.noRelease')}
         </p>
       )}
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Windows */}
-        <DownloadCard icon={<Monitor size={28} />} title="Windows">
+        <DownloadCard icon={<Monitor size={28} />} title={t('download.windows')}>
           {manifest?.platforms.windows ? (
             <div className="flex flex-wrap gap-2">
               {manifest.platforms.windows.installer && (
                 <DownloadButton
                   file={manifest.platforms.windows.installer}
-                  label="Setup (.exe)"
+                  label={t('download.setupExe')}
                 />
               )}
               {manifest.platforms.windows.portable && (
                 <DownloadButton
                   file={manifest.platforms.windows.portable}
-                  label="Portable (.zip)"
+                  label={t('download.portableZip')}
                 />
               )}
             </div>
           ) : (
-            <ComingSoon detail="Coming soon" />
+            <ComingSoon detail={t('download.comingSoon')} />
           )}
         </DownloadCard>
 
         {/* Linux */}
-        <DownloadCard icon={<Terminal size={28} />} title="Linux">
+        <DownloadCard icon={<Terminal size={28} />} title={t('download.linux')}>
           {manifest?.platforms.linux?.appimage ? (
             <div className="space-y-3">
               <DownloadButton
                 file={manifest.platforms.linux.appimage}
-                label="AppImage"
+                label={t('download.appImage')}
               />
               <p className="text-xs text-gray-400 dark:text-gray-500">
-                After downloading, make it executable:{" "}
-                <code className="text-gray-500 dark:text-gray-400">
-                  chmod +x TypeClub*.AppImage
-                </code>{" "}
-                then double-click to run. Works on Ubuntu, Fedora, Debian and
-                most Linux distributions.
+                {t('download.linuxInstruction')}
               </p>
             </div>
           ) : (
-            <ComingSoon detail="Coming soon" />
+            <ComingSoon detail={t('download.comingSoon')} />
           )}
         </DownloadCard>
 
         {/* macOS */}
-        <DownloadCard icon={<Apple size={28} />} title="macOS">
-          <ComingSoon detail="Coming soon" />
+        <DownloadCard icon={<Apple size={28} />} title={t('download.macos')}>
+          <ComingSoon detail={t('download.comingSoon')} />
         </DownloadCard>
 
         {/* GitHub */}
-        <DownloadCard icon={<GitBranch size={28} />} title="Source Code">
-          <ComingSoon detail="Coming soon" />
+        <DownloadCard icon={<GitBranch size={28} />} title={t('download.sourceCode')}>
+          <ComingSoon detail={t('download.comingSoon')} />
         </DownloadCard>
       </div>
     </div>

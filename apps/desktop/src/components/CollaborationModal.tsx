@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { collaborationApi, type Collaborator } from '../api';
 import { UserAutocompleteInput } from './UserAutocompleteInput';
+import { useEditor } from '../context/EditorContext';
 import { X, Copy, Check, Trash2, Link } from 'lucide-react';
 
 interface Props {
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export function CollaborationModal({ articleId, onClose }: Props) {
+  const { t } = useEditor();
   const [editors, setEditors] = useState<Collaborator[]>([]);
   const [coauthors, setCoauthors] = useState<Collaborator[]>([]);
   const [editorLink, setEditorLink] = useState('');
@@ -35,9 +37,9 @@ export function CollaborationModal({ articleId, onClose }: Props) {
       setEditors(data.filter((c) => c.role === 'editor'));
       setCoauthors(data.filter((c) => c.role === 'co_author'));
     } catch (e: any) {
-      setError(e.message || 'Ошибка загрузки соавторов');
+      setError(e.message || t('collab.loadError'));
     }
-  }, [articleId]);
+  }, [articleId, t]);
 
   useEffect(() => {
     fetchCollaborators();
@@ -49,7 +51,7 @@ export function CollaborationModal({ articleId, onClose }: Props) {
       await collaborationApi.invite(articleId, nickname, role);
       await fetchCollaborators();
     } catch (e: any) {
-      setError(e.message || 'Не удалось пригласить пользователя');
+      setError(e.message || t('collab.inviteError'));
     }
   };
 
@@ -59,7 +61,7 @@ export function CollaborationModal({ articleId, onClose }: Props) {
       await collaborationApi.remove(articleId, userId);
       await fetchCollaborators();
     } catch (e: any) {
-      setError(e.message || 'Не удалось удалить пользователя');
+      setError(e.message || t('collab.removeError'));
     }
   };
 
@@ -70,7 +72,7 @@ export function CollaborationModal({ articleId, onClose }: Props) {
       if (role === 'editor') setEditorLink(res.url);
       else setCoauthorLink(res.url);
     } catch (e: any) {
-      setError(e.message || 'Не удалось создать ссылку');
+      setError(e.message || t('collab.createLinkError'));
     }
   };
 
@@ -91,7 +93,7 @@ export function CollaborationModal({ articleId, onClose }: Props) {
         onClick={() => handleRemove(c.user_id)}
         className="rounded-md hover:bg-red-500/10 text-[var(--text-dim)] hover:text-red-500 transition-colors"
         style={{ padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        title="Удалить"
+        title={t('common.delete')}
       >
         <Trash2 size={14} />
       </button>
@@ -101,7 +103,7 @@ export function CollaborationModal({ articleId, onClose }: Props) {
   const linkSection = (role: 'editor' | 'co_author', link: string) => (
     <div style={{ marginTop: '12px' }}>
       <div className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-tight" style={{ marginBottom: '6px' }}>
-        Приглашение по ссылке
+        {t('collab.inviteByLink')}
       </div>
       {link ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -118,7 +120,7 @@ export function CollaborationModal({ articleId, onClose }: Props) {
               onClick={() => copyToClipboard(link, role)}
             >
               {copiedRole === role ? <Check size={14} /> : <Copy size={14} />}
-              <span>{copiedRole === role ? 'Скопировано' : 'Копировать'}</span>
+              <span>{copiedRole === role ? t('collab.copied') : t('collab.copy')}</span>
             </button>
           </div>
           <button
@@ -126,7 +128,7 @@ export function CollaborationModal({ articleId, onClose }: Props) {
             style={{ padding: '2px 0' }}
             onClick={() => handleGenerateLink(role)}
           >
-            Сгенерировать новую (старая перестанет работать)
+            {t('collab.regenerateLink')}
           </button>
         </div>
       ) : (
@@ -136,7 +138,7 @@ export function CollaborationModal({ articleId, onClose }: Props) {
           onClick={() => handleGenerateLink(role)}
         >
           <Link size={14} />
-          <span>Сгенерировать ссылку</span>
+          <span>{t('collab.generateLink')}</span>
         </button>
       )}
     </div>
@@ -151,7 +153,7 @@ export function CollaborationModal({ articleId, onClose }: Props) {
       >
         {/* Header */}
         <div className="flex items-center justify-between" style={{ marginBottom: '16px' }}>
-          <h3 className="text-lg font-bold text-[var(--text-primary)]">Совместная работа</h3>
+          <h3 className="text-lg font-bold text-[var(--text-primary)]">{t('collab.title')}</h3>
           <button onClick={onClose} className="modal-close" style={{ padding: '4px', borderRadius: '8px' }}>
             <X size={18} />
           </button>
@@ -160,17 +162,17 @@ export function CollaborationModal({ articleId, onClose }: Props) {
         {error && <div className="modal-error" style={{ marginBottom: '12px' }}>{error}</div>}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '75vh', overflowY: 'auto', paddingRight: '2px' }}>
-          {/* Section 1: Редакторы */}
+          {/* Section 1: Advisors / Editors */}
           <div>
             <h4 className="text-xs font-bold text-[var(--text-dim)] uppercase tracking-wider" style={{ marginBottom: '4px' }}>
-              Редакторы
+              {t('collab.editors')}
             </h4>
             <p className="text-xs text-[var(--text-muted)]" style={{ marginBottom: '10px' }}>
-              Могут оставлять предложения по тексту (режим советчика)
+              {t('collab.editorsDesc')}
             </p>
             <div style={{ marginBottom: '8px' }}>
               <UserAutocompleteInput
-                placeholder="Пригласить редактора по никнейму…"
+                placeholder={t('collab.inviteEditorPlaceholder')}
                 onSelect={(nickname) => handleInvite(nickname, 'editor')}
               />
             </div>
@@ -178,7 +180,7 @@ export function CollaborationModal({ articleId, onClose }: Props) {
               {editors.length > 0 ? (
                 memberList(editors)
               ) : (
-                <div className="text-xs text-[var(--text-dim)] italic" style={{ padding: '4px 10px' }}>Нет приглашённых</div>
+                <div className="text-xs text-[var(--text-dim)] italic" style={{ padding: '4px 10px' }}>{t('collab.noInvited')}</div>
               )}
             </div>
             {linkSection('editor', editorLink)}
@@ -187,17 +189,17 @@ export function CollaborationModal({ articleId, onClose }: Props) {
           {/* Separator */}
           <div className="border-t border-[var(--border-default)]" style={{ margin: '16px 0' }} />
 
-          {/* Section 2: Соавторы */}
+          {/* Section 2: Co-authors */}
           <div>
             <h4 className="text-xs font-bold text-[var(--text-dim)] uppercase tracking-wider" style={{ marginBottom: '4px' }}>
-              Соавторы
+              {t('collab.coAuthors')}
             </h4>
             <p className="text-xs text-[var(--text-muted)]" style={{ marginBottom: '10px' }}>
-              Могут редактировать текст напрямую
+              {t('collab.coAuthorsDesc')}
             </p>
             <div style={{ marginBottom: '8px' }}>
               <UserAutocompleteInput
-                placeholder="Пригласить соавтора по никнейму…"
+                placeholder={t('collab.inviteCoAuthorPlaceholder')}
                 onSelect={(nickname) => handleInvite(nickname, 'co_author')}
               />
             </div>
@@ -205,7 +207,7 @@ export function CollaborationModal({ articleId, onClose }: Props) {
               {coauthors.length > 0 ? (
                 memberList(coauthors)
               ) : (
-                <div className="text-xs text-[var(--text-dim)] italic" style={{ padding: '4px 10px' }}>Нет приглашённых</div>
+                <div className="text-xs text-[var(--text-dim)] italic" style={{ padding: '4px 10px' }}>{t('collab.noInvited')}</div>
               )}
             </div>
             {linkSection('co_author', coauthorLink)}

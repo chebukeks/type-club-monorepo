@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { articlesApi, ArticleListItem } from "../api";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
 import ArticleCard from "../components/ArticleCard";
 import AuthorFilter from "../components/AuthorFilter";
 import Pagination from "../components/Pagination";
@@ -11,6 +12,7 @@ const PAGE_SIZE = 20;
 
 export default function Articles() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [articles, setArticles] = useState<ArticleListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -46,16 +48,16 @@ export default function Articles() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Articles</h1>
+      <h1 className="text-3xl font-bold mb-6">{t('articles.title')}</h1>
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        <SearchInput value={searchInput} onChange={setSearchInput} />
+        <SearchInput value={searchInput} onChange={setSearchInput} placeholder={t('articles.searchPlaceholder')} />
         <AuthorFilter value={author} onChange={(a) => setParam("author", a)} />
       </div>
       {loading ? (
-        <div className="text-center py-20 text-gray-400">Loading...</div>
+        <div className="text-center py-20 text-gray-400">{t('common.loading')}</div>
       ) : articles.length === 0 ? (
         <div className="text-center py-20 text-gray-400">
-          {hasFilters ? "Nothing found. Try different search or filters." : "No published articles yet."}
+          {hasFilters ? t('articles.nothingFound') : t('articles.noPublishedArticles')}
         </div>
       ) : (
         <>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { statsApi } from "../api";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
 import { Heart, Eye, Link } from "lucide-react";
 
 interface Props {
@@ -12,6 +13,7 @@ interface Props {
 
 export default function ArticleStats({ articleId, initialViews, initialLikes, initialLiked }: Props) {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [views, setViews] = useState(initialViews);
   const [likes, setLikes] = useState(initialLikes);
   const [liked, setLiked] = useState(initialLiked);
@@ -74,12 +76,12 @@ export default function ArticleStats({ articleId, initialViews, initialLikes, in
         <div className="flex items-center gap-5 text-sm text-gray-500">
           <span className="flex items-center gap-1.5">
             <Eye size={16} />
-            {views} views
+            {t('readArticle.views', { count: views })}
           </span>
           <button
             onClick={handleLike}
             disabled={!user || likePending}
-            title={user ? (liked ? "Unlike" : "Like") : "Sign in to like"}
+            title={user ? (liked ? t('readArticle.unlike') : t('readArticle.like')) : t('readArticle.signInToLike')}
             className={`flex items-center gap-1.5 transition-colors ${
               liked ? "text-red-500" : "text-gray-500"
             } ${user ? "hover:text-red-500 cursor-pointer" : "cursor-default"}`}
@@ -90,10 +92,10 @@ export default function ArticleStats({ articleId, initialViews, initialLikes, in
           <button
             onClick={handleCopyLink}
             className="flex items-center gap-1.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
-            title="Copy link"
+            title={t('readArticle.copyLink')}
           >
             <Link size={16} />
-            {copied ? "Copied!" : "Copy link"}
+            {copied ? t('readArticle.copied') : t('readArticle.copyLink')}
           </button>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
 import { X, Copy, Check, ExternalLink } from "lucide-react";
 import CollaborationModal from "./CollaborationModal";
 
@@ -11,12 +12,6 @@ interface PublishModalProps {
   onApply: (accessState: string, slug: string) => void;
   onClose: () => void;
 }
-
-const states = [
-  { value: "private", label: "Private", desc: "Only you can see it" },
-  { value: "link", label: "Link access", desc: "Anyone with the link" },
-  { value: "public", label: "Public", desc: "Visible on the articles page" },
-];
 
 const VALID_SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
@@ -35,11 +30,18 @@ export default function PublishModal({
   onClose,
 }: PublishModalProps) {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const username = user?.nickname || "username";
   const [accessState, setAccessState] = useState(currentState);
   const [slug, setSlug] = useState(currentSlug || generateRandomSlug());
   const [copied, setCopied] = useState(false);
   const [showCollab, setShowCollab] = useState(false);
+
+  const states = [
+    { value: "private", label: t('publish.private'), desc: t('publish.privateDesc') },
+    { value: "link", label: t('publish.link'), desc: t('publish.linkDesc') },
+    { value: "public", label: t('publish.public'), desc: t('publish.publicDesc') },
+  ];
 
   const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
@@ -71,7 +73,7 @@ export default function PublishModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-bold">Publish Settings</h2>
+          <h2 className="text-lg font-bold">{t('publish.title')}</h2>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
             <X size={18} />
           </button>
@@ -95,7 +97,7 @@ export default function PublishModal({
         </div>
 
         <div className="mb-6">
-          <label className="block text-sm font-medium mb-1">Article slug</label>
+          <label className="block text-sm font-medium mb-1">{t('publish.slug')}</label>
           <div className="flex items-center gap-1 text-sm text-gray-400">
             <span>type-club.ru/{username}/</span>
             <input
@@ -119,13 +121,13 @@ export default function PublishModal({
             target="_blank"
             className="flex-1 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium text-center hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors inline-flex items-center justify-center gap-1.5"
           >
-            <ExternalLink size={14} /> View article
+            <ExternalLink size={14} /> {t('publish.viewArticle')}
           </Link>
           <button
             onClick={handleCopy}
             className="flex-1 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors inline-flex items-center justify-center gap-1.5"
           >
-            {copied ? <><Check size={14} className="text-green-500" /> Copied</> : <><Copy size={14} /> Copy link</>}
+            {copied ? <><Check size={14} className="text-green-500" /> {t('publish.copied')}</> : <><Copy size={14} /> {t('publish.copyLink')}</>}
           </button>
         </div>
 
@@ -134,7 +136,7 @@ export default function PublishModal({
           disabled={!!error}
           className="w-full py-2.5 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
         >
-          Apply
+          {t('publish.apply')}
         </button>
 
         {articleId && (
@@ -142,7 +144,7 @@ export default function PublishModal({
             onClick={() => setShowCollab(true)}
             className="w-full mt-2 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >
-            Совместная работа
+            {t('publish.collabBtn')}
           </button>
         )}
       </div>

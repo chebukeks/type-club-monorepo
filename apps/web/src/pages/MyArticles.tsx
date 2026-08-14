@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { articlesApi, ArticleListItem } from "../api";
+import { useLanguage } from "../context/LanguageContext";
 import Pagination from "../components/Pagination";
 import SearchInput from "../components/SearchInput";
 import { useListQuery } from "../hooks/useListQuery";
@@ -10,21 +11,22 @@ const PAGE_SIZE = 20;
 const ALL_ROLES = ["author", "co_author", "editor"] as const;
 type Role = (typeof ALL_ROLES)[number];
 
-const ROLE_LABELS: Record<Role, string> = {
-  author: "Author",
-  co_author: "Co-author",
-  editor: "Editor",
-};
-
 function parseRoles(param: string | null): Role[] {
   if (param === null) return [...ALL_ROLES];
   return ALL_ROLES.filter((r) => param.split(",").includes(r));
 }
 
 export default function MyArticles() {
+  const { t } = useLanguage();
   const [articles, setArticles] = useState<ArticleListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  const roleLabels: Record<Role, string> = {
+    author: t('role.author'),
+    co_author: t('role.co_author'),
+    editor: t('role.editor'),
+  };
 
   const { searchParams, page, q, searchInput, setSearchInput, setPage, setParam } = useListQuery();
   const selectedRoles = parseRoles(searchParams.get("roles"));
@@ -64,7 +66,7 @@ export default function MyArticles() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Delete this article?")) return;
+    if (!confirm(t('articles.deleteConfirm'))) return;
     await articlesApi.delete(id);
     fetchArticles();
   };
@@ -74,13 +76,13 @@ export default function MyArticles() {
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">My Articles</h1>
+        <h1 className="text-3xl font-bold">{t('myArticles.title')}</h1>
         <Link to="/editor" className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">
-          New Article
+          {t('myArticles.newArticle')}
         </Link>
       </div>
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
-        <SearchInput value={searchInput} onChange={setSearchInput} />
+        <SearchInput value={searchInput} onChange={setSearchInput} placeholder={t('articles.searchPlaceholder')} />
         <div className="flex items-center gap-4 shrink-0">
           {ALL_ROLES.map((role) => (
             <label key={role} className="flex items-center gap-1.5 text-sm cursor-pointer select-none">
@@ -90,21 +92,21 @@ export default function MyArticles() {
                 onChange={() => toggleRole(role)}
                 className="w-4 h-4 accent-blue-600 cursor-pointer"
               />
-              {ROLE_LABELS[role]}
+              {roleLabels[role]}
             </label>
           ))}
         </div>
       </div>
       {loading ? (
-        <div className="text-center py-20 text-gray-400">Loading...</div>
+        <div className="text-center py-20 text-gray-400">{t('common.loading')}</div>
       ) : articles.length === 0 ? (
         <div className="text-center py-20 text-gray-400">
           {hasFilters ? (
-            "Nothing found. Try different search or filters."
+            t('articles.nothingFound')
           ) : (
             <>
-              You haven't written any articles yet.{" "}
-              <Link to="/editor" className="text-blue-600 hover:underline">Write one now</Link>
+              {t('myArticles.noArticlesYet')}{" "}
+              <Link to="/editor" className="text-blue-600 hover:underline">{t('myArticles.writeOneNow')}</Link>
             </>
           )}
         </div>
@@ -130,31 +132,31 @@ export default function MyArticles() {
                       </span>
                       {(a.my_roles ?? []).map((role) => (
                         <span key={role} className="text-xs px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950 text-blue-600">
-                          {ROLE_LABELS[role as Role] ?? role}
+                          {roleLabels[role as Role] ?? role}
                         </span>
                       ))}
-                      {!isAuthor && <span className="text-xs">by {a.author_nickname}</span>}
+                      {!isAuthor && <span className="text-xs">{t('articles.byAuthor', { author: a.author_nickname })}</span>}
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     {canSuggest && (
                       <Link to={`/editor/${a.id}?mode=suggest`}
                         className="p-2 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-950 text-amber-600 dark:text-amber-400 transition-colors"
-                        title="Suggest">
+                        title={t('myArticles.suggest')}>
                         <Lightbulb size={16} />
                       </Link>
                     )}
                     {canEdit && (
                       <Link to={`/editor/${a.id}`}
                         className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                        title="Edit">
+                        title={t('myArticles.edit')}>
                         <Edit size={16} />
                       </Link>
                     )}
                     {isAuthor && (
                       <button onClick={() => handleDelete(a.id)}
                         className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-950 text-red-500 transition-colors"
-                        title="Delete">
+                        title={t('common.delete')}>
                         <Trash2 size={16} />
                       </button>
                     )}

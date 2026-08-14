@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { usersApi, UserSuggestion } from "../api";
 import { useDebounce } from "../hooks/useDebounce";
+import { useLanguage } from "../context/LanguageContext";
 
 interface UserAutocompleteInputProps {
   value: string;
@@ -17,15 +18,18 @@ export default function UserAutocompleteInput({
   onChange,
   onSelect,
   onSubmit,
-  placeholder = "Никнейм пользователя",
+  placeholder,
   className = "",
   disabled = false,
 }: UserAutocompleteInputProps) {
+  const { t } = useLanguage();
   const [suggestions, setSuggestions] = useState<UserSuggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [highlighted, setHighlighted] = useState(0);
   const debouncedQuery = useDebounce(value);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  const effectivePlaceholder = placeholder || t('userAutocomplete.placeholder');
 
   useEffect(() => {
     const q = debouncedQuery.trim();
@@ -108,14 +112,14 @@ export default function UserAutocompleteInput({
         }}
         onFocus={() => setOpen(true)}
         onKeyDown={handleKeyDown}
-        placeholder={placeholder}
+        placeholder={effectivePlaceholder}
         disabled={disabled}
         className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-sm text-gray-700 dark:text-gray-300 outline-none focus:border-gray-400"
       />
       {showDropdown && (
         <div className="absolute top-full left-0 right-0 mt-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl overflow-hidden z-50 max-h-48 overflow-y-auto">
           {suggestions.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-gray-400">Пользователи не найдены</div>
+            <div className="px-3 py-2 text-xs text-gray-400">{t('userAutocomplete.noUsersFound')}</div>
           ) : (
             suggestions.map((u, i) => (
               <button

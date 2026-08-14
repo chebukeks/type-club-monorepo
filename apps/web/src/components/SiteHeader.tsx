@@ -1,5 +1,6 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
 import { PenTool, BookOpen, User, LogOut, LogIn, Menu, X } from "lucide-react";
 import { useState } from "react";
 import ThemeSwitcher from "./ThemeSwitcher";
@@ -10,16 +11,17 @@ interface SiteHeaderProps {
 
 export default function SiteHeader({ onLogoClick }: SiteHeaderProps) {
   const { user, logout } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const navLinks = [
-    { to: "/articles", label: "Articles", icon: BookOpen },
+    { to: "/articles", label: t('nav.articles'), icon: BookOpen },
   ];
 
   if (user) {
-    navLinks.push({ to: "/my-articles", label: "My Articles", icon: PenTool });
+    navLinks.push({ to: "/my-articles", label: t('nav.myArticles'), icon: PenTool });
   }
 
   const LogoContent = (
@@ -64,18 +66,19 @@ export default function SiteHeader({ onLogoClick }: SiteHeaderProps) {
                   to="/editor"
                   className="px-4 py-2 ml-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
                 >
-                  New Article
+                  {t('nav.newArticle')}
                 </Link>
                 <Link
                   to={`/${user.nickname}`}
                   className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${location.pathname === `/${user.nickname}` ? "bg-gray-100 dark:bg-gray-800" : "hover:bg-gray-100 dark:hover:bg-gray-800"}`}
-                  title="Profile"
+                  title={t('nav.profile')}
                 >
                   <User size={18} />
                 </Link>
                 <button
                   onClick={() => { logout(); navigate("/"); }}
                   className="px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
+                  title={t('auth.logout')}
                 >
                   <LogOut size={18} />
                 </button>
@@ -85,7 +88,7 @@ export default function SiteHeader({ onLogoClick }: SiteHeaderProps) {
                 to="/login"
                 className="px-4 py-2 ml-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors flex items-center gap-1"
               >
-                <LogIn size={16} /> Sign In
+                <LogIn size={16} /> {t('auth.login')}
               </Link>
             )}
           </nav>
@@ -106,21 +109,21 @@ export default function SiteHeader({ onLogoClick }: SiteHeaderProps) {
             <>
               <Link to="/editor" onClick={() => setMenuOpen(false)}
                 className="block px-3 py-2 mt-1 rounded-lg bg-blue-600 text-white text-sm font-medium">
-                New Article
+                {t('nav.newArticle')}
               </Link>
               <Link to={`/${user.nickname}`} onClick={() => setMenuOpen(false)}
                 className="block px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800">
-                Profile
+                {t('nav.profile')}
               </Link>
               <button onClick={() => { logout(); navigate("/"); setMenuOpen(false); }}
                 className="block w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950">
-                Sign Out
+                {t('auth.logout')}
               </button>
             </>
           ) : (
             <Link to="/login" onClick={() => setMenuOpen(false)}
               className="block px-3 py-2 mt-1 rounded-lg bg-blue-600 text-white text-sm font-medium">
-              Sign In
+              {t('auth.login')}
             </Link>
           )}
         </div>

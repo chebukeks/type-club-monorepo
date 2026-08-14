@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { MessageCircleMore, X } from "lucide-react";
+import { useLanguage } from "../context/LanguageContext";
 
 interface AddNoteModalProps {
   isOpen: boolean;
@@ -8,6 +9,7 @@ interface AddNoteModalProps {
 }
 
 export default function AddNoteModal({ isOpen, onClose, onSubmit }: AddNoteModalProps) {
+  const { t } = useLanguage();
   const [text, setText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -51,7 +53,7 @@ export default function AddNoteModal({ isOpen, onClose, onSubmit }: AddNoteModal
               <MessageCircleMore size={18} />
             </div>
             <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-              Добавить примечание
+              {t('suggestion.addNoteTitle')}
             </h3>
           </div>
           <button
@@ -68,7 +70,7 @@ export default function AddNoteModal({ isOpen, onClose, onSubmit }: AddNoteModal
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Введите примечание для автора..."
+            placeholder={t('suggestion.addNotePlaceholder')}
             rows={3}
             className="w-full bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-3 text-sm text-gray-900 dark:text-gray-100 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all resize-none placeholder-gray-400"
           />
@@ -79,14 +81,14 @@ export default function AddNoteModal({ isOpen, onClose, onSubmit }: AddNoteModal
             onClick={onClose}
             className="px-4 py-2 text-xs font-medium rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           >
-            Отмена
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleSubmit}
             disabled={!text.trim()}
             className="px-4 py-2 text-xs font-medium rounded-xl bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 transition-colors shadow-sm"
           >
-            Добавить
+            {t('common.create')}
           </button>
         </div>
       </div>

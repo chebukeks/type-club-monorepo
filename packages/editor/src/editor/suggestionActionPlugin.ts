@@ -2,6 +2,14 @@ import { Plugin, PluginKey } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { Mark, Node as PMNode } from "prosemirror-model";
 
+import { getTranslation, Locale } from "../i18n";
+
+function getCurrentLocale(): Locale {
+  if (typeof document === "undefined") return "en";
+  const lang = document.documentElement.getAttribute("lang") || document.documentElement.getAttribute("data-lang");
+  return lang === "ru" ? "ru" : "en";
+}
+
 export const suggestionActionPluginKey = new PluginKey("suggestionAction");
 
 export interface SuggestionActionPluginOptions {
@@ -28,6 +36,7 @@ class SuggestionActionView {
     this.view = view;
     this.userRole = userRole;
 
+    const loc = getCurrentLocale();
     this.popup = document.createElement("div");
     this.popup.className = "suggestion-action-popup";
     this.popup.style.display = "none";
@@ -42,8 +51,8 @@ class SuggestionActionView {
 
     this.acceptBtn = document.createElement("button");
     this.acceptBtn.className = "suggestion-action-btn accept";
-    this.acceptBtn.title = "Принять предложение (Accept)";
-    this.acceptBtn.innerHTML = `${checkIcon} <span>Принять</span>`;
+    this.acceptBtn.title = getTranslation(loc, "suggestion.acceptTitle");
+    this.acceptBtn.innerHTML = `${checkIcon} <span>${getTranslation(loc, "suggestion.accept")}</span>`;
     this.acceptBtn.onmousedown = (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -56,8 +65,8 @@ class SuggestionActionView {
 
     this.rejectBtn = document.createElement("button");
     this.rejectBtn.className = "suggestion-action-btn reject";
-    this.rejectBtn.title = "Отклонить предложение (Reject)";
-    this.rejectBtn.innerHTML = `${xIcon} <span>Отклонить</span>`;
+    this.rejectBtn.title = getTranslation(loc, "suggestion.rejectTitle");
+    this.rejectBtn.innerHTML = `${xIcon} <span>${getTranslation(loc, "suggestion.reject")}</span>`;
     this.rejectBtn.onmousedown = (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -160,8 +169,9 @@ class SuggestionActionView {
       );
 
       this.currentTarget = { type: "mark", mark: targetMark, from, to };
-      const author = targetMark.attrs.sugAuthorName || "Советчик";
-      const actionText = markType === "suggestion_insert" ? "Вставка" : "Удаление";
+      const loc = getCurrentLocale();
+      const author = targetMark.attrs.sugAuthorName || getTranslation(loc, "suggestion.advisorDefaultName");
+      const actionText = markType === "suggestion_insert" ? getTranslation(loc, "suggestion.insert") : getTranslation(loc, "suggestion.delete");
       this.infoLabel.textContent = `${author}: ${actionText}`;
 
       this.showPopupAt(from);
@@ -171,13 +181,14 @@ class SuggestionActionView {
     // 2. Check if cursor is on a block node with sugDelete attribute (e.g. image)
     const node = state.doc.nodeAt($from.pos);
     if (node && node.attrs.sugDelete) {
+      const loc = getCurrentLocale();
       this.currentTarget = {
         type: "block",
         node,
         from: $from.pos,
         to: $from.pos + node.nodeSize,
       };
-      this.infoLabel.textContent = "Удаление блока";
+      this.infoLabel.textContent = getTranslation(loc, "suggestion.blockDelete");
       this.showPopupAt($from.pos);
       return;
     }

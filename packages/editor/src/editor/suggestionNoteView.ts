@@ -1,5 +1,12 @@
 import { NodeView, EditorView } from "prosemirror-view";
 import { Node as PMNode } from "prosemirror-model";
+import { getTranslation, Locale } from "../i18n";
+
+function getCurrentLocale(): Locale {
+  if (typeof document === "undefined") return "en";
+  const lang = document.documentElement.getAttribute("lang") || document.documentElement.getAttribute("data-lang");
+  return lang === "ru" ? "ru" : "en";
+}
 
 const MESSAGE_CIRCLE_ICON = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/><path d="M8 12h.01"/><path d="M12 12h.01"/><path d="M16 12h.01"/></svg>`;
 
@@ -33,6 +40,7 @@ export class SuggestionNoteView implements NodeView {
   }
 
   createBubble(): HTMLElement {
+    const loc = getCurrentLocale();
     const bubble = document.createElement("div");
     bubble.className = "suggestion-note-bubble";
 
@@ -41,11 +49,11 @@ export class SuggestionNoteView implements NodeView {
 
     const authorSpan = document.createElement("span");
     authorSpan.className = "suggestion-note-author";
-    authorSpan.textContent = this.node.attrs.sugAuthorName || "Советчик";
+    authorSpan.textContent = this.node.attrs.sugAuthorName || getTranslation(loc, "suggestion.advisorDefaultName");
 
     const deleteBtn = document.createElement("button");
     deleteBtn.className = "suggestion-note-delete-btn";
-    deleteBtn.title = "Удалить примечание";
+    deleteBtn.title = getTranslation(loc, "suggestion.deleteNote");
     deleteBtn.innerHTML = TRASH_ICON;
     deleteBtn.onmousedown = (e) => {
       e.preventDefault();
@@ -80,7 +88,7 @@ export class SuggestionNoteView implements NodeView {
       document.body.appendChild(this.bubble);
     } else {
       const authorSpan = this.bubble.querySelector(".suggestion-note-author");
-      if (authorSpan) authorSpan.textContent = this.node.attrs.sugAuthorName || "Советчик";
+      if (authorSpan) authorSpan.textContent = this.node.attrs.sugAuthorName || getTranslation(getCurrentLocale(), "suggestion.advisorDefaultName");
       const textDiv = this.bubble.querySelector(".suggestion-note-text");
       if (textDiv) textDiv.textContent = this.node.attrs.noteText || "";
     }

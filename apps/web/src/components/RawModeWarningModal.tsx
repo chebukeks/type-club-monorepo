@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { AlertTriangle, X } from "lucide-react";
+import { useLanguage } from "../context/LanguageContext";
 
 interface RawModeWarningModalProps {
   onConfirm: () => void;
@@ -9,6 +10,7 @@ interface RawModeWarningModalProps {
 export const STORAGE_KEY_HIDE_RAW_WARNING = "typeclub_hide_raw_collab_warning";
 
 export default function RawModeWarningModal({ onConfirm, onCancel }: RawModeWarningModalProps) {
+  const { t } = useLanguage();
   const [dontShowAgain, setDontShowAgain] = useState(false);
 
   const handleConfirm = () => {
@@ -27,7 +29,7 @@ export default function RawModeWarningModal({ onConfirm, onCancel }: RawModeWarn
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2 text-amber-600 dark:text-amber-500">
             <AlertTriangle size={22} />
-            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Переход в Raw-режим</h3>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">{t('rawWarning.title')}</h3>
           </div>
           <button onClick={onCancel} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400">
             <X size={18} />
@@ -35,8 +37,7 @@ export default function RawModeWarningModal({ onConfirm, onCancel }: RawModeWarn
         </div>
 
         <p className="text-sm text-gray-600 dark:text-gray-300 mb-4 leading-relaxed">
-          В Raw-режиме совместная работа приостанавливается: ваши изменения зафиксируются локально и отправятся соавторам только после возврата в режим <strong>Seamless</strong> или <strong>Preview</strong>.
-          Изменения соавторов, сделанные в это время, могут быть перезаписаны.
+          {t('rawWarning.message1')} {t('rawWarning.message2')}
         </p>
 
         <label className="flex items-center gap-2 mb-6 cursor-pointer select-none">
@@ -46,7 +47,7 @@ export default function RawModeWarningModal({ onConfirm, onCancel }: RawModeWarn
             onChange={(e) => setDontShowAgain(e.target.checked)}
             className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           />
-          <span className="text-xs text-gray-500 dark:text-gray-400">Больше не показывать</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">{t('rawWarning.dontShowAgain')}</span>
         </label>
 
         <div className="flex justify-end gap-2">
@@ -54,13 +55,13 @@ export default function RawModeWarningModal({ onConfirm, onCancel }: RawModeWarn
             onClick={onCancel}
             className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
           >
-            Отмена
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleConfirm}
             className="px-4 py-2 text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700"
           >
-            Перейти в Raw
+            {t('rawWarning.confirm')}
           </button>
         </div>
       </div>

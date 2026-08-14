@@ -15,7 +15,7 @@ interface StatsToastProps {
 }
 
 export function StatsToast({ mode = 'right', sidebarWidth = 240, containerWidth }: StatsToastProps) {
-  const { state, setWordLimit } = useEditor()
+  const { state, setWordLimit, t } = useEditor()
   const { tabs, activeTabId, wordLimit } = state
   const activeTab = activeTabId ? tabs.find((t) => t.id === activeTabId) : null
   const [isExpanded, setIsExpanded] = useState(false)
@@ -85,9 +85,10 @@ export function StatsToast({ mode = 'right', sidebarWidth = 240, containerWidth 
 
   if (!activeTab) return null
 
+  const numLocale = state.language === 'ru' ? 'ru-RU' : 'en-US'
   const compactText = wordLimit.enabled
-    ? `${currentValue.toLocaleString('ru-RU')} / ${wordLimit.value.toLocaleString('ru-RU')} ${wordLimit.type === 'chars' ? 'симв.' : 'сл.'}`
-    : `${stats.chars.toLocaleString('ru-RU')} симв.`
+    ? `${currentValue.toLocaleString(numLocale)} / ${wordLimit.value.toLocaleString(numLocale)} ${wordLimit.type === 'chars' ? t('stats.charsShort') : t('stats.wordsShort')}`
+    : `${stats.chars.toLocaleString(numLocale)} ${t('stats.charsShort')}`
 
   const limitColor = isOverLimit
     ? '#ec404eff'
@@ -182,25 +183,25 @@ export function StatsToast({ mode = 'right', sidebarWidth = 240, containerWidth 
 
             {/* Подробная статистика */}
             <div className="menu-item" style={{ cursor: 'default' }}>
-              <span className="text-[var(--text-dim)]">Символы</span>
-              <span className="text-[var(--text-secondary)] tabular-nums">{stats.chars.toLocaleString('ru-RU')}</span>
+              <span className="text-[var(--text-dim)]">{t('stats.chars')}</span>
+              <span className="text-[var(--text-secondary)] tabular-nums">{stats.chars.toLocaleString(numLocale)}</span>
             </div>
             <div className="menu-item" style={{ cursor: 'default' }}>
-              <span className="text-[var(--text-dim)]">Слова</span>
-              <span className="text-[var(--text-secondary)] tabular-nums">{stats.words.toLocaleString('ru-RU')}</span>
+              <span className="text-[var(--text-dim)]">{t('stats.words')}</span>
+              <span className="text-[var(--text-secondary)] tabular-nums">{stats.words.toLocaleString(numLocale)}</span>
             </div>
             <div className="menu-item" style={{ cursor: 'default' }}>
-              <span className="text-[var(--text-dim)]">Предложения</span>
-              <span className="text-[var(--text-secondary)] tabular-nums">{stats.sentences.toLocaleString('ru-RU')}</span>
+              <span className="text-[var(--text-dim)]">{t('stats.sentences')}</span>
+              <span className="text-[var(--text-secondary)] tabular-nums">{stats.sentences.toLocaleString(numLocale)}</span>
             </div>
             <div className="menu-item" style={{ cursor: 'default' }}>
-              <span className="text-[var(--text-dim)]">Абзацы</span>
-              <span className="text-[var(--text-secondary)] tabular-nums">{stats.paragraphs.toLocaleString('ru-RU')}</span>
+              <span className="text-[var(--text-dim)]">{t('stats.paragraphs')}</span>
+              <span className="text-[var(--text-secondary)] tabular-nums">{stats.paragraphs.toLocaleString(numLocale)}</span>
             </div>
             <div className="menu-item" style={{ cursor: 'default' }}>
-              <span className="text-[var(--text-dim)]">Чтение</span>
+              <span className="text-[var(--text-dim)]">{t('stats.reading')}</span>
               <span className="text-[var(--text-secondary)]">
-                {stats.readingMinutes === 1 ? '~1 мин' : `~${stats.readingMinutes} мин`}
+                {t('stats.readingMinutes', { count: stats.readingMinutes })}
               </span>
             </div>
 
@@ -211,18 +212,18 @@ export function StatsToast({ mode = 'right', sidebarWidth = 240, containerWidth 
               wordLimit.enabled ? (
                 <div className="menu-item" style={{ cursor: 'default' }}>
                   <span className="text-[var(--text-dim)]">
-                    Лимит: {wordLimit.value.toLocaleString('ru-RU')} {wordLimit.type === 'chars' ? 'симв.' : 'сл.'}
+                    {t('stats.limit')}: {wordLimit.value.toLocaleString(numLocale)} {wordLimit.type === 'chars' ? t('stats.charsShort') : t('stats.wordsShort')}
                   </span>
                   <span
                     className="text-[var(--accent)] cursor-pointer hover:underline"
                     onClick={handleRemoveLimit}
                   >
-                    Убрать
+                    {t('stats.removeLimit')}
                   </span>
                 </div>
               ) : (
                 <div className="menu-item enabled" onClick={() => setShowLimitInput(true)}>
-                  <span className="text-[var(--accent)]">Задать ограничение</span>
+                  <span className="text-[var(--accent)]">{t('stats.setLimit')}</span>
                 </div>
               )
             ) : (
@@ -251,7 +252,7 @@ export function StatsToast({ mode = 'right', sidebarWidth = 240, containerWidth 
                       borderColor: isSelectOpen ? 'var(--accent)' : 'var(--border-strong)'
                     }}
                   >
-                    <span className="select-none">{limitInputType === 'chars' ? 'симв.' : 'слов'}</span>
+                    <span className="select-none">{limitInputType === 'chars' ? t('stats.charsShort') : t('stats.wordsShort')}</span>
                     <div className="text-[var(--text-dim)] ml-1 pointer-events-none">
                       <svg width="8" height="5" viewBox="0 0 8 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M1 1l3 3 3-3" />
@@ -270,7 +271,7 @@ export function StatsToast({ mode = 'right', sidebarWidth = 240, containerWidth 
                         }}
                         style={{ padding: '5px' }}
                       >
-                        симв.
+                        {t('stats.charsShort')}
                       </div>
                       <div
                         className={`px-3 py-2 text-[13px] cursor-pointer hover:bg-[var(--menu-hover-bg)] ${limitInputType === 'words' ? 'text-[var(--accent)] bg-[var(--menu-hover-bg)]' : 'text-[var(--text-primary)]'}`}
@@ -280,7 +281,7 @@ export function StatsToast({ mode = 'right', sidebarWidth = 240, containerWidth 
                         }}
                         style={{ padding: '5px' }}
                       >
-                        слов
+                        {t('stats.wordsShort')}
                       </div>
                     </div>
                   )}
@@ -292,7 +293,7 @@ export function StatsToast({ mode = 'right', sidebarWidth = 240, containerWidth 
                   className="text-[13px] font-medium rounded bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] transition-colors active:opacity-80"
                   style={{ padding: '6px 12px' }}
                 >
-                  ОК
+                  {t('stats.ok')}
                 </button>
               </div>
             )}

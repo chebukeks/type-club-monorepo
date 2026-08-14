@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { ArticleListItem, articlesApi } from "../api";
+import { useLanguage } from "../context/LanguageContext";
 import { Eye, MessageCircle } from "lucide-react";
 
 interface Props {
@@ -9,6 +10,8 @@ interface Props {
 }
 
 export default function ArticleCard({ article, isModerator, onModerate }: Props) {
+  const { t } = useLanguage();
+
   const handleBlock = async (e: React.MouseEvent) => {
     e.preventDefault();
     try {
@@ -27,7 +30,7 @@ export default function ArticleCard({ article, isModerator, onModerate }: Props)
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.preventDefault();
-    if (!confirm("Delete this article?")) return;
+    if (!confirm(t('articles.deleteConfirm'))) return;
     try {
       await articlesApi.delete(article.id);
       onModerate?.();
@@ -41,7 +44,7 @@ export default function ArticleCard({ article, isModerator, onModerate }: Props)
     >
       <h3 className="font-semibold text-lg mb-1 line-clamp-2">{article.title}</h3>
       <div className="flex items-center gap-2 text-sm text-gray-500 mb-3">
-        <span>by {article.author_nickname}</span>
+        <span>{t('articles.byAuthor', { author: article.author_nickname })}</span>
         <span>·</span>
         <span>{new Date(article.updated_at).toLocaleDateString()}</span>
         {article.access_state !== "public" && (
@@ -73,21 +76,21 @@ export default function ArticleCard({ article, isModerator, onModerate }: Props)
                 onClick={handleUnblock}
                 className="px-2 py-0.5 text-xs rounded-md bg-green-100 dark:bg-green-950 text-green-700 hover:bg-green-200 dark:hover:bg-green-900 transition-colors"
               >
-                Unblock
+                {t('articles.unblock')}
               </button>
             ) : (
               <button
                 onClick={handleBlock}
                 className="px-2 py-0.5 text-xs rounded-md bg-yellow-100 dark:bg-yellow-950 text-yellow-700 hover:bg-yellow-200 dark:hover:bg-yellow-900 transition-colors"
               >
-                Block
+                {t('articles.block')}
               </button>
             )}
             <button
               onClick={handleDelete}
               className="px-2 py-0.5 text-xs rounded-md bg-red-100 dark:bg-red-950 text-red-600 hover:bg-red-200 dark:hover:bg-red-900 transition-colors"
             >
-              Delete
+              {t('common.delete')}
             </button>
           </div>
         )}

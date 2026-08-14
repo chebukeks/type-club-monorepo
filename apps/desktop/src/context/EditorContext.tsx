@@ -4,6 +4,7 @@
 import React, { createContext, useContext, useReducer, useCallback, useEffect, useRef } from 'react'
 import type { AppState, AppAction, FileEntry, ThemeMode, EditorMode, WordLimit, FocusMode, TocLayoutMode, StatsLayoutMode } from '../types'
 import { articlesApi } from '../api'
+import { Locale, TranslationKey, getTranslation } from '@type-club/editor'
 
 // ============================================================
 // Начальное состояние
@@ -15,6 +16,7 @@ const initialState: AppState = {
   fileTree: [],
   creating: null,
   theme: 'dark',
+  language: 'en',
   autosave: true,
   wordLimit: { enabled: false, value: 1000, type: 'chars' },
   showStats: true,
@@ -36,7 +38,7 @@ const initialState: AppState = {
 }
 
 // ============================================================
-// Вспомогательные функции для темы
+// Вспомогательные функции для темы и языка
 // ============================================================
 
 /** Применить тему к DOM */
@@ -46,6 +48,12 @@ function applyThemeToDOM(theme: ThemeMode) {
     resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   }
   document.documentElement.setAttribute('data-theme', resolved)
+}
+
+/** Применить язык к DOM */
+function applyLanguageToDOM(language: Locale) {
+  document.documentElement.setAttribute('lang', language)
+  document.documentElement.setAttribute('data-lang', language)
 }
 
 // ============================================================
@@ -135,6 +143,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, activeExplorerPath: action.payload.path }
     case 'SET_THEME':
       return { ...state, theme: action.payload.theme }
+    case 'SET_LANGUAGE':
+      return { ...state, language: action.payload.language }
     case 'SET_TOC_LAYOUT_MODE':
       return { ...state, tocLayoutMode: action.payload.mode }
     case 'SET_STATS_LAYOUT_MODE':
@@ -236,6 +246,8 @@ interface EditorContextValue {
   moveItem: (sourcePath: string, targetDirPath: string) => Promise<void>
   closeTab: (tabId: string) => Promise<void>
   setTheme: (theme: ThemeMode) => Promise<void>
+  setLanguage: (language: Locale) => Promise<void>
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string
   setEditorMode: (mode: EditorMode) => Promise<void>
   refreshTab: (tabId: string) => void
   setAutosave: (enabled: boolean) => Promise<void>
@@ -274,7 +286,7 @@ const EditorContext = createContext<EditorContextValue | null>(null)
 export function EditorProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState)
 
-  // --- Инициализация темы и autosave при загрузке ---
+  // --- Инициализация темы, языка и autosave при загрузке ---
   useEffect(() => {
     (async () => {
       try {
@@ -282,6 +294,11 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         const theme = savedTheme || 'dark'
         dispatch({ type: 'SET_THEME', payload: { theme } })
         applyThemeToDOM(theme)
+
+        const savedLang = await window.api.storeGet('language') as Locale | undefined
+        const language = savedLang === 'ru' ? 'ru' : 'en'
+        dispatch({ type: 'SET_LANGUAGE', payload: { language } })
+        applyLanguageToDOM(language)
 
         const savedTocLayoutMode = await window.api.storeGet('tocLayoutMode') as TocLayoutMode | undefined
         if (savedTocLayoutMode) dispatch({ type: 'SET_TOC_LAYOUT_MODE', payload: { mode: savedTocLayoutMode } })
@@ -561,6 +578,18 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     applyThemeToDOM(theme)
     try { await window.api.storeSet('theme', theme) } catch (e) { /* ignore */ }
   }, [])
+
+  // --- Установить язык ---
+  const setLanguage = useCallback(async (language: Locale) => {
+    dispatch({ type: 'SET_LANGUAGE', payload: { language } })
+    applyLanguageToDOM(language)
+    try { await window.api.storeSet('language', language) } catch (e) { /* ignore */ }
+  }, [])
+
+  // --- Функция перевода t(key, params) ---
+  const t = useCallback((key: TranslationKey, params?: Record<string, string | number>) => {
+    return getTranslation(state.language, key, params)
+  }, [state.language])
 
   // --- Установить режим редактирования (глобальный) ---
   const setEditorMode = useCallback(async (mode: EditorMode) => {
@@ -969,7 +998,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       startCreating, setActiveExplorerPath,
       renameItem, deleteItem, showInExplorer, startRenaming, moveItem,
       closeTab,
-      setTheme, setEditorMode, refreshTab,
+      setTheme, setLanguage, t, setEditorMode, refreshTab,
       setAutosave, setShowStats, setWordLimit,
       setTypewriterMode, setFocusMode, setShowEmptyFolders,
       setTextZoom, setDocumentZoom,

@@ -11,7 +11,7 @@ interface SettingsPopupProps {
 }
 
 export function SettingsPopup({ onClose }: SettingsPopupProps) {
-  const { state, setAutosave, setShowStats, setTypewriterMode } = useEditor()
+  const { state, setAutosave, setShowStats, setTypewriterMode, t } = useEditor()
   const [spellcheck, setSpellcheckState] = useState(true)
   const popupRef = useRef<HTMLDivElement>(null)
 
@@ -75,7 +75,7 @@ export function SettingsPopup({ onClose }: SettingsPopupProps) {
             <circle cx="12" cy="12" r="3" />
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
           </svg>
-          Настройки
+          {t('settings.title')}
         </span>
       </div>
 
@@ -83,13 +83,13 @@ export function SettingsPopup({ onClose }: SettingsPopupProps) {
 
       {/* Автосохранение */}
       <div className="menu-item enabled" onClick={handleAutosaveToggle}>
-        <span>Автосохранение</span>
+        <span>{t('settings.autosave')}</span>
         <ToggleSwitch enabled={state.autosave} />
       </div>
 
       {/* Проверка орфографии */}
       <div className="menu-item enabled" onClick={handleSpellcheckToggle}>
-        <span>Проверка орфографии</span>
+        <span>{t('settings.spellcheck')}</span>
         <ToggleSwitch enabled={spellcheck} />
       </div>
 
@@ -97,7 +97,7 @@ export function SettingsPopup({ onClose }: SettingsPopupProps) {
 
       {/* Режим печатной машинки */}
       <div className="menu-item enabled" onClick={() => setTypewriterMode(!state.typewriterMode)}>
-        <span>Режим печатной машинки</span>
+        <span>{t('settings.typewriter')}</span>
         <ToggleSwitch enabled={state.typewriterMode} />
       </div>
 
@@ -105,7 +105,7 @@ export function SettingsPopup({ onClose }: SettingsPopupProps) {
 
       {/* Статистика */}
       <div className="menu-item enabled" onClick={() => setShowStats(!state.showStats)}>
-        <span>Статистика</span>
+        <span>{t('settings.stats')}</span>
         <ToggleSwitch enabled={state.showStats} />
       </div>
     </div>

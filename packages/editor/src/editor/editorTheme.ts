@@ -193,7 +193,7 @@ figure[data-sug-delete] {
 }
 
 figure[data-sug-delete]::after {
-  content: "Предложено удалить";
+  content: "Suggested deletion";
   position: absolute;
   top: 8px;
   right: 8px;
@@ -204,6 +204,11 @@ figure[data-sug-delete]::after {
   padding: 2px 8px;
   border-radius: 4px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+html[lang="ru"] figure[data-sug-delete]::after,
+html[data-lang="ru"] figure[data-sug-delete]::after {
+  content: "Предложено удалить";
 }
 
 .suggestion-action-popup {

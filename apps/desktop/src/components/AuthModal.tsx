@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useEditor } from "../context/EditorContext";
 
 interface AuthModalProps {
   onClose: () => void;
@@ -7,6 +8,7 @@ interface AuthModalProps {
 
 export function AuthModal({ onClose }: AuthModalProps) {
   const { login, register } = useAuth();
+  const { t } = useEditor();
   const [tab, setTab] = useState<"login" | "register">("login");
 
   const [email, setEmail] = useState("");
@@ -37,7 +39,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
       await login(email, password);
       onClose();
     } catch (err: any) {
-      setError(err.message || "Login failed");
+      setError(err.message || t('auth.loginFailed'));
     } finally {
       setLoading(false);
     }
@@ -47,7 +49,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
     e.preventDefault();
     setError("");
     if (password !== confirm) {
-      setError("Passwords do not match");
+      setError(t('auth.passwordsDoNotMatch'));
       return;
     }
     setLoading(true);
@@ -55,14 +57,14 @@ export function AuthModal({ onClose }: AuthModalProps) {
       await register(nickname, email, password, confirm);
       onClose();
     } catch (err: any) {
-      setError(err.message || "Registration failed");
+      setError(err.message || t('auth.registerFailed'));
     } finally {
       setLoading(false);
     }
   };
 
-  const switchTab = (t: "login" | "register") => {
-    setTab(t);
+  const switchTab = (tName: "login" | "register") => {
+    setTab(tName);
     setError("");
   };
 
@@ -75,13 +77,13 @@ export function AuthModal({ onClose }: AuthModalProps) {
             onClick={() => switchTab("login")}
             className={`modal-tab ${tab === "login" ? "active" : ""}`}
           >
-            Sign In
+            {t('auth.login')}
           </button>
           <button
             onClick={() => switchTab("register")}
             className={`modal-tab ${tab === "register" ? "active" : ""}`}
           >
-            Register
+            {t('auth.register')}
           </button>
         </div>
 
@@ -90,7 +92,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
         {tab === "login" ? (
           <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
-              <label className="modal-label">Email</label>
+              <label className="modal-label">{t('auth.email')}</label>
               <input
                 type="email"
                 required
@@ -100,7 +102,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
               />
             </div>
             <div>
-              <label className="modal-label">Password</label>
+              <label className="modal-label">{t('auth.password')}</label>
               <input
                 type="password"
                 required
@@ -110,13 +112,13 @@ export function AuthModal({ onClose }: AuthModalProps) {
               />
             </div>
             <button type="submit" disabled={loading} className="btn-primary">
-              {loading ? "Signing in..." : "Sign In"}
+              {loading ? t('auth.signingIn') : t('auth.login')}
             </button>
           </form>
         ) : (
           <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
-              <label className="modal-label">Nickname</label>
+              <label className="modal-label">{t('auth.nickname')}</label>
               <input
                 type="text"
                 required
@@ -127,7 +129,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
               />
             </div>
             <div>
-              <label className="modal-label">Email</label>
+              <label className="modal-label">{t('auth.email')}</label>
               <input
                 type="email"
                 required
@@ -137,7 +139,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
               />
             </div>
             <div>
-              <label className="modal-label">Password</label>
+              <label className="modal-label">{t('auth.password')}</label>
               <input
                 type="password"
                 required
@@ -148,7 +150,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
               />
             </div>
             <div>
-              <label className="modal-label">Confirm Password</label>
+              <label className="modal-label">{t('auth.confirmPassword')}</label>
               <input
                 type="password"
                 required
@@ -158,7 +160,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
               />
             </div>
             <button type="submit" disabled={loading} className="btn-primary">
-              {loading ? "Creating account..." : "Create Account"}
+              {loading ? t('auth.creatingAccount') : t('auth.createAccount')}
             </button>
           </form>
         )}

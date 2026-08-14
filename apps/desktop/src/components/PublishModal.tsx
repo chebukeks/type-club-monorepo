@@ -8,18 +8,12 @@ interface PublishModalProps {
   onClose: () => void;
 }
 
-const states = [
-  { value: "private", label: "Private", desc: "Only you can see it" },
-  { value: "link", label: "Link access", desc: "Anyone with the link" },
-  { value: "public", label: "Public", desc: "Visible on the articles page" },
-];
-
 const VALID_SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
-function slugError(s: string): string | null {
-  if (!s.trim()) return "Slug cannot be empty";
-  if (!VALID_SLUG.test(s)) return "Use only a–z, 0–9, and hyphens (not at start/end, no consecutive)";
-  if (s.length > 80) return "Slug is too long (max 80)";
+function getSlugError(s: string, t: (k: any) => string): string | null {
+  if (!s.trim()) return t('publish.slugErrorEmpty');
+  if (!VALID_SLUG.test(s)) return t('publish.slugErrorChars');
+  if (s.length > 80) return t('publish.slugErrorLength');
   return null;
 }
 
@@ -29,23 +23,29 @@ export function generateRandomSlug(): string {
 
 export function PublishModal({ onClose }: PublishModalProps) {
   const { user } = useAuth();
-  const { state } = useEditor();
+  const { state, t } = useEditor();
   const username = user?.nickname || "username";
 
-  const activeTab = state.tabs.find((t) => t.id === state.activeTabId);
+  const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId);
   const articleContent = activeTab?.content || "";
   const articleId = activeTab?.articleId;
   const isExisting = !!articleId;
 
   const [loading, setLoading] = useState(isExisting);
 
-  const defaultFn = activeTab?.fileName?.replace(/\.md$/, "") || "Untitled";
+  const defaultFn = activeTab?.fileName?.replace(/\.md$/, "") || t('common.untitled');
   const [title, setTitle] = useState(isExisting ? defaultFn : defaultFn);
   const [accessState, setAccessState] = useState<string>("private");
   const [slug, setSlug] = useState(isExisting ? _slugify(defaultFn) : generateRandomSlug());
   const [copied, setCopied] = useState(false);
   const [status, setStatus] = useState<"idle" | "publishing" | "done" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+
+  const states = [
+    { value: "private", label: t('publish.private'), desc: t('publish.privateDesc') },
+    { value: "link", label: t('publish.link'), desc: t('publish.linkDesc') },
+    { value: "public", label: t('publish.public'), desc: t('publish.publicDesc') },
+  ];
 
   const overlayMouseDownRef = useRef(false);
 
@@ -80,7 +80,7 @@ export function PublishModal({ onClose }: PublishModalProps) {
     return () => { cancelled = true; };
   }, [articleId]);
 
-  const titleError = !title.trim() ? "Title cannot be empty" : null;
+  const titleError = !title.trim() ? t('publish.titleError') : null;
 
   const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
@@ -92,7 +92,7 @@ export function PublishModal({ onClose }: PublishModalProps) {
   };
 
   const finalSlug = slug.trim() || (isExisting ? _slugify(title) : generateRandomSlug());
-  const serr = slugError(finalSlug);
+  const serr = getSlugError(finalSlug, t);
 
   const handlePublish = async () => {
     if (serr || titleError) return;
@@ -119,7 +119,7 @@ export function PublishModal({ onClose }: PublishModalProps) {
       }
       setStatus("done");
     } catch (err: any) {
-      setErrorMsg(err.message || "Failed to publish");
+      setErrorMsg(err.message || t('publish.publishFailed'));
       setStatus("error");
     }
   };
@@ -142,17 +142,17 @@ export function PublishModal({ onClose }: PublishModalProps) {
         >
           <div style={{ fontSize: "28px", marginBottom: "12px", color: "var(--accent)" }}>✓</div>
           <h2 className="modal-title" style={{ marginBottom: "8px" }}>
-            {isExisting ? "Updated!" : "Published!"}
+            {isExisting ? t('publish.updated') : t('publish.published')}
           </h2>
           <p style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "16px" }}>
             {`${new URL(config.siteUrl).hostname}/${username}/${finalSlug}`}
           </p>
           <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
             <button onClick={handleCopy} className="btn-primary" style={{ width: "auto" }}>
-              {copied ? "Copied!" : "Copy Link"}
+              {copied ? t('publish.copied') : t('publish.copyLink')}
             </button>
             <button onClick={onClose} className="btn-secondary">
-              Close
+              {t('common.close')}
             </button>
           </div>
         </div>
@@ -169,7 +169,7 @@ export function PublishModal({ onClose }: PublishModalProps) {
       >
         <div className="modal-header">
           <h2 className="modal-title">
-            {isExisting ? "Update Article" : "Share to Type Club"}
+            {isExisting ? t('publish.updateArticle') : t('publish.shareToTypeClub')}
           </h2>
           <button onClick={onClose} className="modal-close">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -181,20 +181,20 @@ export function PublishModal({ onClose }: PublishModalProps) {
 
         {loading ? (
           <div style={{ padding: "40px 0", textAlign: "center" }}>
-            <div style={{ fontSize: "13px", color: "var(--text-dim)" }}>Loading…</div>
+            <div style={{ fontSize: "13px", color: "var(--text-dim)" }}>{t('common.loading')}</div>
           </div>
         ) : (
           <>
             {status === "error" && <div className="modal-error">{errorMsg}</div>}
 
             <div style={{ marginBottom: "16px" }}>
-              <label className="modal-label">Title</label>
+              <label className="modal-label">{t('publish.articleTitle')}</label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 className={`modal-input ${titleError ? "error" : ""}`}
-                placeholder="Article title"
+                placeholder={t('publish.titlePlaceholder')}
               />
               {titleError && <p className="modal-field-error">{titleError}</p>}
             </div>
@@ -217,7 +217,7 @@ export function PublishModal({ onClose }: PublishModalProps) {
             </div>
 
             <div style={{ marginBottom: "20px" }}>
-              <label className="modal-label">Article slug</label>
+              <label className="modal-label">{t('publish.slug')}</label>
               <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: "var(--text-dim)" }}>
                 <span>{new URL(config.siteUrl).hostname}/{username}/</span>
                 <input
@@ -231,7 +231,7 @@ export function PublishModal({ onClose }: PublishModalProps) {
                 <button
                   onClick={handleCopy}
                   className="modal-close"
-                  title="Copy link"
+                  title={t('publish.copyLink')}
                 >
                   {copied ? (
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -254,10 +254,10 @@ export function PublishModal({ onClose }: PublishModalProps) {
               className="btn-primary"
             >
               {status === "publishing"
-                ? "Publishing..."
+                ? t('publish.publishing')
                 : isExisting
-                  ? "Update"
-                  : "Publish"}
+                  ? t('publish.update')
+                  : t('publish.publish')}
             </button>
           </>
         )}
