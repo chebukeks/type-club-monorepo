@@ -166,6 +166,10 @@ packages/editor/
     ├── index.ts              # Публичный API пакета
     ├── types.ts              # EditorMode, EditorProps, FocusMode, TocItem, CollaborationConfig
     ├── EditorCore.tsx         # Базовый компонент редактора ( seamless / raw / preview )
+    ├── i18n/                 # Интернационализация и словари
+    │   ├── index.ts          #   Экспорт getTranslation, createTranslator, типов
+    │   ├── en.ts             #   Словарь английского языка (источник типов)
+    │   └── ru.ts             #   Словарь русского языка
     └── editor/               # Плагины ProseMirror
         ├── schema.ts              # Схема документа (ноды + марки)
         ├── markdownConfig.ts      # Парсер + Сериализатор (MD ↔ PM) + generateExportHtml()
@@ -439,6 +443,59 @@ style={{ padding: '6px 12px' }}  // для кнопочной строки
 ### Единый дизайн модальных окон
 
 Все модалки используют CSS-классы: `.modal-overlay`, `.modal-panel`, `.modal-title`, `.modal-input`, `.btn-primary`, `.btn-secondary` и т.д. Определены в `src/index.css`.
+
+---
+
+## Интернационализация и локализация (i18n)
+
+Вся текстовая локализация проекта централизована в пакете `@type-club/editor/src/i18n/`.
+
+### Структура и типобезопасность
+
+- `packages/editor/src/i18n/en.ts` — основной английский словарь. Тип `TranslationKey` определяется автоматически как `keyof typeof en`.
+- `packages/editor/src/i18n/ru.ts` — русский словарь со строгой проверкой соответствия ключей `Record<TranslationKey, string>`.
+- `packages/editor/src/i18n/index.ts` — хелперы `getTranslation(locale, key, params)` и `createTranslator(locale)`.
+
+### Использование в Web-приложении
+
+```tsx
+import { useLanguage } from '../context/LanguageContext';
+
+export function MyComponent() {
+  const { t, language, setLanguage } = useLanguage();
+  return (
+    <div>
+      <h1>{t('articles.title')}</h1>
+      <p>{t('articles.viewsCount', { count: 42 })}</p>
+    </div>
+  );
+}
+```
+
+### Использование в Desktop-приложении
+
+```tsx
+import { useEditor } from '../context/EditorContext';
+
+export function MyDesktopComponent() {
+  const { t, language, setLanguage } = useEditor();
+  return <button>{t('common.save')}</button>;
+}
+```
+
+### Использование в ванильном JS / плагинах ProseMirror
+
+```ts
+import { getTranslation, Locale } from '@type-club/editor';
+
+const label = getTranslation('ru', 'suggestion.accept');
+```
+
+### Добавление новых ключей
+
+1. Добавьте ключ и английский текст в `packages/editor/src/i18n/en.ts`.
+2. Добавьте соответствующий перевод в `packages/editor/src/i18n/ru.ts`. Если ключ пропущен или опечатан, TypeScript выдаст ошибку сборки.
+3. Используйте ключ через `t('your.key')`.
 
 ---
 

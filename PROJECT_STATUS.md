@@ -1,11 +1,12 @@
 # Статус проекта Type-Club Monorepo
 
-Дата обновления: 11 августа 2026 г.
+Дата обновления: 15 августа 2026 г.
 
 ---
 
 ## 1. Текущие цели
 
+- **Интернационализация и многоязычность (i18n)**: Полноценная поддержка переключения языков (English / Русский) в веб- и десктоп-приложениях с единым типобезопасным словарем в пакете `@type-club/editor`.
 - **Интерактивное и адаптивное оглавление (ToC)**: Единый UX оглавления и предложений на десктопе, вебе и в режиме чтения (`ReadArticle`), с поддержкой раздельного (сайдбар) и совмещенного (плавающая кнопка/дравер) режимов.
 - **Стандартизация дизайна меню и поп-апов**: Единый визуальный язык для контекстных меню, дропдаунов, попапов настроек и статистики с современными Enter & Exit анимациями и эффектами размытия (glassmorphism).
 - **Разграничение прав и режимов редактирования**: Изоляция режимов Автор (`author`), Соавтор (`co_author`) и Советчик (`editor`).
@@ -13,9 +14,25 @@
 
 ---
 
-## 2. Завершённые задачи (Этап 10-11 августа 2026 г.)
+## 2. Завершённые задачи
 
-### 2.1 Дизайн, адаптивность и логика Оглавления (ToC)
+### 2.1 Интернационализация и локализация (i18n, 14–15 августа 2026 г.)
+- **Единый типобезопасный словарь (`packages/editor/src/i18n`)**:
+  - Создана система переводов с поддержкой динамических параметров (`{col}`, `{count}`, `{author}`, `{page}`, `{totalPages}`).
+  - Строгая типизация `TranslationKey = keyof typeof en`, гарантирующая синхронность ключей между `en.ts` и `ru.ts` на этапе компиляции TypeScript.
+  - Экспортированы утилиты `getTranslation()`, `createTranslator()`, `applyLanguageToDOM()`.
+- **Локализация Desktop-приложения (`apps/desktop`)**:
+  - Добавлено переключение языка в меню **View → Language → English / Русский** с сохранением в `electron-store` / `EditorContext`.
+  - Полностью локализованы: `MenuBar`, `TitleBar`, `TabBar`, `Sidebar`, `SearchBar`, `TableOfContents`, `SettingsPopup`, `StatsToast`, модальные окна (`AuthModal`, `PublishModal`, `CollaborationModal`, `AddNoteModal`, `RawModeWarningModal`, `UserAutocompleteInput`), контекстные меню редактора, конструкторы таблиц и блоков кода.
+- **Локализация Web-приложения (`apps/web`)**:
+  - Создан `LanguageContext` с сохранением выбранного языка в `localStorage` (`typeclub_language`) и динамическим обновлением `document.documentElement.lang`.
+  - Добавлен переключатель языка в шапку сайта рядом с темой (`ThemeSwitcher`).
+  - Полностью переведены все страницы: `Landing`, `Login`, `Register`, `ForgotPassword`, `ResetPassword`, `VerifyEmail`, `Download`, `Articles`, `MyArticles`, `ReadArticle` (включая бейджи доступа, форматирование дат, счетчики просмотров/лайков и действия), `Editor`, `Settings`, `UserProfile`, `JoinPage`.
+  - Локализованы компоненты: `SiteHeader`, `EditorHeader`, `ArticleCard`, `ArticleStats`, `AuthorFilter`, `CommentSection` (с относительными датами), `ErrorBoundary`, `TableOfContents`.
+- **Локализация ProseMirror-плагинов (`packages/editor`)**:
+  - Тултипы и интерфейсы принятия/отклонения правок в `suggestionActionPlugin` и `suggestionNoteView` адаптированы под текущую локаль.
+
+### 2.2 Дизайн, адаптивность и логика Оглавления (ToC)
 - **Адаптивный вынос оглавления в правое поле редакторов**:
   - В десктопном и веб-редакторах динамически вычисляется свободное пространство справа от холста с учетом масштабирования документа (`docScale`). При достаточном месте оглавление отображается правым сайдбаром, при нехватке — автоматически переключается на плавающую кнопку.
   - На странице `ReadArticle.tsx` оглавление позиционируется относительно центра статьи (`left: calc(50vw + 408px)`), с брейкпоинтом `@media (min-width: 1240px)`.
@@ -25,7 +42,7 @@
 - **Навигация и переход к предложениям**:
   - Реализованы слушатели событий `editor-scroll-to` и `editor-scroll-to-suggestion` на вебе и десктопе. Клик по пункту оглавления или предложению плавно скроллит редактор к целевому узлу с выделением диапазона текста и установкой фокуса.
 
-### 2.2 Стандартизация элементов управления и анимации
+### 2.3 Стандартизация элементов управления и анимации
 - **Единый стиль разделителей (`sep`)**:
   - Все разделители в контекстных меню (`MarkdownEditor`, `Sidebar`), главных меню (`MenuBar`), поп-апе профиля (`TitleBar`), настройках (`SettingsPopup`) и статистике (`StatsToast`) приведены к каноническому стилю ToC (`border-t border-[var(--border-default)] my-1.5 mx-2 opacity-80`).
 - **Анимации появления и исчезновения (Enter & Exit Animations)**:
@@ -37,7 +54,7 @@
 - **Положение попапа масштабирования**:
   - Попап процента зума закреплен строго по центру снизу (`fixed bottom-6 left-1/2 -translate-x-1/2 z-50`).
 
-### 2.3 Стабильность веб-приложения и обработка ошибок
+### 2.4 Стабильность веб-приложения и обработка ошибок
 - **Предохранитель ошибок (`ErrorBoundary`)**:
   - Создан компонент `ErrorBoundary.tsx`, предотвращающий "белый экран" в веб-приложении при неперехваченных JS-исключениях в React 18.
 - **Исправление нарушения правил хуков (Rules of Hooks)**:
@@ -49,14 +66,17 @@
 
 ## 3. Ключевые технические решения и архитектура
 
-1. **Динамический расчет правого сайдбара**:
+1. **Единый словарь локализации `@type-club/editor/i18n`**:
+   - Словарь ключей `en.ts` выступает источником истины типов (`type TranslationKey = keyof typeof en`). Любое расхождение в `ru.ts` немедленно отслеживается компилятором.
+   - Поддержка параметров интерполяции `t('key', { name: value })` для динамических строк.
+2. **Динамический расчет правого сайдбара**:
    - `leftPos = containerWidth / 2 + docHalfWidth + 16`, где `docHalfWidth = 430 * docScale`.
    - Позволяет плавно убирать/показывать сайдбар оглавления в зависимости от доступных пикселей справа от редактора.
-2. **CSS Grid Accordion Pattern**:
+3. **CSS Grid Accordion Pattern**:
    - Для раскрывающихся контейнеров без фиксированной JS-высоты используется CSS-сетка: `grid transition-all duration-200 ease-out grid-rows-[0fr]` → `grid-rows-[1fr]`, исключающая визуальные рывки.
-3. **Безопасное размонтирование поповеров**:
+4. **Безопасное размонтирование поповеров**:
    - Для сохранения анимаций скрытия в чистом React применяются либо таймеры задержки удержания монтирования (`mounted`), либо внутренний флаг `closing` перед вызовом родительского `onClose()`.
-4. **Безопасность слушателей ProseMirror**:
+5. **Безопасность слушателей ProseMirror**:
    - Все обработчики событий прокрутки (`editor-scroll-to-suggestion`) проверяют `view.isDestroyed` и вычисляют родительский контейнер скролла, не ломая цепочку при неполной отрисовке DOM.
 
 ---
@@ -65,32 +85,30 @@
 
 | Файл | Описание изменений |
 |------|-------------------|
-| [`apps/web/src/components/TableOfContents.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/components/TableOfContents.tsx) | Исправление порядка хуков, добавление enter/exit анимаций плавающей панели. |
-| [`apps/desktop/src/components/TableOfContents.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/components/TableOfContents.tsx) | Вынос оглавления, исправление порядка хуков, добавление enter/exit анимаций. |
-| [`apps/desktop/src/components/MarkdownEditor.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/components/MarkdownEditor.tsx) | Добавление события `editor-scroll-to-suggestion`, стандартизация `sep`, анимации контекстных меню. |
-| [`apps/web/src/components/MarkdownEditor.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/components/MarkdownEditor.tsx) | Обработка клика по предложениям, плавный скролл с фокусом и выделением. |
-| [`apps/desktop/src/components/MenuBar.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/components/MenuBar.tsx) | Обёртка дропдаунов в `AnimatedMenu`, стандартизация разделителей. |
-| [`apps/desktop/src/components/TitleBar.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/components/TitleBar.tsx) | Анимация выхода меню профиля, стиль разделителей. |
-| [`apps/desktop/src/components/SettingsPopup.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/components/SettingsPopup.tsx) | Анимация выхода настроек, стиль разделителей. |
-| [`apps/desktop/src/components/StatsToast.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/components/StatsToast.tsx) | Анимация раскрытия по наведению на CSS Grid, стиль разделителей. |
-| [`apps/desktop/src/components/Sidebar.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/components/Sidebar.tsx) | Анимация вылета контекстных меню, аккордеон ToC у текущего файла. |
-| [`apps/web/src/pages/ReadArticle.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/pages/ReadArticle.tsx) | Исправление формулы `left` позиционирования десктопного ToC сайдбара. |
-| [`apps/web/src/index.css`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/index.css) | Обновлены медиазапросы брейкпоинтов оглавления (`@media (min-width: 1240px)`). |
-| [`apps/web/src/components/ErrorBoundary.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/components/ErrorBoundary.tsx) | **[NEW]** Компонент предохранителя веб-приложения от упавших компонентов. |
+| [`packages/editor/src/i18n/`](file:///c:/git/type-club/type-club-monorepo/packages/editor/src/i18n/) | **[NEW]** Модуль интернационализации (`en.ts`, `ru.ts`, `index.ts`), строгая типизация и хелперы. |
+| [`apps/web/src/context/LanguageContext.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/context/LanguageContext.tsx) | **[NEW]** Контекст языка веб-приложения с персистенцией в `localStorage`. |
+| [`apps/web/src/components/ThemeSwitcher.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/components/ThemeSwitcher.tsx) | Добавлен переключатель языка (English / Русский) в дропдаун темы. |
+| [`apps/desktop/src/components/MenuBar.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/components/MenuBar.tsx) | Добавлено подменю **View → Language → English / Русский**, локализация всех пунктов меню. |
+| [`apps/desktop/src/context/EditorContext.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/context/EditorContext.tsx) | Хранение `language`, экспорт `t()`, персистенция в `electron-store`. |
+| [`apps/web/src/pages/ReadArticle.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/pages/ReadArticle.tsx) | Локализация бейджей доступа, форматирования дат, кнопок Edit/Suggest, оглавления. |
+| [`apps/web/src/components/CommentSection.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/components/CommentSection.tsx) | Полный перевод секции комментариев и относительного времени. |
+| [`apps/web/src/components/ArticleStats.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/components/ArticleStats.tsx) | Локализация счетчиков просмотров, лайков и копирования ссылки. |
+| [`apps/desktop/src/components/MarkdownEditor.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/components/MarkdownEditor.tsx) | Локализация контекстных меню, модалок создания таблиц и кода. |
+| [`apps/web/src/components/MarkdownEditor.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/components/MarkdownEditor.tsx) | Локализация контекстных меню, модалок создания таблиц и кода. |
+| [`apps/web/src/components/ErrorBoundary.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/components/ErrorBoundary.tsx) | Компонент предохранителя веб-приложения от упавших компонентов. |
 | [`apps/web/vite.config.ts`](file:///c:/git/type-club/type-club-monorepo/apps/web/vite.config.ts) | Зафиксирован `port: 5173` и `strictPort: true`. |
 
 ---
 
 ## 5. Результаты тестирования и проверки
 
-- **Сборка Desktop (TypeScript)**: `npx tsc --noEmit -p apps/desktop/tsconfig.json` выполняется с кодом `0` (0 ошибок).
-- **Сборка Web (Vite / TypeScript)**: `npm run build:web` выполняется с кодом `0` (0 ошибок).
+- **Сборка Core (@type-club/editor)**: `npx tsc --noEmit -p packages/editor/tsconfig.json` → `0` ошибок.
+- **Сборка Desktop (TypeScript)**: `npx tsc --noEmit -p apps/desktop/tsconfig.json` → `0` ошибок.
+- **Сборка Web (Vite / TypeScript)**: `npm run build:web` → `0` ошибок.
 - **Проведенные сценарии проверки**:
-  - Клик по предложению в оглавлении (десктоп/веб) → переход к строке с фокусировкой редактора и плавным скроллом.
-  - Наведение на `StatsToast` → плавное раскрытие без выталкивания кнопок.
-  - Открытие/закрытие меню `File`, `View`, `Settings`, контекстных меню → плавное появление и растворение.
-  - Страница `ReadArticle` → оглавление отображается на десктопе справа от статьи, не накладываясь на текст.
-  - Отсутствие зависших процессов на порту `5174` → приложению гарантирован порт `5173`.
+  - Переключение языка в веб-версии (`ThemeSwitcher`) → мгновенное обновление текста на странице, в шапке, на странице чтения `ReadArticle`, комментариях и редакторе без перезагрузки.
+  - Переключение языка в десктоп-версии (`View → Language`) → обновление всех меню, сайдбара, вкладок, ToC, диалогов и контекстных меню.
+  - Сохранение языка в `localStorage` на вебе и `electron-store` на десктопе при перезапуске приложения.
 
 ---
 
