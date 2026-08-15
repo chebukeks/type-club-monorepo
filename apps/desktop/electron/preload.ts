@@ -112,6 +112,56 @@ contextBridge.exposeInMainWorld('api', {
     return ipcRenderer.invoke('spellcheck:get')
   },
 
+  /** Получить активные языки проверки орфографии */
+  getSpellcheckLanguages: (): Promise<string[]> => {
+    return ipcRenderer.invoke('spellcheck:getLanguages')
+  },
+
+  /** Установить активные языки проверки орфографии */
+  setSpellcheckLanguages: (languages: string[]): Promise<boolean> => {
+    return ipcRenderer.invoke('spellcheck:setLanguages', languages)
+  },
+
+  /** Получить список пользовательских слов */
+  getCustomDictionaryWords: (): Promise<string[]> => {
+    return ipcRenderer.invoke('spellcheck:getCustomWords')
+  },
+
+  /** Добавить слово в пользовательский словарь */
+  addCustomWord: (word: string): Promise<boolean> => {
+    return ipcRenderer.invoke('spellcheck:addCustomWord', word)
+  },
+
+  /** Удалить слово из пользовательского словаря */
+  removeCustomWord: (word: string): Promise<boolean> => {
+    return ipcRenderer.invoke('spellcheck:removeCustomWord', word)
+  },
+
+  /** Проверить, считается ли слово ошибочным по спеллчекеру */
+  isWordMisspelled: (word: string): boolean => {
+    try {
+      return webFrame.isWordMisspelled(word)
+    } catch {
+      return false
+    }
+  },
+
+  /** Получить варианты исправлений для слова */
+  getWordSuggestions: (word: string): string[] => {
+    try {
+      return webFrame.getWordSuggestions(word)
+    } catch {
+      return []
+    }
+  },
+
+  /** Подписаться на данные контекстного меню спеллчекера */
+  onContextMenuInfo: (callback: (info: { misspelledWord: string; dictionarySuggestions: string[]; x: number; y: number }) => void) => {
+    const subscription = (_event: unknown, info: { misspelledWord: string; dictionarySuggestions: string[]; x: number; y: number }) => callback(info)
+    ipcRenderer.on('context-menu-info', subscription)
+    return () => ipcRenderer.off('context-menu-info', subscription)
+  },
+
   // ==========================================
   // Управление окном (frameless window)
   // ==========================================

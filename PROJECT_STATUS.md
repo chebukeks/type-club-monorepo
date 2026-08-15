@@ -38,7 +38,7 @@
   - На странице `ReadArticle.tsx` оглавление позиционируется относительно центра статьи (`left: calc(50vw + 408px)`), с брейкпоинтом `@media (min-width: 1240px)`.
 - **Режимы отображения ToC (Вместе / Раздельно)**:
   - Режим `separate`: заголовки выводятся под открытым файлом в сайдбаре.
-  - Режим `combined`: оглавление и предложения выносятся в плавающую панель (поповер/дравер).
+  - Режим `combined`: оглавление и предложения выносятся в плавующую панель (поповер/дравер).
 - **Навигация и переход к предложениям**:
   - Реализованы слушатели событий `editor-scroll-to` и `editor-scroll-to-suggestion` на вебе и десктопе. Клик по пункту оглавления или предложению плавно скроллит редактор к целевому узлу с выделением диапазона текста и установкой фокуса.
 
@@ -61,6 +61,20 @@
   - В `TableOfContents.tsx` вызовы `useState(mounted)` и `useEffect` вынесены до условного раннего `return null`, что устранило падение React при смене состояний `hasToc`.
 - **Строгая привязка портов Vite**:
   - В `apps/web/vite.config.ts` зафиксированы `port: 5173` и `strictPort: true`, исключающие случайный уход веб-клиента на порт `5174` при наличии зависших фоновых процессов.
+
+### 2.5 Модальное окно настроек и управление словарями спеллчекера (15 августа 2026 г.)
+- **Полноценное окно настроек десктоп-приложения (`SettingsModal.tsx`)**:
+  - Реализован кастомный лейаут настроек: слева вертикальные сегментированные вкладки («Тема», «Язык и словари», «Горячие клавиши»), справа область настроек текущей категории.
+  - Дизайн без лишних перегородок с поддержкой тем оформления, плавных анимаций открытия/закрытия, закрытия по Escape и клику вне окна.
+  - Открытие модалки доступно по клику на пункт «Настройки» в шестеренке `TitleBar` и по глобальному событию `open-settings`.
+- **Раздел «Язык и словари»**:
+  - **Язык интерфейса**: выбор между «Русский» и «English» с немедленным обновлением всего приложения.
+  - **Словари**: независимые чекбоксы включения русского (`ru-RU`) и английского (`en-US`) словарей проверки орфографии через `session.setSpellCheckerLanguages(...)`.
+  - **Пользовательский словарь**: добавление кастомных слов через инпут (Enter / кнопка) и удаление слов из словаря с моментальным обновлением спеллчекера Electron.
+- **Интеграция со спеллчекером и контекстным меню редактора (`MarkdownEditor.tsx`)**:
+  - Точное определение слова под курсором или выделения в ProseMirror через `getWordAtDocPos`.
+  - При клике по ошибочному слову контекстное меню выводит варианты исправлений (клик сразу заменяет слово в документе) и кнопку **«Добавить в словарь»**.
+  - Включение встроенного движка Hunspell (`--disable-features=WinUseBrowserSpellChecker`) для надежной и быстрой работы спеллчекера на всех версиях Windows.
 
 ---
 
@@ -85,16 +99,20 @@
 
 | Файл | Описание изменений |
 |------|-------------------|
-| [`packages/editor/src/i18n/`](file:///c:/git/type-club/type-club-monorepo/packages/editor/src/i18n/) | **[NEW]** Модуль интернационализации (`en.ts`, `ru.ts`, `index.ts`), строгая типизация и хелперы. |
-| [`apps/web/src/context/LanguageContext.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/context/LanguageContext.tsx) | **[NEW]** Контекст языка веб-приложения с персистенцией в `localStorage`. |
-| [`apps/web/src/components/ThemeSwitcher.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/components/ThemeSwitcher.tsx) | Добавлен переключатель языка (English / Русский) в дропдаун темы. |
-| [`apps/desktop/src/components/MenuBar.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/components/MenuBar.tsx) | Добавлено подменю **View → Language → English / Русский**, локализация всех пунктов меню. |
-| [`apps/desktop/src/context/EditorContext.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/context/EditorContext.tsx) | Хранение `language`, экспорт `t()`, персистенция в `electron-store`. |
-| [`apps/web/src/pages/ReadArticle.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/pages/ReadArticle.tsx) | Локализация бейджей доступа, форматирования дат, кнопок Edit/Suggest, оглавления. |
+| [`apps/desktop/src/components/SettingsModal.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/components/SettingsModal.tsx) | **[NEW]** Модалка настроек приложения с вкладками Тема, Язык и словари, Горячие клавиши, формой и списком пользовательского словаря. |
+| [`apps/desktop/src/components/MarkdownEditor.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/components/MarkdownEditor.tsx) | Точное извлечение слова `getWordAtDocPos`, вывод вариантов исправлений и кнопки «Добавить в словарь» в контекстном меню. |
+| [`apps/desktop/electron/main.ts`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/electron/main.ts) | Настройка Hunspell, IPC-хэндлеры для спеллчекер-словарей и пользовательских слов. |
+| [`apps/desktop/electron/preload.ts`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/electron/preload.ts) | Мост `window.api` для спеллчекера (`isWordMisspelled`, `getWordSuggestions`, `addCustomWord`, `removeCustomWord`). |
+| [`apps/desktop/src/types.ts`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/types.ts) | Типизация `IElectronAPI` для словарей и спеллчекера. |
+| [`apps/desktop/src/components/SettingsPopup.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/components/SettingsPopup.tsx) | Кликабельный пункт «Настройки» для открытия `SettingsModal`. |
+| [`apps/desktop/src/components/TitleBar.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/components/TitleBar.tsx) | Состояние модалки настроек и прослушивание события `open-settings`. |
+| [`packages/editor/src/EditorCore.tsx`](file:///c:/git/type-club/type-club-monorepo/packages/editor/src/EditorCore.tsx) | Явный атрибут `attributes: { spellcheck: 'true' }` на DOM-элементе ProseMirror. |
+| [`packages/editor/src/i18n/`](file:///c:/git/type-club/type-club-monorepo/packages/editor/src/i18n/) | Новые ключи для модалки настроек, словарей и пунктов контекстного меню. |
+| [`apps/web/src/context/LanguageContext.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/context/LanguageContext.tsx) | Контекст языка веб-приложения с персистенцией в `localStorage`. |
+| [`apps/web/src/components/ThemeSwitcher.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/components/ThemeSwitcher.tsx) | Переключатель языка (English / Русский) в шапке веб-приложения. |
+| [`apps/desktop/src/components/MenuBar.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/components/MenuBar.tsx) | Подменю **View → Language → English / Русский**, локализация пунктов меню. |
 | [`apps/web/src/components/CommentSection.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/components/CommentSection.tsx) | Полный перевод секции комментариев и относительного времени. |
 | [`apps/web/src/components/ArticleStats.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/components/ArticleStats.tsx) | Локализация счетчиков просмотров, лайков и копирования ссылки. |
-| [`apps/desktop/src/components/MarkdownEditor.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/components/MarkdownEditor.tsx) | Локализация контекстных меню, модалок создания таблиц и кода. |
-| [`apps/web/src/components/MarkdownEditor.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/components/MarkdownEditor.tsx) | Локализация контекстных меню, модалок создания таблиц и кода. |
 | [`apps/web/src/components/ErrorBoundary.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/components/ErrorBoundary.tsx) | Компонент предохранителя веб-приложения от упавших компонентов. |
 | [`apps/web/vite.config.ts`](file:///c:/git/type-club/type-club-monorepo/apps/web/vite.config.ts) | Зафиксирован `port: 5173` и `strictPort: true`. |
 

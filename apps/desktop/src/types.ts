@@ -188,6 +188,22 @@ export interface IElectronAPI {
   setSpellcheck: (enabled: boolean) => Promise<void>;
   /** Получить текущее состояние спеллчекера */
   getSpellcheck: () => Promise<boolean>;
+  /** Получить активные языки проверки орфографии */
+  getSpellcheckLanguages: () => Promise<string[]>;
+  /** Установить активные языки проверки орфографии */
+  setSpellcheckLanguages: (languages: string[]) => Promise<boolean>;
+  /** Получить список пользовательских слов */
+  getCustomDictionaryWords: () => Promise<string[]>;
+  /** Добавить слово в пользовательский словарь */
+  addCustomWord: (word: string) => Promise<boolean>;
+  /** Удалить слово из пользовательского словаря */
+  removeCustomWord: (word: string) => Promise<boolean>;
+  /** Проверить, считается ли слово ошибочным по спеллчекеру */
+  isWordMisspelled: (word: string) => boolean;
+  /** Получить варианты исправлений для слова */
+  getWordSuggestions: (word: string) => string[];
+  /** Подписка на данные контекстного меню спеллчекера */
+  onContextMenuInfo: (callback: (info: { misspelledWord: string; dictionarySuggestions: string[]; x: number; y: number }) => void) => () => void;
   /** Получить файлы, переданные при старте (Open with...) */
   getFilesToOpen: () => Promise<string[]>;
   /** Подписаться на открытие новых файлов (когда приложение уже запущен) */

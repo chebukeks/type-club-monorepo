@@ -8,9 +8,10 @@ import { useEditor } from '../context/EditorContext'
 
 interface SettingsPopupProps {
   onClose: () => void
+  onOpenSettingsModal?: () => void
 }
 
-export function SettingsPopup({ onClose }: SettingsPopupProps) {
+export function SettingsPopup({ onClose, onOpenSettingsModal }: SettingsPopupProps) {
   const { state, setAutosave, setShowStats, setTypewriterMode, t } = useEditor()
   const [spellcheck, setSpellcheckState] = useState(true)
   const popupRef = useRef<HTMLDivElement>(null)
@@ -68,8 +69,14 @@ export function SettingsPopup({ onClose }: SettingsPopupProps) {
           : 'animate-in fade-in zoom-in-95 duration-100 ease-out'
       }`}
     >
-      {/* Заголовок */}
-      <div className="menu-item enabled" style={{ cursor: 'default' }}>
+      {/* Заголовок / Открытие модалки */}
+      <div
+        className="menu-item enabled cursor-pointer"
+        onClick={() => {
+          handleClose()
+          onOpenSettingsModal?.()
+        }}
+      >
         <span className="flex items-center gap-2 text-[var(--text-primary)] font-medium">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--text-muted)]">
             <circle cx="12" cy="12" r="3" />

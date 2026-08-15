@@ -5,6 +5,13 @@ import fs from 'node:fs'
 import os from 'node:os'
 import Store from 'electron-store'
 
+// Отключаем Windows Native Spellchecker в пользу встроенного Hunspell,
+// чтобы webFrame.isWordMisspelled, webFrame.getWordSuggestions и
+// session.setSpellCheckerLanguages работали надёжно и одинаково на всех системах.
+if (process.platform === 'win32') {
+  app.commandLine.appendSwitch('disable-features', 'WinUseBrowserSpellChecker')
+}
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 /** Хранилище настроек приложения */
@@ -114,6 +121,33 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
 let win: BrowserWindow | null
 /** Флаг: разрешено ли закрытие окна (после подтверждения renderer) */
 let allowClose = false
+
+/** Применить список языков для спеллчекера с валидацией доступных словарей */
+function applySpellCheckerLanguages(targetLangs: string[]) {
+  if (!win) return
+  try {
+    const available = win.webContents.session.availableSpellCheckerLanguages || []
+    if (available.length === 0) {
+      win.webContents.session.setSpellCheckerLanguages(targetLangs)
+      return
+    }
+    const resolved: string[] = []
+    for (const lang of targetLangs) {
+      if (available.includes(lang)) {
+        resolved.push(lang)
+      } else {
+        const prefix = lang.slice(0, 2).toLowerCase()
+        const match = available.find((a) => a.toLowerCase().startsWith(prefix))
+        if (match && !resolved.includes(match)) {
+          resolved.push(match)
+        }
+      }
+    }
+    win.webContents.session.setSpellCheckerLanguages(resolved)
+  } catch (e) {
+    console.error('Failed to set spellchecker languages:', e)
+  }
+}
 
 // ============================================================
 // Создание главного окна приложения
@@ -248,6 +282,27 @@ function createWindow() {
     // Все остальные навигации (например youtube.com) блокируем и открываем в браузере
     event.preventDefault()
     shell.openExternal(url)
+  })
+
+  // Настройка языков спеллчекера и пользовательских слов
+  const enabledSpellcheckLangs = (store.get('spellcheckLanguages', ['ru-RU', 'en-US']) as string[]) || ['ru-RU', 'en-US']
+  applySpellCheckerLanguages(enabledSpellcheckLangs)
+
+  const customWords = (store.get('customDictionaryWords', []) as string[]) || []
+  for (const word of customWords) {
+    try {
+      win.webContents.session.addWordToSpellCheckerDictionary(word)
+    } catch { /* ignore */ }
+  }
+
+  // Перехват контекстного меню спеллчекера для отправки слова с ошибкой и вариантов в renderer
+  win.webContents.on('context-menu', (_event, params) => {
+    win?.webContents.send('context-menu-info', {
+      misspelledWord: params.misspelledWord || '',
+      dictionarySuggestions: params.dictionarySuggestions || [],
+      x: params.x,
+      y: params.y,
+    })
   })
 }
 
@@ -502,6 +557,57 @@ ipcMain.handle('spellcheck:set', async (_event, enabled: boolean) => {
 /** Получить текущее состояние спеллчекера */
 ipcMain.handle('spellcheck:get', async () => {
   return store.get('spellcheck', true) as boolean
+})
+
+/** Получить активные языки проверки орфографии */
+ipcMain.handle('spellcheck:getLanguages', async () => {
+  return (store.get('spellcheckLanguages', ['ru-RU', 'en-US']) as string[]) || ['ru-RU', 'en-US']
+})
+
+/** Установить активные языки проверки орфографии */
+ipcMain.handle('spellcheck:setLanguages', async (_event, languages: string[]) => {
+  applySpellCheckerLanguages(languages)
+  store.set('spellcheckLanguages', languages)
+  return true
+})
+
+/** Получить список пользовательских слов */
+ipcMain.handle('spellcheck:getCustomWords', async () => {
+  return (store.get('customDictionaryWords', []) as string[]) || []
+})
+
+/** Добавить слово в пользовательский словарь */
+ipcMain.handle('spellcheck:addCustomWord', async (_event, word: string) => {
+  const trimmed = word.trim()
+  if (!trimmed) return false
+  const current = (store.get('customDictionaryWords', []) as string[]) || []
+  if (!current.includes(trimmed)) {
+    current.push(trimmed)
+    store.set('customDictionaryWords', current)
+  }
+  if (win) {
+    try {
+      win.webContents.session.addWordToSpellCheckerDictionary(trimmed)
+    } catch (e) {
+      console.error('Failed to add word to spellchecker dictionary:', e)
+    }
+  }
+  return true
+})
+
+/** Удалить слово из пользовательского словаря */
+ipcMain.handle('spellcheck:removeCustomWord', async (_event, word: string) => {
+  const current = (store.get('customDictionaryWords', []) as string[]) || []
+  const filtered = current.filter((w) => w !== word)
+  store.set('customDictionaryWords', filtered)
+  if (win) {
+    try {
+      win.webContents.session.removeWordFromSpellCheckerDictionary(word)
+    } catch {
+      /* ignore */
+    }
+  }
+  return true
 })
 
 // ============================================================

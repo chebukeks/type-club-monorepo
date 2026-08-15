@@ -231,6 +231,9 @@ export function EditorCore({
     const view = new EditorView(editorRef.current, {
       state: editorState,
       editable: () => !isPreview,
+      attributes: {
+        spellcheck: isPreview ? 'false' : 'true',
+      },
       nodeViews: {
         heading: (node, view, getPos) => new HeadingView(node, view, getPos),
         code_block: (node, view, getPos) => new CodeBlockView(node, view, getPos),

@@ -471,6 +471,74 @@ export function MarkdownEditor() {
     'markdown', 'dockerfile', 'graphql'
   ]
 
+  // Извлечение слова и диапазона по координатам курсора или текущей позиции
+  const getWordAtDocPos = (
+    view: EditorView,
+    clientX: number,
+    clientY: number
+  ): { word: string; from: number; to: number } | null => {
+    try {
+      let pos: number | null = null
+      try {
+        const posInfo = view.posAtCoords({ left: clientX, top: clientY })
+        if (posInfo) pos = posInfo.pos
+      } catch { /* ignore */ }
+
+      if (pos == null) {
+        pos = view.state.selection.from
+      }
+
+      const $pos = view.state.doc.resolve(pos)
+      const textblock = $pos.parent
+      if (!textblock || !textblock.isTextblock) return null
+
+      const text = textblock.textContent
+      const offset = $pos.parentOffset
+      if (!text) return null
+
+      const isWordChar = (c: string) => /[\p{L}\p{N}_'-]/u.test(c)
+
+      let start = Math.min(Math.max(0, offset), text.length)
+      if (start > 0 && !isWordChar(text[start]) && isWordChar(text[start - 1])) {
+        start--
+      }
+      if (start >= text.length || !isWordChar(text[start])) {
+        return null
+      }
+
+      while (start > 0 && isWordChar(text[start - 1])) {
+        start--
+      }
+      let end = start
+      while (end < text.length && isWordChar(text[end])) {
+        end++
+      }
+
+      const rawWord = text.slice(start, end).trim()
+      const cleanWord = rawWord.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/u, '')
+      if (!cleanWord || cleanWord.length < 1) return null
+
+      const wordFrom = $pos.start() + start
+      const wordTo = $pos.start() + end
+
+      return {
+        word: cleanWord,
+        from: wordFrom,
+        to: wordTo,
+      }
+    } catch {
+      return null
+    }
+  }
+
+  const [ctxMenuMounted, setCtxMenuMounted] = useState(false)
+  const [savedCtxMenuStyle, setSavedCtxMenuStyle] = useState<React.CSSProperties | null>(null)
+  const [ctxSpellcheck, setCtxSpellcheck] = useState<{
+    misspelledWord: string
+    dictionarySuggestions: string[]
+    range: { from: number; to: number } | null
+  } | null>(null)
+
   const handleContextMenu = (e: React.MouseEvent) => {
     if (state.editorMode !== 'seamless') return
     e.preventDefault()
@@ -480,25 +548,92 @@ export function MarkdownEditor() {
     setTableRows(3)
     setCodeLang('')
 
+    let spellcheckInfo: {
+      misspelledWord: string
+      dictionarySuggestions: string[]
+      range: { from: number; to: number } | null
+    } | null = null
+
     if (editorView) {
+      // 1. Проверяем, был ли клик по таблице
       try {
         const clickPos = editorView.posAtDOM(e.target as Node, 0)
         const $click = editorView.state.doc.resolve(clickPos)
         for (let d = $click.depth; d > 0; d--) {
           if ($click.node(d).type.name === 'table') {
             setCtxTable($click.before(d))
+            setCtxSpellcheck(null)
             setCtxMenu({ x: e.clientX, y: e.clientY })
             return
           }
         }
       } catch { /* ignore */ }
+
+      // 2. Проверяем слово под курсором или выделение для спеллчекера
+      try {
+        const { from, to } = editorView.state.selection
+        let targetWord: string | null = null
+        let targetRange: { from: number; to: number } | null = null
+
+        if (from !== to) {
+          const selText = editorView.state.doc.textBetween(from, to).trim()
+          if (selText && !selText.includes(' ') && !selText.includes('\n')) {
+            const clean = selText.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/u, '')
+            if (clean) {
+              targetWord = clean
+              targetRange = { from, to }
+            }
+          }
+        }
+
+        if (!targetWord) {
+          const wordAtPos = getWordAtDocPos(editorView, e.clientX, e.clientY)
+          if (wordAtPos) {
+            targetWord = wordAtPos.word
+            targetRange = { from: wordAtPos.from, to: wordAtPos.to }
+          }
+        }
+
+        if (targetWord) {
+          let suggestions: string[] = []
+          try {
+            if (window.api?.getWordSuggestions) {
+              suggestions = window.api.getWordSuggestions(targetWord)
+              if (suggestions.length === 0 && targetWord.toLowerCase() !== targetWord) {
+                suggestions = window.api.getWordSuggestions(targetWord.toLowerCase())
+              }
+            }
+          } catch { /* ignore */ }
+
+          spellcheckInfo = {
+            misspelledWord: targetWord,
+            dictionarySuggestions: suggestions,
+            range: targetRange,
+          }
+        }
+      } catch (err) {
+        console.error('Error resolving spellcheck on contextmenu:', err)
+      }
     }
 
+    setCtxSpellcheck(spellcheckInfo)
     setCtxMenu({ x: e.clientX, y: e.clientY })
   }
 
-  const [ctxMenuMounted, setCtxMenuMounted] = useState(false)
-  const [savedCtxMenuStyle, setSavedCtxMenuStyle] = useState<React.CSSProperties | null>(null)
+  // Подписка на событие контекстного меню спеллчекера от main process (дополнительный источник)
+  useEffect(() => {
+    if (!window.api?.onContextMenuInfo) return
+    const cleanup = window.api.onContextMenuInfo((info) => {
+      if (info.misspelledWord) {
+        setCtxSpellcheck((prev) => ({
+          misspelledWord: info.misspelledWord,
+          dictionarySuggestions: info.dictionarySuggestions || [],
+          range: prev?.range || null,
+        }))
+      }
+    })
+    return cleanup
+  }, [])
 
   useEffect(() => {
     if (ctxMenu) {
@@ -513,6 +648,27 @@ export function MarkdownEditor() {
     setCtxMenu(null)
     setCtxSubmenu(null)
     setCtxTable(null)
+    setCtxSpellcheck(null)
+  }
+
+  const handleApplySuggestion = (suggestion: string) => {
+    if (!editorView || !ctxSpellcheck?.misspelledWord) return
+    const { state: pmState, dispatch } = editorView
+    if (ctxSpellcheck.range) {
+      dispatch(pmState.tr.insertText(suggestion, ctxSpellcheck.range.from, ctxSpellcheck.range.to))
+    } else {
+      const { from, to } = pmState.selection
+      dispatch(pmState.tr.insertText(suggestion, from, to))
+    }
+    editorView.focus()
+    closeCtxMenu()
+  }
+
+  const handleAddToDictionary = async () => {
+    if (!ctxSpellcheck?.misspelledWord) return
+    await window.api.addCustomWord(ctxSpellcheck.misspelledWord)
+    editorView?.focus()
+    closeCtxMenu()
   }
 
   const handleTableCopy = () => {
@@ -800,6 +956,28 @@ export function MarkdownEditor() {
           onContextMenu={(e) => e.preventDefault()}
           onClick={(e) => e.stopPropagation()}
         >
+          {/* Спеллчекер: варианты исправлений и добавление в словарь */}
+          {ctxSpellcheck?.misspelledWord && (
+            <>
+              {ctxSpellcheck.dictionarySuggestions.length > 0 && (
+                <>
+                  {ctxSpellcheck.dictionarySuggestions.slice(0, 5).map((suggestion) => (
+                    <div
+                      key={suggestion}
+                      className="menu-item enabled font-medium text-[var(--text-primary)] hover:text-[var(--accent)]"
+                      onClick={() => handleApplySuggestion(suggestion)}
+                    >
+                      <span>{suggestion}</span>
+                    </div>
+                  ))}
+                  {sep}
+                </>
+              )}
+              {ctxMenuItem(t('editor.menu.addToDictionary'), undefined, handleAddToDictionary)}
+              {sep}
+            </>
+          )}
+
           {ctxMenuItem(t('editor.menu.copy'), 'Ctrl+C', () => handleClipboard('copy'))}
           {ctxMenuItem(t('editor.menu.cut'), 'Ctrl+X', () => handleClipboard('cut'))}
           {ctxMenuItem(t('editor.menu.paste'), 'Ctrl+V', () => handleClipboard('paste'))}
