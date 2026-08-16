@@ -355,8 +355,6 @@ export const markdownParser = new MarkdownParser(schema, md, {
   },
   softbreak: { node: 'hard_break' },
   hardbreak: { node: 'hard_break' },
-  html_inline: { ignore: true },
-  html_block: { ignore: true },
 
   // Suggestion marks & nodes (parsed from HTML by suggestionHtmlPlugin)
   suggestion_insert: { mark: 'suggestion_insert', getAttrs: (tok: any) => ({
@@ -426,6 +424,17 @@ if (handlers) {
       noteText: getTokenAttr(tok, 'noteText'),
       sugCreatedAt: getTokenAttr(tok, 'sugCreatedAt'),
     })
+  }
+
+  // Обработчики для inline и блочного HTML (не относящегося к suggestion-разметке):
+  // Сохраняем их как обычный текст, чтобы такие теги как <term>, <topic>, <br> и т.д. не ломали парсер
+  handlers.html_inline = (state: any, tok: any) => {
+    state.addText(tok.content)
+  }
+  handlers.html_block = (state: any, tok: any) => {
+    state.openNode(schema.nodes.paragraph)
+    state.addText(tok.content)
+    state.closeNode()
   }
 }
 

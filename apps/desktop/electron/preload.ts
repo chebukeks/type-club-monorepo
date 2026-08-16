@@ -236,4 +236,33 @@ contextBridge.exposeInMainWorld('api', {
     webFrame.setZoomLevel(0)
     return 100
   },
+
+  // ==========================================
+  // Темы оформления и редактор тем
+  // ==========================================
+
+  /** Получить сохраненные пользовательские темы */
+  getCustomThemes: (): Promise<any[]> => {
+    return ipcRenderer.invoke('theme:getCustomThemes')
+  },
+
+  /** Сохранить пользовательскую тему */
+  saveCustomTheme: (theme: any): Promise<boolean> => {
+    return ipcRenderer.invoke('theme:saveCustomTheme', theme)
+  },
+
+  /** Удалить пользовательскую тему */
+  deleteCustomTheme: (themeId: string): Promise<boolean> => {
+    return ipcRenderer.invoke('theme:deleteCustomTheme', themeId)
+  },
+
+  /** Экспорт темы в JSON файл */
+  exportTheme: (theme: any): Promise<boolean> => {
+    return ipcRenderer.invoke('theme:exportTheme', theme)
+  },
+
+  /** Импорт тем из JSON файла */
+  importThemes: (): Promise<any[] | null> => {
+    return ipcRenderer.invoke('theme:importThemes')
+  },
 })

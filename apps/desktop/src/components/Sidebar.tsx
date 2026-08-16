@@ -167,7 +167,7 @@ export function Sidebar({ width }: { width: number }) {
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
   const onlineUsername = user?.nickname || 'username'
   return (
-    <div style={{ width: `${width}px`, minWidth: '140px', maxWidth: '500px' }} className="bg-[var(--bg-surface)] flex flex-col h-full flex-shrink-0 select-none border-r border-[var(--border-default)]">
+    <div style={{ width: `${width}px`, minWidth: '140px', maxWidth: '500px' }} className="bg-[var(--bg-surface)] flex flex-col h-full flex-shrink-0 select-none">
       <div
         className="flex items-center justify-between"
         style={{ height: '36px', paddingLeft: '16px', paddingRight: '12px' }}

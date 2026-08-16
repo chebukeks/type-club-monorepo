@@ -126,12 +126,12 @@ function ToggleSwitch({ enabled }: { enabled: boolean }) {
     <div
       style={{
         position: 'relative',
-        width: 40,
-        height: 22,
-        borderRadius: 11,
+        width: 38,
+        height: 20,
+        borderRadius: 10,
         backgroundColor: enabled ? 'var(--accent)' : 'var(--bg-input)',
         border: `1px solid ${enabled ? 'transparent' : 'var(--border-strong)'}`,
-        transition: 'background-color 0.3s, border-color 0.3s',
+        transition: 'background-color 0.25s, border-color 0.25s',
         cursor: 'pointer',
         flexShrink: 0,
       }}
@@ -146,9 +146,9 @@ function ToggleSwitch({ enabled }: { enabled: boolean }) {
           width: 14,
           height: 14,
           borderRadius: '50%',
-          backgroundColor: 'white',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
-          transition: 'transform 0.3s',
+          backgroundColor: enabled ? '#ffffff' : 'var(--text-dim)',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.25)',
+          transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.25s',
           transform: enabled ? 'translateX(18px)' : 'translateX(0)',
         }}
       />

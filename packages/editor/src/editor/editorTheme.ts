@@ -118,9 +118,9 @@ export function getEditorStyles(): string {
   position: fixed;
   z-index: 99999;
   display: none;
-  background: var(--bg-elevated, #ffffff);
-  color: var(--text-primary, #111827);
-  border: 1px solid var(--border-default, #e5e7eb);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
   border-radius: 12px;
   padding: 8px 12px;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
@@ -130,12 +130,6 @@ export function getEditorStyles(): string {
   animation: fadeInPop 0.12s ease-out;
 }
 
-.dark .suggestion-note-bubble {
-  background: #1f2937;
-  color: #f9fafb;
-  border-color: #374151;
-}
-
 .suggestion-note-header {
   display: flex;
   align-items: center;
@@ -143,11 +137,7 @@ export function getEditorStyles(): string {
   gap: 8px;
   margin-bottom: 4px;
   padding-bottom: 4px;
-  border-bottom: 1px solid var(--border-subtle, #f3f4f6);
-}
-
-.dark .suggestion-note-header {
-  border-bottom-color: #374151;
+  border-bottom: 1px solid var(--border-default);
 }
 
 .suggestion-note-author {
@@ -217,8 +207,8 @@ html[data-lang="ru"] figure[data-sug-delete]::after {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: var(--bg-elevated, #ffffff);
-  border: 1px solid var(--border-default, #e5e7eb);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
   border-radius: 10px;
   padding: 5px 8px;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
@@ -226,11 +216,6 @@ html[data-lang="ru"] figure[data-sug-delete]::after {
   font-size: 12px;
   user-select: none;
   animation: fadeInPop 0.12s ease-out;
-}
-
-.dark .suggestion-action-popup {
-  background: #1f2937;
-  border-color: #374151;
 }
 
 @keyframes fadeInPop {
@@ -265,26 +250,20 @@ html[data-lang="ru"] figure[data-sug-delete]::after {
 }
 
 .suggestion-action-btn.accept {
-  background: #2563eb;
+  background: var(--accent);
   color: #ffffff;
 }
 .suggestion-action-btn.accept:hover {
-  background: #1d4ed8;
+  background: var(--accent-hover);
 }
 
 .suggestion-action-btn.reject {
-  background: #f3f4f6;
-  color: #374151;
-}
-.dark .suggestion-action-btn.reject {
-  background: #374151;
-  color: #e5e7eb;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
 }
 .suggestion-action-btn.reject:hover {
-  background: #e5e7eb;
-}
-.dark .suggestion-action-btn.reject:hover {
-  background: #4b5563;
+  background: var(--bg-active);
+  color: var(--text-primary);
 }
 
 /* ==========================================
@@ -478,13 +457,11 @@ html[data-lang="ru"] figure[data-sug-delete]::after {
 /* Цитаты */
 .ProseMirror blockquote {
   border-left: 4px solid var(--editor-blockquote-border);
-  padding-left: 16px;
+  padding: 8px 16px 8px 16px;
   margin: 16px 0;
   color: var(--editor-blockquote-text);
   background: var(--editor-blockquote-bg);
-  padding-top: 8px;
-  padding-bottom: 8px;
-  border-radius: 0 4px 4px 0;
+  border-radius: 4px;
 }
 .ProseMirror blockquote p { margin-bottom: 0.5em; color: inherit; }
 .ProseMirror blockquote p:last-child { margin-bottom: 0; }
@@ -619,7 +596,7 @@ html[data-lang="ru"] figure[data-sug-delete]::after {
 .math-block-editor-wrapper {
   background: var(--math-block-editor-bg); border: 1px solid var(--math-block-editor-border);
   border-radius: 8px 8px 0 0; padding: 12px; display: none;
-  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-family: var(--font-code);
   color: var(--math-text); white-space: pre-wrap;
 }
 .math-block-preview-wrapper { background: transparent; padding: 12px; text-align: center; position: relative; }
@@ -730,7 +707,7 @@ html[data-lang="ru"] figure[data-sug-delete]::after {
 /* Таблицы */
 .ProseMirror table {
   border-collapse: separate; border-spacing: 0; width: 100%; margin: 12px 0;
-  border-radius: 8px; overflow: hidden; border: 1px solid var(--codeblock-border); table-layout: auto;
+  border-radius: 8px; overflow: hidden; border: 1px solid var(--table-border); table-layout: auto;
 }
 .ProseMirror th, .ProseMirror td {
   padding: 8px 16px; border-bottom: 1px solid var(--table-border);
@@ -738,7 +715,7 @@ html[data-lang="ru"] figure[data-sug-delete]::after {
 }
 .ProseMirror th:last-child, .ProseMirror td:last-child { border-right: none; }
 .ProseMirror tbody tr:last-child td { border-bottom: none; }
-.ProseMirror th { background: var(--table-header-bg); font-weight: 600; color: var(--table-header-text); border-bottom: 2px solid var(--codeblock-border); }
+.ProseMirror th { background: var(--table-header-bg); font-weight: 600; color: var(--table-header-text); border-bottom: 2px solid var(--table-border); }
 .ProseMirror td { background: var(--table-cell-bg); color: var(--table-cell-text); }
 .ProseMirror tbody tr:nth-child(even) td { background: var(--table-even-bg); }
 .ProseMirror .selectedCell::after {

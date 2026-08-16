@@ -20,8 +20,85 @@ export interface TocItem {
   pos: number;
 }
 
+/** Цветовая схема темы оформления */
+export interface ThemeColors {
+  // Интерфейс приложения
+  bgBase: string;
+  bgSurface: string;
+  bgElevated: string;
+  bgHover: string;
+  bgActive: string;
+  bgInput: string;
+  borderDefault: string;
+  borderStrong: string;
+  textPrimary: string;
+  textSecondary: string;
+  textMuted: string;
+  textDim: string;
+  textDanger: string;
+  accent: string;
+  accentHover: string;
+  menuHoverBg: string;
+
+  // Редактор текста
+  editorText: string;
+  editorCaret: string;
+  editorSelection: string;
+  editorHeading: string;
+  editorLink: string;
+  editorSyntax: string;
+  editorHr: string;
+  editorStrike: string;
+  editorCodeBg: string;
+  editorCodeText: string;
+  editorMarkBg: string;
+  editorMarkText: string;
+  editorBlockquoteBorder: string;
+  editorBlockquoteText: string;
+  editorBlockquoteBg: string;
+
+  // Блоки кода и подсветка
+  codeblockBg: string;
+  codeblockBorder: string;
+  codeblockText: string;
+  codeblockLang: string;
+  hljsKeyword: string;
+  hljsString: string;
+  hljsTitle: string;
+  hljsNumber: string;
+  hljsComment: string;
+
+  // Таблицы
+  tableBorder: string;
+  tableHeaderBg: string;
+  tableHeaderText: string;
+  tableCellBg: string;
+  tableCellText: string;
+  tableEvenBg: string;
+  tableSelected: string;
+}
+
+/** Типографика темы */
+export interface ThemeTypography {
+  fontFamilyUi: string;
+  fontFamilyEditor: string;
+  fontFamilyCode: string;
+  fontSizeEditor: number;
+  lineHeightEditor: number;
+}
+
+/** Полная структура темы оформления */
+export interface AppTheme {
+  id: string;
+  name: string;
+  isBuiltin?: boolean;
+  baseTheme: 'dark' | 'light';
+  colors: ThemeColors;
+  typography: ThemeTypography;
+}
+
 /** Режим цветовой темы */
-export type ThemeMode = 'light' | 'dark' | 'system';
+export type ThemeMode = 'light' | 'dark' | 'system' | string;
 
 /** Режим отображения оглавления и предложений */
 export type TocLayoutMode = 'separate' | 'combined';
@@ -87,6 +164,10 @@ export interface AppState {
   renaming: { path: string, type: 'file' | 'folder' } | null;
   /** Текущая цветовая тема */
   theme: ThemeMode;
+  /** Пользовательские темы оформления */
+  customThemes: AppTheme[];
+  /** Полная конфигурация активной темы */
+  activeTheme?: AppTheme;
   /** Автосохранение включено */
   autosave: boolean;
   /** Ограничение по символам/словам для активной вкладки */
@@ -133,7 +214,8 @@ export type AppAction =
   | { type: 'STOP_RENAMING' }
   | { type: 'RENAME_TAB_PATHS'; payload: { oldPath: string; newPath: string } }
   | { type: 'SET_ACTIVE_EXPLORER_PATH'; payload: { path: string | null } }
-  | { type: 'SET_THEME'; payload: { theme: ThemeMode } }
+  | { type: 'SET_THEME'; payload: { theme: ThemeMode; activeTheme?: AppTheme } }
+  | { type: 'SET_CUSTOM_THEMES'; payload: { customThemes: AppTheme[] } }
   | { type: 'SET_LANGUAGE'; payload: { language: import('@type-club/editor').Locale } }
   | { type: 'SET_TOC_LAYOUT_MODE'; payload: { mode: TocLayoutMode } }
   | { type: 'SET_EDITOR_MODE'; payload: { mode: EditorMode } }
@@ -220,6 +302,16 @@ export interface IElectronAPI {
   zoomOut: () => number;
   /** Сбросить масштаб интерфейса */
   zoomReset: () => number;
+  /** Получить сохраненные пользовательские темы */
+  getCustomThemes: () => Promise<AppTheme[]>;
+  /** Сохранить пользовательскую тему */
+  saveCustomTheme: (theme: AppTheme) => Promise<boolean>;
+  /** Удалить пользовательскую тему */
+  deleteCustomTheme: (themeId: string) => Promise<boolean>;
+  /** Экспорт темы в JSON файл */
+  exportTheme: (theme: AppTheme) => Promise<boolean>;
+  /** Импорт тем из JSON файла */
+  importThemes: () => Promise<AppTheme[] | null>;
 }
 
 declare global {

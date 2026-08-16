@@ -2,9 +2,10 @@
  * EditorContext.tsx — Централизованное управление состоянием приложения.
  */
 import React, { createContext, useContext, useReducer, useCallback, useEffect, useRef } from 'react'
-import type { AppState, AppAction, FileEntry, ThemeMode, EditorMode, WordLimit, FocusMode, TocLayoutMode, StatsLayoutMode } from '../types'
+import type { AppState, AppAction, FileEntry, ThemeMode, EditorMode, WordLimit, FocusMode, TocLayoutMode, StatsLayoutMode, AppTheme } from '../types'
 import { articlesApi } from '../api'
 import { Locale, TranslationKey, getTranslation } from '@type-club/editor'
+import { DARK_THEME, LIGHT_THEME, applyThemeToDOM as applyCustomThemeToDOM } from '../utils/themePresets'
 
 // ============================================================
 // Начальное состояние
@@ -16,6 +17,8 @@ const initialState: AppState = {
   fileTree: [],
   creating: null,
   theme: 'dark',
+  customThemes: [],
+  activeTheme: DARK_THEME,
   language: 'en',
   autosave: true,
   wordLimit: { enabled: false, value: 1000, type: 'chars' },
@@ -40,15 +43,6 @@ const initialState: AppState = {
 // ============================================================
 // Вспомогательные функции для темы и языка
 // ============================================================
-
-/** Применить тему к DOM */
-function applyThemeToDOM(theme: ThemeMode) {
-  let resolved = theme
-  if (theme === 'system') {
-    resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-  }
-  document.documentElement.setAttribute('data-theme', resolved)
-}
 
 /** Применить язык к DOM */
 function applyLanguageToDOM(language: Locale) {
@@ -142,7 +136,13 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'SET_ACTIVE_EXPLORER_PATH':
       return { ...state, activeExplorerPath: action.payload.path }
     case 'SET_THEME':
-      return { ...state, theme: action.payload.theme }
+      return {
+        ...state,
+        theme: action.payload.theme,
+        activeTheme: action.payload.activeTheme || state.activeTheme,
+      }
+    case 'SET_CUSTOM_THEMES':
+      return { ...state, customThemes: action.payload.customThemes }
     case 'SET_LANGUAGE':
       return { ...state, language: action.payload.language }
     case 'SET_TOC_LAYOUT_MODE':
@@ -245,7 +245,6 @@ interface EditorContextValue {
   startRenaming: (path: string, type: 'file' | 'folder') => void
   moveItem: (sourcePath: string, targetDirPath: string) => Promise<void>
   closeTab: (tabId: string) => Promise<void>
-  setTheme: (theme: ThemeMode) => Promise<void>
   setLanguage: (language: Locale) => Promise<void>
   t: (key: TranslationKey, params?: Record<string, string | number>) => string
   setEditorMode: (mode: EditorMode) => Promise<void>
@@ -279,6 +278,12 @@ interface EditorContextValue {
   setTabBarOpen: (open: boolean) => void
   setTocLayoutMode: (mode: TocLayoutMode) => void
   setStatsLayoutMode: (mode: StatsLayoutMode) => void
+  setTheme: (theme: ThemeMode, customThemeObj?: AppTheme) => Promise<void>
+  saveCustomTheme: (theme: AppTheme) => Promise<boolean>
+  deleteCustomTheme: (themeId: string) => Promise<boolean>
+  exportTheme: (theme: AppTheme) => Promise<boolean>
+  importThemes: () => Promise<AppTheme[] | null>
+  applyLiveTheme: (theme: AppTheme) => void
 }
 
 const EditorContext = createContext<EditorContextValue | null>(null)
@@ -290,10 +295,20 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
-        const savedTheme = await window.api.storeGet('theme') as ThemeMode | undefined
+        const customThemes = (await window.api.getCustomThemes?.()) || []
+        dispatch({ type: 'SET_CUSTOM_THEMES', payload: { customThemes } })
+
+        const savedTheme = (await window.api.storeGet('theme')) as ThemeMode | undefined
         const theme = savedTheme || 'dark'
-        dispatch({ type: 'SET_THEME', payload: { theme } })
-        applyThemeToDOM(theme)
+        let activeTheme: AppTheme = DARK_THEME
+        if (theme === 'light') activeTheme = LIGHT_THEME
+        else if (theme === 'dark') activeTheme = DARK_THEME
+        else {
+          const found = customThemes.find((t: AppTheme) => t.id === theme)
+          if (found) activeTheme = found
+        }
+        dispatch({ type: 'SET_THEME', payload: { theme, activeTheme } })
+        applyCustomThemeToDOM(activeTheme)
 
         const savedLang = await window.api.storeGet('language') as Locale | undefined
         const language = savedLang === 'ru' ? 'ru' : 'en'
@@ -359,7 +374,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
           } catch (err) { /* ignore */ }
         }
       } catch (e) {
-        applyThemeToDOM('dark')
+        applyCustomThemeToDOM(DARK_THEME)
       }
     })()
   }, [])
@@ -368,7 +383,10 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (state.theme !== 'system') return
     const mql = window.matchMedia('(prefers-color-scheme: dark)')
-    const handler = () => applyThemeToDOM('system')
+    const handler = (e: MediaQueryListEvent | MediaQueryList) => {
+      const isDark = 'matches' in e ? e.matches : mql.matches
+      applyCustomThemeToDOM(isDark ? DARK_THEME : LIGHT_THEME)
+    }
     mql.addEventListener('change', handler)
     return () => mql.removeEventListener('change', handler)
   }, [state.theme])
@@ -573,10 +591,71 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
   }, [state.folderPath])
 
   // --- Установить тему ---
-  const setTheme = useCallback(async (theme: ThemeMode) => {
-    dispatch({ type: 'SET_THEME', payload: { theme } })
-    applyThemeToDOM(theme)
-    try { await window.api.storeSet('theme', theme) } catch (e) { /* ignore */ }
+  const setTheme = useCallback(async (themeId: ThemeMode, customThemeObj?: AppTheme) => {
+    let targetTheme: AppTheme = DARK_THEME
+    if (customThemeObj) {
+      targetTheme = customThemeObj
+    } else if (themeId === 'light') {
+      targetTheme = LIGHT_THEME
+    } else if (themeId === 'dark') {
+      targetTheme = DARK_THEME
+    } else {
+      const found = state.customThemes.find((t) => t.id === themeId)
+      if (found) targetTheme = found
+    }
+
+    dispatch({ type: 'SET_THEME', payload: { theme: themeId, activeTheme: targetTheme } })
+    applyCustomThemeToDOM(targetTheme)
+    try { await window.api.storeSet('theme', themeId) } catch (e) { /* ignore */ }
+  }, [state.customThemes])
+
+  // --- Сохранить пользовательскую тему ---
+  const saveCustomTheme = useCallback(async (theme: AppTheme): Promise<boolean> => {
+    const success = await window.api.saveCustomTheme(theme)
+    if (success) {
+      const updatedThemes = (await window.api.getCustomThemes()) || []
+      dispatch({ type: 'SET_CUSTOM_THEMES', payload: { customThemes: updatedThemes } })
+      if (state.theme === theme.id) {
+        dispatch({ type: 'SET_THEME', payload: { theme: theme.id, activeTheme: theme } })
+        applyCustomThemeToDOM(theme)
+      }
+    }
+    return success
+  }, [state.theme])
+
+  // --- Удалить пользовательскую тему ---
+  const deleteCustomTheme = useCallback(async (themeId: string): Promise<boolean> => {
+    const success = await window.api.deleteCustomTheme(themeId)
+    if (success) {
+      const updatedThemes = (await window.api.getCustomThemes()) || []
+      dispatch({ type: 'SET_CUSTOM_THEMES', payload: { customThemes: updatedThemes } })
+      if (state.theme === themeId) {
+        await setTheme('dark')
+      }
+    }
+    return success
+  }, [state.theme, setTheme])
+
+  // --- Экспорт темы ---
+  const exportTheme = useCallback(async (theme: AppTheme): Promise<boolean> => {
+    return window.api.exportTheme(theme)
+  }, [])
+
+  // --- Импорт тем ---
+  const importThemes = useCallback(async (): Promise<AppTheme[] | null> => {
+    const imported = await window.api.importThemes()
+    if (imported && imported.length > 0) {
+      const updatedThemes = (await window.api.getCustomThemes()) || []
+      dispatch({ type: 'SET_CUSTOM_THEMES', payload: { customThemes: updatedThemes } })
+      await setTheme(imported[0].id, imported[0])
+      return imported
+    }
+    return null
+  }, [setTheme])
+
+  // --- Применить тему вживую (live preview) ---
+  const applyLiveTheme = useCallback((theme: AppTheme) => {
+    applyCustomThemeToDOM(theme)
   }, [])
 
   // --- Установить язык ---
@@ -1011,6 +1090,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       toggleSidebar, setSidebarOpen,
       toggleTabBar, setTabBarOpen,
       setTocLayoutMode, setStatsLayoutMode,
+      saveCustomTheme, deleteCustomTheme, exportTheme, importThemes, applyLiveTheme,
     }}>
       {children}
     </EditorContext.Provider>

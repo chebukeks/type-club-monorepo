@@ -595,9 +595,14 @@ export function MarkdownEditor() {
         }
 
         if (targetWord) {
+          let isMisspelled = false
           let suggestions: string[] = []
+
           try {
-            if (window.api?.getWordSuggestions) {
+            if (window.api?.isWordMisspelled) {
+              isMisspelled = window.api.isWordMisspelled(targetWord) || window.api.isWordMisspelled(targetWord.toLowerCase())
+            }
+            if (isMisspelled && window.api?.getWordSuggestions) {
               suggestions = window.api.getWordSuggestions(targetWord)
               if (suggestions.length === 0 && targetWord.toLowerCase() !== targetWord) {
                 suggestions = window.api.getWordSuggestions(targetWord.toLowerCase())
@@ -605,10 +610,13 @@ export function MarkdownEditor() {
             }
           } catch { /* ignore */ }
 
-          spellcheckInfo = {
-            misspelledWord: targetWord,
-            dictionarySuggestions: suggestions,
-            range: targetRange,
+          // Пункт "Добавить в словарь" и подсказки доступны ТОЛЬКО если слово подчеркнуто спеллчекером
+          if (isMisspelled) {
+            spellcheckInfo = {
+              misspelledWord: targetWord,
+              dictionarySuggestions: suggestions,
+              range: targetRange,
+            }
           }
         }
       } catch (err) {
@@ -1119,8 +1127,8 @@ export function MarkdownEditor() {
       {showRightSidebar ? (
         <div
           style={{
-            left: `${leftPos}px`,
             right: '32px',
+            width: `${Math.min(280, availableWidth)}px`,
             maxWidth: '280px',
             top: '16px',
             bottom: (state.showStats && state.statsLayoutMode === 'right') ? '84px' : '24px',

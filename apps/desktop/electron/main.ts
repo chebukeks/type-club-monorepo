@@ -611,6 +611,114 @@ ipcMain.handle('spellcheck:removeCustomWord', async (_event, word: string) => {
 })
 
 // ============================================================
+// IPC-хэндлеры для работы с темами оформления
+// ============================================================
+
+/** Получить список сохраненных пользовательских тем */
+ipcMain.handle('theme:getCustomThemes', async () => {
+  return (store.get('customThemes', []) as any[]) || []
+})
+
+/** Сохранить или обновить пользовательскую тему */
+ipcMain.handle('theme:saveCustomTheme', async (_event, theme: any) => {
+  if (!theme || !theme.id || !theme.name) return false
+  const customThemes = (store.get('customThemes', []) as any[]) || []
+  const index = customThemes.findIndex((t: any) => t.id === theme.id)
+  if (index >= 0) {
+    customThemes[index] = { ...theme, isBuiltin: false }
+  } else {
+    customThemes.push({ ...theme, isBuiltin: false })
+  }
+  store.set('customThemes', customThemes)
+  return true
+})
+
+/** Удалить пользовательскую тему */
+ipcMain.handle('theme:deleteCustomTheme', async (_event, themeId: string) => {
+  if (!themeId) return false
+  const customThemes = (store.get('customThemes', []) as any[]) || []
+  const filtered = customThemes.filter((t: any) => t.id !== themeId)
+  store.set('customThemes', filtered)
+  return true
+})
+
+/** Экспорт темы в JSON файл */
+ipcMain.handle('theme:exportTheme', async (_event, theme: any) => {
+  if (!win || !theme) return false
+  const defaultName = `${theme.name || 'theme'}.typeclub-theme.json`
+  const { canceled, filePath } = await dialog.showSaveDialog(win, {
+    title: 'Экспорт темы',
+    defaultPath: defaultName,
+    filters: [
+      { name: 'Type Club Theme (*.json)', extensions: ['json'] },
+      { name: 'Все файлы (*.*)', extensions: ['*'] },
+    ],
+  })
+
+  if (canceled || !filePath) return false
+
+  try {
+    const jsonStr = JSON.stringify(theme, null, 2)
+    await fs.promises.writeFile(filePath, jsonStr, 'utf-8')
+    return true
+  } catch (err) {
+    console.error('Failed to export theme:', err)
+    return false
+  }
+})
+
+/** Импорт тем из JSON файла */
+ipcMain.handle('theme:importThemes', async () => {
+  if (!win) return null
+  const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+    title: 'Импорт тем',
+    properties: ['openFile'],
+    filters: [
+      { name: 'Type Club Themes (*.json)', extensions: ['json'] },
+      { name: 'Все файлы (*.*)', extensions: ['*'] },
+    ],
+  })
+
+  if (canceled || !filePaths || filePaths.length === 0) return null
+
+  try {
+    const content = await fs.promises.readFile(filePaths[0], 'utf-8')
+    const parsed = JSON.parse(content)
+    const items = Array.isArray(parsed) ? parsed : [parsed]
+    const validThemes: any[] = []
+
+    for (const raw of items) {
+      if (raw && typeof raw === 'object' && typeof raw.name === 'string' && raw.name.trim()) {
+        const id = typeof raw.id === 'string' && raw.id ? raw.id : `custom_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+        validThemes.push({
+          ...raw,
+          id,
+          isBuiltin: false,
+        })
+      }
+    }
+
+    if (validThemes.length === 0) return null
+
+    const existing = (store.get('customThemes', []) as any[]) || []
+    for (const newTheme of validThemes) {
+      const idx = existing.findIndex((t: any) => t.id === newTheme.id || t.name === newTheme.name)
+      if (idx >= 0) {
+        existing[idx] = newTheme
+      } else {
+        existing.push(newTheme)
+      }
+    }
+    store.set('customThemes', existing)
+
+    return validThemes
+  } catch (err) {
+    console.error('Failed to import themes:', err)
+    return null
+  }
+})
+
+// ============================================================
 // IPC-хэндлеры для управления окном
 // ============================================================
 ipcMain.on('window:minimize', () => win?.minimize())

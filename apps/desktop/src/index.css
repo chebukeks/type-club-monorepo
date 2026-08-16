@@ -22,6 +22,7 @@
   --text-dim: #6a6e78;
   --text-disabled: #4a4d54;
   --text-heading: #e8eaed;
+  --text-danger: #ef4444;
   --accent: #6c8cff;
   --accent-hover: #5a7aef;
   --menu-hover-bg: #04395e;
@@ -119,6 +120,7 @@
   --text-dim: #999999;
   --text-disabled: #bbbbbb;
   --text-heading: #1e1e1e;
+  --text-danger: #e81123;
   --accent: #4472c4;
   --accent-hover: #3561b3;
   --menu-hover-bg: #d6e4ff;
@@ -228,6 +230,10 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+::selection {
+  background-color: var(--editor-selection);
+}
+
 /* Скроллбар */
 ::-webkit-scrollbar {
   width: 6px;
@@ -322,7 +328,14 @@ body {
   background: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  transition: backdrop-filter 0.3s ease, -webkit-backdrop-filter 0.3s ease, background-color 0.3s ease;
   animation: modalOverlayFade 0.15s ease-out forwards;
+}
+
+.modal-overlay.no-blur {
+  backdrop-filter: blur(0px);
+  -webkit-backdrop-filter: blur(0px);
+  background: transparent;
 }
 
 /* Панель модального окна */
@@ -337,7 +350,12 @@ body {
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  transition: box-shadow 0.3s ease;
   animation: modalScale 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.modal-panel.no-shadow {
+  box-shadow: none;
 }
 
 @keyframes modalOverlayFade {
