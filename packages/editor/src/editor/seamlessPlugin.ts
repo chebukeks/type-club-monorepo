@@ -49,28 +49,21 @@ function buildDecorations(state: import('prosemirror-state').EditorState): Decor
   const doc = state.doc
   const cursorPos = state.selection.from
   const decorations: Decoration[] = []
+  const $from = doc.resolve(cursorPos)
 
   // --- Заголовки: добавляем класс, когда курсор внутри (для показа префикса) ---
-  doc.descendants((node, pos) => {
+  for (let d = $from.depth; d >= 0; d--) {
+    const node = $from.node(d)
     if (node.type === schema.nodes.heading) {
-      const headingStart = pos
-      const headingEnd = pos + node.nodeSize
-      const cursorInside = cursorPos >= headingStart && cursorPos <= headingEnd
-
-      if (cursorInside) {
-        decorations.push(
-          Decoration.node(pos, pos + node.nodeSize, { class: 'heading-cursor-inside' })
-        )
-      }
-
-      return true // продолжаем обход внутрь
+      const headingPos = $from.before(d)
+      decorations.push(
+        Decoration.node(headingPos, headingPos + node.nodeSize, { class: 'heading-cursor-inside' })
+      )
+      break
     }
-
-    return true
-  })
+  }
 
   // --- Inline marks: показываем синтаксис когда курсор внутри ---
-  const $from = doc.resolve(cursorPos)
   const parent = $from.parent
   const parentStart = $from.start()
 

@@ -712,13 +712,44 @@ html[data-lang="ru"] figure[data-sug-delete]::after {
 .ProseMirror hr { border: none; border-top: 1px solid var(--editor-hr); margin: 16px 0; }
 
 /* Таблицы */
+.ProseMirror .tableWrapper {
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 16px 0;
+  border-radius: 8px;
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb, rgba(128, 128, 128, 0.3)) transparent;
+}
+.ProseMirror .tableWrapper::-webkit-scrollbar {
+  height: 6px;
+}
+.ProseMirror .tableWrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+.ProseMirror .tableWrapper::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb, rgba(128, 128, 128, 0.3));
+  border-radius: 3px;
+}
+.ProseMirror .tableWrapper::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover, rgba(128, 128, 128, 0.5));
+}
 .ProseMirror table {
-  border-collapse: separate; border-spacing: 0; width: 100%; margin: 12px 0;
+  border-collapse: separate; border-spacing: 0; width: 100%; max-width: 100%; margin: 16px 0;
   border-radius: 8px; overflow: hidden; border: 1px solid var(--table-border); table-layout: auto;
+  box-sizing: border-box;
+}
+.ProseMirror .tableWrapper table {
+  margin: 0;
+  min-width: 100%;
+  max-width: none;
 }
 .ProseMirror th, .ProseMirror td {
-  padding: 8px 16px; border-bottom: 1px solid var(--table-border);
+  padding: 8px 12px; border-bottom: 1px solid var(--table-border);
   border-right: 1px solid var(--table-border); vertical-align: top; position: relative;
+  box-sizing: border-box;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 .ProseMirror th:last-child, .ProseMirror td:last-child { border-right: none; }
 .ProseMirror tbody tr:last-child td { border-bottom: none; }
@@ -735,7 +766,16 @@ html[data-lang="ru"] figure[data-sug-delete]::after {
   width: 4px; z-index: 20; background-color: var(--accent);
   pointer-events: auto; cursor: col-resize;
 }
-.ProseMirror th p, .ProseMirror td p { margin: 0; }
+.ProseMirror th p, .ProseMirror td p {
+  margin: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+.ProseMirror th code, .ProseMirror td code {
+  overflow-wrap: break-word;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
 
 /* Gap Cursor */
 .ProseMirror .ProseMirror-gapcursor { position: relative; }

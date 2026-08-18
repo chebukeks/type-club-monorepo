@@ -7,7 +7,7 @@ import { Node as PMNode } from "prosemirror-model";
 import { history } from "prosemirror-history";
 import { dropCursor } from "prosemirror-dropcursor";
 import { gapCursor } from "prosemirror-gapcursor";
-import { columnResizing, tableEditing, goToNextCell } from "prosemirror-tables";
+import { columnResizing, tableEditing, goToNextCell, TableView } from "prosemirror-tables";
 import { keymap } from "prosemirror-keymap";
 import { prosemirrorToYXmlFragment, yXmlFragmentToProsemirrorJSON } from "y-prosemirror";
 
@@ -127,17 +127,33 @@ export function EditorCore({
   const docScale = documentZoom / 100;
 
   // ── Scroll position restoration ──
+  const initialScrollRestoredRef = useRef(false);
+
   useEffect(() => {
-    if (scrollTop == null) return;
-    const timer = setTimeout(() => {
+    if (scrollTop == null || scrollTop <= 0) return;
+    initialScrollRestoredRef.current = false;
+
+    const restore = () => {
+      if (initialScrollRestoredRef.current) return;
       if (scrollContainerRef.current) {
         scrollContainerRef.current.scrollTop = scrollTop;
       }
-    }, 30);
-    return () => clearTimeout(timer);
+    };
+
+    restore();
+    const id1 = requestAnimationFrame(restore);
+    const id2 = setTimeout(restore, 50);
+    const id3 = setTimeout(restore, 150);
+
+    return () => {
+      cancelAnimationFrame(id1);
+      clearTimeout(id2);
+      clearTimeout(id3);
+    };
   }, [scrollTop, editorMode]);
 
   const handleScroll = (e: React.UIEvent<HTMLElement>) => {
+    initialScrollRestoredRef.current = true;
     onScroll?.(e.currentTarget.scrollTop);
   };
 
@@ -239,6 +255,7 @@ export function EditorCore({
         autocapitalize: 'off',
       },
       nodeViews: {
+        table: (node) => new TableView(node, 100),
         heading: (node, view, getPos) => new HeadingView(node, view, getPos),
         code_block: (node, view, getPos) => new CodeBlockView(node, view, getPos),
         math_block: (node, view, getPos) => new MathBlockView(node, view, getPos),

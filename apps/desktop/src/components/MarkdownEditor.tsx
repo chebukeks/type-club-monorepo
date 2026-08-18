@@ -314,7 +314,7 @@ export function MarkdownEditor() {
   const caretDocY = useRef(-1)
 
   function updateFocusMaskFromDocY(scrollContainer: HTMLElement) {
-    if (caretDocY.current < 0) return
+    if (state.focusMode !== 'lines' || caretDocY.current < 0) return
     scrollContainer.style.setProperty('--focus-mask-y', `${caretDocY.current - scrollContainer.scrollTop}px`)
   }
 
@@ -901,10 +901,46 @@ export function MarkdownEditor() {
 
   const isSuggestionActive = articleId != null && (userRole === 'editor' || suggestionModeActive) && state.editorMode === 'seamless'
 
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingScrollMapRef = useRef<Map<string, number>>(new Map())
+  const activeTabIdRef = useRef(activeTabId)
+  activeTabIdRef.current = activeTabId
+
+  const flushScroll = useCallback((tabId: string) => {
+    const st = pendingScrollMapRef.current.get(tabId)
+    if (st !== undefined) {
+      pendingScrollMapRef.current.delete(tabId)
+      dispatch({ type: 'SAVE_SCROLL_POSITION', payload: { tabId, scrollTop: st } })
+    }
+  }, [dispatch])
+
   const handleScroll = useCallback((st: number) => {
-    if (!activeTabId) return
-    dispatch({ type: 'SAVE_SCROLL_POSITION', payload: { tabId: activeTabId, scrollTop: st } })
-  }, [activeTabId, dispatch])
+    const tabId = activeTabIdRef.current
+    if (!tabId) return
+    pendingScrollMapRef.current.set(tabId, st)
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current)
+    scrollTimeoutRef.current = setTimeout(() => {
+      flushScroll(tabId)
+    }, 200)
+  }, [flushScroll])
+
+  const lastActiveTabForScrollRef = useRef<string | undefined>(activeTabId)
+  useEffect(() => {
+    const prevTabId = lastActiveTabForScrollRef.current
+    if (prevTabId && prevTabId !== activeTabId) {
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current)
+      flushScroll(prevTabId)
+    }
+    lastActiveTabForScrollRef.current = activeTabId
+  }, [activeTabId, flushScroll])
+
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current)
+      const curTabId = activeTabIdRef.current
+      if (curTabId) flushScroll(curTabId)
+    }
+  }, [flushScroll])
 
   const docScale = (state.documentZoom || 100) / 100
   const docHalfWidth = 430 * docScale
