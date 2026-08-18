@@ -186,7 +186,7 @@ export function TitleBar() {
   return (
     <>
       <div
-        className="flex items-center h-9 bg-[var(--bg-surface)] select-none"
+        className="relative flex items-center h-9 bg-[var(--bg-surface)] select-none"
         style={{ paddingLeft: '8px', paddingRight: '0' }}
       >
         {/* Область перетаскивания окна — левая часть */}
@@ -230,14 +230,19 @@ export function TitleBar() {
           </div>
         </div>
 
-        {/* Центральная часть — переключатель режимов (скрыт в режиме советчика) */}
+        {/* Центральная часть перетаскивания окна */}
         <div
-          className="flex-1 flex items-center justify-center h-full"
+          className="flex-1 h-full"
           style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-        >
-          {!isSuggestionActive && (
+        />
+
+        {/* Абсолютно центрированный переключатель режимов (скрыт в режиме советчика) */}
+        {!isSuggestionActive && (
+          <div
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex items-center pointer-events-none"
+          >
             <div
-              className="flex items-center rounded-lg bg-[var(--bg-surface)] select-none"
+              className="flex items-center rounded-lg bg-[var(--bg-surface)] select-none pointer-events-auto"
               style={{ padding: '3px', gap: '3px', WebkitAppRegion: 'no-drag' } as React.CSSProperties}
             >
               {modes.map((m) => (
@@ -255,20 +260,20 @@ export function TitleBar() {
                 </button>
               ))}
             </div>
-          )}
-          {/* Спиннер при переключении режима */}
-          {modeLoading && (
-            <div
-              className="ml-2 flex items-center"
-              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="animate-spin">
-                <circle cx="12" cy="12" r="10" stroke="var(--text-dim)" strokeWidth="2" opacity="0.3" />
-                <path d="M12 2a10 10 0 0 1 10 10" stroke="var(--text-secondary)" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-            </div>
-          )}
-        </div>
+            {/* Спиннер при переключении режима */}
+            {modeLoading && (
+              <div
+                className="ml-2 flex items-center pointer-events-auto"
+                style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="animate-spin">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+                  <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                </svg>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Кнопки: пользователь + настройки + управление окном */}
         <div

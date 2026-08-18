@@ -36,6 +36,7 @@ import { createCollaborationPlugins } from "./editor/collaborationPlugin";
 import { createSuggestionPlugin } from "./editor/suggestionPlugin";
 import { createSuggestionActionPlugin } from "./editor/suggestionActionPlugin";
 import { SuggestionNoteView } from "./editor/suggestionNoteView";
+import { spellcheckPlugin } from "./editor/spellcheckPlugin";
 
 import type { EditorProps } from "./types";
 
@@ -200,7 +201,7 @@ export function EditorCore({
     const historyPlugins = collaboration ? [] : [history()];
 
     const plugins: Plugin[] = isPreview
-      ? [...historyPlugins, dropCursor(), gapCursor(), syncPlugin, foldingPlugin, interactivePlugin, syntaxHighlightPlugin, typographyPlugin(), focusModePlugin(() => focusModeRef.current || 'none'), ...(onTocUpdateRef.current ? [tocPlugin((toc, sug) => onTocUpdateRef.current?.(toc, sug))] : []), ...collabPlugins, ...(extraPlugins || [])]
+      ? [...historyPlugins, dropCursor(), gapCursor(), syncPlugin, foldingPlugin, interactivePlugin, syntaxHighlightPlugin, typographyPlugin(), focusModePlugin(() => focusModeRef.current || 'none'), tocPlugin((toc, sug) => onTocUpdateRef.current?.(toc, sug)), ...collabPlugins, ...(extraPlugins || [])]
       : [
           ...suggestionPlugins,
           ...getKeymapPlugins(),
@@ -211,6 +212,7 @@ export function EditorCore({
           tabPlugin,
           seamlessPlugin,
           syntaxHighlightPlugin,
+          spellcheckPlugin,
           linkTooltipPlugin(),
           mathActivePlugin,
           ...historyPlugins,
@@ -221,7 +223,7 @@ export function EditorCore({
           typographyPlugin(),
           tableEditPlugin(),
           focusModePlugin(() => focusModeRef.current || 'none'),
-          ...(onTocUpdateRef.current ? [tocPlugin((toc, sug) => onTocUpdateRef.current?.(toc, sug))] : []),
+          tocPlugin((toc, sug) => onTocUpdateRef.current?.(toc, sug)),
           ...collabPlugins,
           ...(extraPlugins || []),
         ];
@@ -232,7 +234,9 @@ export function EditorCore({
       state: editorState,
       editable: () => !isPreview,
       attributes: {
-        spellcheck: isPreview ? 'false' : 'true',
+        spellcheck: 'false',
+        autocorrect: 'off',
+        autocapitalize: 'off',
       },
       nodeViews: {
         heading: (node, view, getPos) => new HeadingView(node, view, getPos),
@@ -341,6 +345,9 @@ export function EditorCore({
             scrollContainerRef.current = el;
           }}
           onScroll={handleScroll}
+          spellCheck={false}
+          autoCorrect="off"
+          autoCapitalize="off"
           className="w-full flex-1 resize-none outline-none bg-transparent text-[var(--editor-text)] p-6"
           style={{
             fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
@@ -358,7 +365,6 @@ export function EditorCore({
             }
             onChange(e.target.value);
           }}
-          spellCheck={false}
           readOnly={readOnly}
         />
       </div>

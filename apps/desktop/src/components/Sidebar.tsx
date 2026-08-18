@@ -118,6 +118,7 @@ export function Sidebar({ width }: { width: number }) {
     return articleRoles.some((r) => selectedRoles.includes(r as any))
   })
 
+  const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, path: string, type: 'file' | 'folder', name: string } | null>(null)
   const [onlineMenu, setOnlineMenu] = useState<{ x: number, y: number, article: ArticleListItem } | null>(null)
 
@@ -158,9 +159,53 @@ export function Sidebar({ width }: { width: number }) {
     }
   }, [contextMenu, onlineMenu])
 
+  // Сброс выбранного файла при клике вне элементов файлов
+  useEffect(() => {
+    const handleGlobalMouseDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null
+      if (!target?.closest('[data-sidebar-file]')) {
+        setSelectedFilePath(null)
+      }
+    }
+    window.addEventListener('mousedown', handleGlobalMouseDown)
+    return () => window.removeEventListener('mousedown', handleGlobalMouseDown)
+  }, [])
+
+  // Копирование файла целиком по Ctrl+C, если после выбора файла не было других кликов
+  useEffect(() => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C' || e.key === 'с' || e.key === 'С')) {
+        // Если в документе или полях ввода есть выделенный текст, не перехватываем
+        const selection = window.getSelection()?.toString()
+        if (selection && selection.length > 0) return
+        const activeTag = document.activeElement?.tagName.toLowerCase()
+        if (activeTag === 'input' || activeTag === 'textarea') return
+
+        if (selectedFilePath) {
+          e.preventDefault()
+          try {
+            if (window.api?.copyFileToClipboard) {
+              await window.api.copyFileToClipboard(selectedFilePath)
+            } else {
+              const content = await window.api.readFile(selectedFilePath)
+              await navigator.clipboard.writeText(content)
+            }
+          } catch (err) {
+            console.error('Ошибка копирования файла в буфер обмена:', err)
+          }
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedFilePath])
+
   const handleContextMenu = (e: React.MouseEvent, path: string, type: 'file' | 'folder', name: string) => {
     e.preventDefault()
     e.stopPropagation()
+    if (type === 'file') {
+      setSelectedFilePath(path)
+    }
     setContextMenu({ x: e.clientX, y: e.clientY, path, type, name })
   }
 
@@ -394,7 +439,11 @@ export function Sidebar({ width }: { width: number }) {
                   {flatSearchResults.map((file) => (
                     <div
                       key={file.path}
-                      onClick={() => openFile(file.path, file.name)}
+                      data-sidebar-file={file.path}
+                      onClick={() => {
+                        setSelectedFilePath(file.path)
+                        openFile(file.path, file.name)
+                      }}
                       onContextMenu={(e) => handleContextMenu(e, file.path, 'file', file.name)}
                       style={{ padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '8px' }}
                       className={`rounded text-xs cursor-pointer hover:bg-[var(--bg-hover)] ${
@@ -437,7 +486,10 @@ export function Sidebar({ width }: { width: number }) {
                     key={entry.path}
                     entry={entry}
                     depth={0}
-                    onFileClick={(filePath, fileName) => openFile(filePath, fileName)}
+                    onFileClick={(filePath, fileName) => {
+                      setSelectedFilePath(filePath)
+                      openFile(filePath, fileName)
+                    }}
                     onContextMenu={handleContextMenu}
                     activeFilePath={activeTab?.filePath || null}
                     activeToc={state.activeToc || []}
@@ -456,10 +508,10 @@ export function Sidebar({ width }: { width: number }) {
         const menu = contextMenu || savedCtxMenu!
         return (
           <div
-            className={`fixed bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)] ${
+            className={`fixed bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-lg shadow-xl z-50 py-0.5 flex flex-col text-[12px] text-[var(--text-secondary)] ${
               contextMenu ? 'animate-in fade-in zoom-in-95 duration-100 ease-out' : 'animate-out fade-out zoom-out-95 duration-100 ease-in fill-mode-forwards'
             }`}
-            style={{ top: menu.y, left: menu.x, minWidth: '160px' }}
+            style={{ top: menu.y, left: menu.x, minWidth: '150px' }}
             onContextMenu={(e) => e.preventDefault()}
           >
             {menu.path === '__empty__' ? (
@@ -475,8 +527,21 @@ export function Sidebar({ width }: { width: number }) {
               <button className="menu-item enabled" onClick={() => { startCreating('file'); setContextMenu(null) }}>
                 {t('sidebar.newArticle')}
               </button>
-            ) : (
+            ) : menu.type === 'folder' ? (
               <>
+                <button className="menu-item enabled" onClick={() => {
+                  startCreating('file', menu.path)
+                  setContextMenu(null)
+                }}>
+                  {t('sidebar.newFileHere')}
+                </button>
+                <button className="menu-item enabled" onClick={() => {
+                  startCreating('folder', menu.path)
+                  setContextMenu(null)
+                }}>
+                  {t('sidebar.newFolderHere')}
+                </button>
+                <div className="border-t border-[var(--border-default)] my-1 mx-1.5 opacity-80" />
                 <button className="menu-item enabled" onClick={() => { startRenaming(menu.path, menu.type); setContextMenu(null) }}>
                   {t('sidebar.rename')}
                 </button>
@@ -486,28 +551,81 @@ export function Sidebar({ width }: { width: number }) {
                 }}>
                   {t('sidebar.copyPath')}
                 </button>
-                {menu.type === 'file' && (
-                  <button className="menu-item enabled" onClick={async () => {
-                    try {
-                      const content = await window.api.readFile(menu.path)
-                      const sep = menu.path.includes('/') ? '/' : '\\'
-                      const ext = menu.name.includes('.') ? menu.name.substring(menu.name.lastIndexOf('.')) : ''
-                      const baseName = ext ? menu.name.substring(0, menu.name.lastIndexOf('.')) : menu.name
-                      const dir = menu.path.substring(0, menu.path.lastIndexOf(sep))
-                      const copyPath = dir + sep + baseName + ' копия' + ext
-                      await window.api.writeFile(copyPath, content)
-                      refreshFileTree()
-                    } catch (err) { console.error('Ошибка копированиея файла:', err) }
-                    setContextMenu(null)
-                  }}>
-                    {t('sidebar.duplicate')}
-                  </button>
-                )}
-                <div className="border-t border-[var(--border-default)] my-1.5 mx-2 opacity-80" />
+                <div className="border-t border-[var(--border-default)] my-1 mx-1.5 opacity-80" />
                 <button className="menu-item enabled" style={{ color: 'var(--text-danger)' }} onClick={() => { deleteItem(menu.path, menu.type, menu.name); setContextMenu(null) }}>
                   {t('common.delete')}
                 </button>
-                <div className="border-t border-[var(--border-default)] my-1.5 mx-2 opacity-80" />
+                <div className="border-t border-[var(--border-default)] my-1 mx-1.5 opacity-80" />
+                <button className="menu-item enabled" onClick={() => { showInExplorer(menu.path); setContextMenu(null) }}>
+                  {t('sidebar.showInExplorer')}
+                </button>
+              </>
+            ) : (
+              <>
+                <button className="menu-item enabled" onClick={async () => {
+                  try {
+                    if (window.api?.copyFileToClipboard) {
+                      await window.api.copyFileToClipboard(menu.path)
+                    } else {
+                      const content = await window.api.readFile(menu.path)
+                      await navigator.clipboard.writeText(content)
+                    }
+                  } catch (err) { console.error('Ошибка копирования файла:', err) }
+                  setContextMenu(null)
+                }}>
+                  {t('sidebar.copyContent')}
+                </button>
+                <button className="menu-item enabled" onClick={async () => {
+                  try {
+                    const content = await window.api.readFile(menu.path)
+                    const sep = menu.path.includes('/') ? '/' : '\\'
+                    const ext = menu.name.includes('.') ? menu.name.substring(menu.name.lastIndexOf('.')) : ''
+                    const baseName = ext ? menu.name.substring(0, menu.name.lastIndexOf('.')) : menu.name
+                    const dir = menu.path.substring(0, menu.path.lastIndexOf(sep))
+                    const copyPath = dir + sep + baseName + ' копия' + ext
+                    await window.api.writeFile(copyPath, content)
+                    refreshFileTree()
+                  } catch (err) { console.error('Ошибка дублирования файла:', err) }
+                  setContextMenu(null)
+                }}>
+                  {t('sidebar.duplicate')}
+                </button>
+                <div className="border-t border-[var(--border-default)] my-1 mx-1.5 opacity-80" />
+                {(() => {
+                  const sep = menu.path.includes('/') ? '/' : '\\'
+                  const parentDir = menu.path.substring(0, menu.path.lastIndexOf(sep)) || state.folderPath
+                  return (
+                    <>
+                      <button className="menu-item enabled" onClick={() => {
+                        if (parentDir) startCreating('file', parentDir)
+                        setContextMenu(null)
+                      }}>
+                        {t('sidebar.newFileHere')}
+                      </button>
+                      <button className="menu-item enabled" onClick={() => {
+                        if (parentDir) startCreating('folder', parentDir)
+                        setContextMenu(null)
+                      }}>
+                        {t('sidebar.newFolderHere')}
+                      </button>
+                    </>
+                  )
+                })()}
+                <div className="border-t border-[var(--border-default)] my-1 mx-1.5 opacity-80" />
+                <button className="menu-item enabled" onClick={() => { startRenaming(menu.path, menu.type); setContextMenu(null) }}>
+                  {t('sidebar.rename')}
+                </button>
+                <button className="menu-item enabled" onClick={() => {
+                  navigator.clipboard.writeText(menu.path)
+                  setContextMenu(null)
+                }}>
+                  {t('sidebar.copyPath')}
+                </button>
+                <div className="border-t border-[var(--border-default)] my-1 mx-1.5 opacity-80" />
+                <button className="menu-item enabled" style={{ color: 'var(--text-danger)' }} onClick={() => { deleteItem(menu.path, menu.type, menu.name); setContextMenu(null) }}>
+                  {t('common.delete')}
+                </button>
+                <div className="border-t border-[var(--border-default)] my-1 mx-1.5 opacity-80" />
                 <button className="menu-item enabled" onClick={() => { showInExplorer(menu.path); setContextMenu(null) }}>
                   {t('sidebar.showInExplorer')}
                 </button>
@@ -523,10 +641,10 @@ export function Sidebar({ width }: { width: number }) {
         const isAuthor = !menu.article.my_roles || menu.article.my_roles.includes('author')
         return (
           <div
-            className={`fixed bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)] ${
+            className={`fixed bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-lg shadow-xl z-50 py-0.5 flex flex-col text-[12px] text-[var(--text-secondary)] ${
               onlineMenu ? 'animate-in fade-in zoom-in-95 duration-100 ease-out' : 'animate-out fade-out zoom-out-95 duration-100 ease-in fill-mode-forwards'
             }`}
-            style={{ top: menu.y, left: menu.x, minWidth: '160px' }}
+            style={{ top: menu.y, left: menu.x, minWidth: '150px' }}
             onContextMenu={(e) => e.preventDefault()}
           >
             {isAuthor && (
@@ -554,7 +672,7 @@ export function Sidebar({ width }: { width: number }) {
             )}
             {isAuthor && (
               <>
-                <div className="border-t border-[var(--border-default)] my-1.5 mx-2 opacity-80" />
+                <div className="border-t border-[var(--border-default)] my-1 mx-1.5 opacity-80" />
                 <button className="menu-item enabled" style={{ color: 'var(--text-danger)' }} onClick={() => {
                   deleteOnlineArticle(menu.article.id)
                   setOnlineMenu(null)
@@ -563,7 +681,7 @@ export function Sidebar({ width }: { width: number }) {
                 </button>
               </>
             )}
-            <div className="border-t border-[var(--border-default)] my-1.5 mx-2 opacity-80" />
+            <div className="border-t border-[var(--border-default)] my-1 mx-1.5 opacity-80" />
             <button className="menu-item enabled" onClick={() => {
               const authorNick = menu.article.author_nickname || onlineUsername
               window.api.openExternal(`${config.siteUrl}/${authorNick}/${menu.article.slug}`)
@@ -979,6 +1097,7 @@ function FileTreeItem({ entry, depth, onFileClick, onContextMenu, activeFilePath
       ) : (
         <div 
           draggable
+          data-sidebar-file={entry.path}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDragEnter={handleDragEnter}

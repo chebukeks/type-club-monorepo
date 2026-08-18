@@ -151,14 +151,14 @@ export default function TableOfContents({
     return (
       <nav className={`w-full h-full overflow-hidden rounded-2xl border border-gray-200/80 dark:border-gray-800/80 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md shadow-xs flex flex-col ${className}`}>
         <div className="overflow-y-auto flex-1 p-4 custom-scrollbar">
-          {hasToc && (
-            <>
-              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100 dark:border-gray-800/80">
-                <BookOpen size={16} className="text-blue-500" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{t('toc.title')}</h3>
-              </div>
-              <TocList />
-            </>
+          <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100 dark:border-gray-800/80">
+            <BookOpen size={16} className="text-blue-500" />
+            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{t('toc.title')}</h3>
+          </div>
+          {hasToc ? (
+            <TocList />
+          ) : (
+            <p className="text-xs text-gray-400 dark:text-gray-500 italic py-2">{t('toc.empty')}</p>
           )}
           {showSuggestions && <SuggestionsList />}
         </div>
@@ -176,9 +176,11 @@ export default function TableOfContents({
           title={t('toc.tocAndSuggestions')}
         >
           <List size={20} className="transition-transform group-hover:rotate-6" />
-          <span className="absolute -top-1 -right-1 px-1.5 py-0.5 text-[10px] font-bold bg-amber-500 text-white rounded-full border-2 border-white dark:border-gray-950">
-            {totalCount}
-          </span>
+          {totalCount > 0 && (
+            <span className="absolute -top-1 -right-1 px-1.5 py-0.5 text-[10px] font-bold bg-amber-500 text-white rounded-full border-2 border-white dark:border-gray-950">
+              {totalCount}
+            </span>
+          )}
         </button>
 
         {/* Popover / Sheet Drawer */}
@@ -203,7 +205,9 @@ export default function TableOfContents({
                     ? showSuggestions
                       ? `${t('toc.tocAndSuggestions')} (${totalCount})`
                       : `${t('toc.title')} (${toc.length})`
-                    : `${t('toc.suggestions')} (${suggestions.length})`}
+                    : showSuggestions
+                    ? `${t('toc.suggestions')} (${suggestions.length})`
+                    : t('toc.title')}
                 </h3>
               </div>
               <button
@@ -214,7 +218,11 @@ export default function TableOfContents({
               </button>
             </div>
             <div className="overflow-y-auto flex-1 pr-1 custom-scrollbar">
-              {hasToc && <TocList />}
+              {hasToc ? (
+                <TocList />
+              ) : (
+                <p className="text-xs text-gray-400 dark:text-gray-500 italic py-2">{t('toc.empty')}</p>
+              )}
               {showSuggestions && <SuggestionsList />}
             </div>
           </div>

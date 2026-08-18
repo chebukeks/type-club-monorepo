@@ -210,8 +210,9 @@ export default function Editor() {
         {showRightSidebar ? (
           <div
             style={{
-              left: `${leftPos}px`,
               right: "24px",
+              width: `${Math.min(280, availableWidth)}px`,
+              maxWidth: "280px",
               top: "16px",
               bottom: "24px",
             }}

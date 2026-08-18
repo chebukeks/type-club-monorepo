@@ -414,21 +414,6 @@ export function MenuBar() {
                 <RadioIcon active={theme === 'system'} />
                 <span>{t('menu.view.themeSystem')}</span>
               </div>
-              {state.customThemes.length > 0 && (
-                <>
-                  {sep}
-                  {state.customThemes.map((cTheme) => (
-                    <div
-                      key={cTheme.id}
-                      className={`${itemCls(true)} gap-2`}
-                      onClick={() => handleSetTheme(cTheme.id)}
-                    >
-                      <RadioIcon active={theme === cTheme.id} />
-                      <span className="truncate">{cTheme.name}</span>
-                    </div>
-                  ))}
-                </>
-              )}
             </AnimatedMenu>
           </div>
 

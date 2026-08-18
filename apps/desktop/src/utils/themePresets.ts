@@ -140,7 +140,121 @@ export const LIGHT_THEME: AppTheme = {
   typography: { ...DEFAULT_TYPOGRAPHY },
 }
 
-export const BUILTIN_THEMES: AppTheme[] = [DARK_THEME, LIGHT_THEME]
+export const PEACHY_THEME: AppTheme = {
+  id: 'peachy',
+  name: 'Peachy',
+  isBuiltin: true,
+  baseTheme: 'light',
+  colors: {
+    bgBase: '#fef4ec',
+    bgSurface: '#ffe6db',
+    bgElevated: '#fef6ec',
+    bgHover: '#e8caca',
+    bgActive: '#dcbcbc',
+    bgInput: '#fef4ec',
+    borderDefault: '#e8d3d3',
+    borderStrong: '#dcbcbc',
+    textPrimary: '#6f5252',
+    textSecondary: '#846262',
+    textMuted: '#a28181',
+    textDim: '#846262',
+    textDanger: '#ee7272',
+    accent: '#ba7878',
+    accentHover: '#bf8282',
+    menuHoverBg: 'rgba(236, 165, 142, 0.15)',
+    editorText: '#6f5252',
+    editorCaret: '#bc6262',
+    editorSelection: 'rgba(236, 165, 142, 0.25)',
+    editorHeading: '#6f5252',
+    editorLink: '#ff781f',
+    editorSyntax: '#ba7878',
+    editorHr: '#9d7b7b',
+    editorStrike: '#9d7b7b',
+    editorCodeBg: 'rgba(150, 57, 98, 0.08)',
+    editorCodeText: '#ff781f',
+    editorMarkBg: '#fd6bff',
+    editorMarkText: '#863687',
+    editorBlockquoteBorder: '#ff781f',
+    editorBlockquoteText: '#6f5252',
+    editorBlockquoteBg: 'rgba(236, 165, 142, 0.15)',
+    codeblockBg: '#ffe6db',
+    codeblockBorder: '#ce8d8d',
+    codeblockText: '#6f5252',
+    codeblockLang: '#6f5252',
+    hljsKeyword: '#ac3eab',
+    hljsString: '#918712',
+    hljsTitle: '#3da966',
+    hljsNumber: '#b55f26',
+    hljsComment: '#a88a8a',
+    tableBorder: '#ce8d8d',
+    tableHeaderBg: '#ba7878',
+    tableHeaderText: '#fef4ec',
+    tableCellBg: '#ffdbcc',
+    tableCellText: '#6f5252',
+    tableEvenBg: '#ffe6db',
+    tableSelected: 'rgba(236, 165, 142, 0.15)',
+  },
+  typography: { ...DEFAULT_TYPOGRAPHY },
+}
+
+export const DISSONANCE_THEME: AppTheme = {
+  id: 'dissonance',
+  name: 'Dissonance',
+  isBuiltin: true,
+  baseTheme: 'dark',
+  colors: {
+    bgBase: '#323339',
+    bgSurface: '#2c2d32',
+    bgElevated: '#323339',
+    bgHover: '#414249',
+    bgActive: '#313238',
+    bgInput: '#2a2b30',
+    borderDefault: '#393a3f',
+    borderStrong: '#414348',
+    textPrimary: '#f3f3f4',
+    textSecondary: '#d7d8da',
+    textMuted: '#c5c5c9',
+    textDim: '#c5c5c9',
+    textDanger: '#a9232e',
+    accent: '#5865f2',
+    accentHover: '#4452bb',
+    menuHoverBg: '#414249',
+    editorText: '#f3f3f4',
+    editorCaret: '#5865f2',
+    editorSelection: 'rgba(88, 101, 242, 0.25)',
+    editorHeading: '#f3f3f4',
+    editorLink: '#76aff6',
+    editorSyntax: '#f3f3f4',
+    editorHr: '#f3f3f4',
+    editorStrike: '#f3f3f4',
+    editorCodeBg: '#353748',
+    editorCodeText: '#d4d4d8',
+    editorMarkBg: '#5865f2',
+    editorMarkText: '#ffffff',
+    editorBlockquoteBorder: '#595a63',
+    editorBlockquoteText: '#b5b6bb',
+    editorBlockquoteBg: '#323339',
+    codeblockBg: '#353748',
+    codeblockBorder: '#494a59',
+    codeblockText: '#F3F3F4',
+    codeblockLang: '#8bb4e7',
+    hljsKeyword: '#F2B5B1',
+    hljsString: '#93D8A6',
+    hljsTitle: '#B3C1F3',
+    hljsNumber: '#DCAA93',
+    hljsComment: '#9B9CA5',
+    tableBorder: '#494a59',
+    tableHeaderBg: '#3f4151',
+    tableHeaderText: '#ededee',
+    tableCellBg: '#353748',
+    tableCellText: '#d7d8da',
+    tableEvenBg: '#323443',
+    tableSelected: 'rgba(88, 101, 242, 0.25)',
+  },
+  typography: { ...DEFAULT_TYPOGRAPHY },
+}
+
+export const BUILTIN_THEMES: AppTheme[] = [DARK_THEME, LIGHT_THEME, PEACHY_THEME, DISSONANCE_THEME]
 
 /** Генерация CSS переменных для темы */
 export function generateCssVariables(theme: AppTheme): string {
@@ -178,6 +292,11 @@ export function generateCssVariables(theme: AppTheme): string {
       --editor-caret: ${colors.editorCaret} !important;
       --editor-selection: ${colors.editorSelection} !important;
       --editor-heading: ${colors.editorHeading} !important;
+      --editor-heading-h3: ${colors.editorHeading} !important;
+      --editor-heading-h4: ${colors.editorHeading} !important;
+      --editor-heading-h5: ${colors.editorHeading} !important;
+      --editor-heading-h6: ${colors.editorHeading} !important;
+      --text-heading: ${colors.editorHeading} !important;
       --editor-link: ${colors.editorLink} !important;
       --editor-syntax: ${colors.editorSyntax || (isDark ? '#4a4d54' : '#bbbbbb')} !important;
       --editor-prefix: ${colors.editorSyntax || (isDark ? '#4a4d54' : '#bbbbbb')} !important;

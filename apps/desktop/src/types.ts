@@ -162,8 +162,12 @@ export interface AppState {
   activeExplorerPath: string | null;
   /** Режим переименования файла/папки в Sidebar */
   renaming: { path: string, type: 'file' | 'folder' } | null;
-  /** Текущая цветовая тема */
+  /** Текущий режим темы (light | dark | system) */
   theme: ThemeMode;
+  /** Выбранная дневная тема (ID) */
+  lightThemeId: string;
+  /** Выбранная ночная тема (ID) */
+  darkThemeId: string;
   /** Пользовательские темы оформления */
   customThemes: AppTheme[];
   /** Полная конфигурация активной темы */
@@ -215,6 +219,7 @@ export type AppAction =
   | { type: 'RENAME_TAB_PATHS'; payload: { oldPath: string; newPath: string } }
   | { type: 'SET_ACTIVE_EXPLORER_PATH'; payload: { path: string | null } }
   | { type: 'SET_THEME'; payload: { theme: ThemeMode; activeTheme?: AppTheme } }
+  | { type: 'SET_THEME_SLOTS'; payload: { lightThemeId?: string; darkThemeId?: string; themeMode?: ThemeMode; activeTheme?: AppTheme } }
   | { type: 'SET_CUSTOM_THEMES'; payload: { customThemes: AppTheme[] } }
   | { type: 'SET_LANGUAGE'; payload: { language: import('@type-club/editor').Locale } }
   | { type: 'SET_TOC_LAYOUT_MODE'; payload: { mode: TocLayoutMode } }
@@ -252,6 +257,7 @@ export interface IElectronAPI {
   renameItem: (oldPath: string, newPath: string) => Promise<void>;
   deleteItem: (filePath: string) => Promise<void>;
   showItemInFolder: (filePath: string) => void;
+  copyFileToClipboard: (filePath: string) => Promise<boolean>;
   confirmDelete: (itemName: string) => Promise<boolean>;
   openFolder: () => Promise<string | null>;
   openFile: () => Promise<{ filePath: string; content: string } | null>;
@@ -281,9 +287,11 @@ export interface IElectronAPI {
   /** Удалить слово из пользовательского словаря */
   removeCustomWord: (word: string) => Promise<boolean>;
   /** Проверить, считается ли слово ошибочным по спеллчекеру */
-  isWordMisspelled: (word: string) => boolean;
+  isWordMisspelled: (word: string) => Promise<boolean>;
   /** Получить варианты исправлений для слова */
-  getWordSuggestions: (word: string) => string[];
+  getWordSuggestions: (word: string) => Promise<string[]>;
+  /** Пакетная проверка списка слов */
+  checkWords: (words: string[]) => Promise<string[]>;
   /** Подписка на данные контекстного меню спеллчекера */
   onContextMenuInfo: (callback: (info: { misspelledWord: string; dictionarySuggestions: string[]; x: number; y: number }) => void) => () => void;
   /** Получить файлы, переданные при старте (Open with...) */

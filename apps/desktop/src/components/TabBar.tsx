@@ -63,9 +63,16 @@ export function TabBar() {
             onDragLeave={() => { if (dropIndex === index) setDropIndex(null) }}
             onDrop={(e) => handleDrop(e, index)}
             onClick={() => dispatch({ type: 'SET_ACTIVE_TAB', payload: { tabId: tab.id } })}
-            className={`group flex items-center cursor-pointer transition-all min-w-0 max-w-[220px] rounded-lg ${
+            onMouseDown={(e) => {
+              if (e.button === 1) {
+                e.preventDefault()
+                e.stopPropagation()
+                closeTab(tab.id)
+              }
+            }}
+            className={`group flex items-center cursor-pointer transition-colors min-w-0 max-w-[220px] rounded-lg font-medium ${
               isActive
-                ? 'bg-[var(--bg-base)] text-[var(--text-primary)] shadow-xs border border-[var(--border-default)] font-medium'
+                ? 'bg-[var(--bg-base)] text-[var(--text-primary)] shadow-xs border border-[var(--border-default)]'
                 : 'text-[var(--text-dim)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] border border-transparent'
             }`}
             style={{
@@ -108,7 +115,8 @@ export function TabBar() {
                   closeTab(tab.id)
                 }
               }}
-              className="ml-auto p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-active)] transition-all flex-shrink-0"
+              className="ml-auto flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-active)] transition-all flex-shrink-0 -mr-1"
+              style={{ width: '22px', height: '22px' }}
               title={t('titlebar.tabCloseOthers')}
             >
               <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5">

@@ -8,8 +8,7 @@ import { toggleMark } from 'prosemirror-commands'
 import { Plugin, TextSelection, NodeSelection, Selection } from 'prosemirror-state'
 import { deleteTable } from 'prosemirror-tables'
 import type { EditorView } from 'prosemirror-view'
-
-import { EditorCore, injectEditorStyles, schema, tableEditPluginKey } from '@type-club/editor'
+import { EditorCore, injectEditorStyles, schema, tableEditPluginKey, spellcheckService } from '@type-club/editor'
 import { useEditor } from '../context/EditorContext'
 import { useAuth } from '../context/AuthContext'
 import { useCollaboration } from '../hooks/useCollaboration'
@@ -32,6 +31,29 @@ export function MarkdownEditor() {
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([])
   const [showSearch, setShowSearch] = useState(false)
   const lastWheelTimeRef = useRef(0)
+
+  // Инициализация провайдера спеллчекера и синхронизация словарей при старте
+  useEffect(() => {
+    if (window.api?.isWordMisspelled) {
+      spellcheckService.setProvider({
+        isWordMisspelled: (word) => window.api.isWordMisspelled(word),
+        getWordSuggestions: (word) => window.api.getWordSuggestions(word),
+        checkWords: (words) => window.api.checkWords(words),
+      })
+    }
+
+    if (window.api?.getCustomDictionaryWords) {
+      Promise.all([
+        window.api.getCustomDictionaryWords(),
+        window.api.getSpellcheckLanguages(),
+        window.api.getSpellcheck(),
+      ])
+        .then(([words, langs, enabled]) => {
+          spellcheckService.init(words, langs, enabled)
+        })
+        .catch(() => {})
+    }
+  }, [])
 
   const [zoomToast, setZoomToast] = useState<{ type: 'app' | 'text' | 'document'; percent: number } | null>(null)
   const zoomToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -532,14 +554,13 @@ export function MarkdownEditor() {
   }
 
   const [ctxMenuMounted, setCtxMenuMounted] = useState(false)
-  const [savedCtxMenuStyle, setSavedCtxMenuStyle] = useState<React.CSSProperties | null>(null)
   const [ctxSpellcheck, setCtxSpellcheck] = useState<{
     misspelledWord: string
     dictionarySuggestions: string[]
     range: { from: number; to: number } | null
   } | null>(null)
 
-  const handleContextMenu = (e: React.MouseEvent) => {
+  const handleContextMenu = async (e: React.MouseEvent) => {
     if (state.editorMode !== 'seamless') return
     e.preventDefault()
     setCtxTable(null)
@@ -591,27 +612,19 @@ export function MarkdownEditor() {
           if (wordAtPos) {
             targetWord = wordAtPos.word
             targetRange = { from: wordAtPos.from, to: wordAtPos.to }
+            try {
+              const clickPos = editorView.posAtCoords({ left: e.clientX, top: e.clientY })
+              if (clickPos && (clickPos.pos < from || clickPos.pos > to)) {
+                editorView.dispatch(editorView.state.tr.setSelection(Selection.near(editorView.state.doc.resolve(clickPos.pos))))
+              }
+            } catch { /* ignore */ }
           }
         }
 
         if (targetWord) {
-          let isMisspelled = false
-          let suggestions: string[] = []
-
-          try {
-            if (window.api?.isWordMisspelled) {
-              isMisspelled = window.api.isWordMisspelled(targetWord) || window.api.isWordMisspelled(targetWord.toLowerCase())
-            }
-            if (isMisspelled && window.api?.getWordSuggestions) {
-              suggestions = window.api.getWordSuggestions(targetWord)
-              if (suggestions.length === 0 && targetWord.toLowerCase() !== targetWord) {
-                suggestions = window.api.getWordSuggestions(targetWord.toLowerCase())
-              }
-            }
-          } catch { /* ignore */ }
-
-          // Пункт "Добавить в словарь" и подсказки доступны ТОЛЬКО если слово подчеркнуто спеллчекером
+          const isMisspelled = await spellcheckService.isWordMisspelled(targetWord)
           if (isMisspelled) {
+            const suggestions = await spellcheckService.getWordSuggestions(targetWord)
             spellcheckInfo = {
               misspelledWord: targetWord,
               dictionarySuggestions: suggestions,
@@ -628,54 +641,65 @@ export function MarkdownEditor() {
     setCtxMenu({ x: e.clientX, y: e.clientY })
   }
 
-  // Подписка на событие контекстного меню спеллчекера от main process (дополнительный источник)
-  useEffect(() => {
-    if (!window.api?.onContextMenuInfo) return
-    const cleanup = window.api.onContextMenuInfo((info) => {
-      if (info.misspelledWord) {
-        setCtxSpellcheck((prev) => ({
-          misspelledWord: info.misspelledWord,
-          dictionarySuggestions: info.dictionarySuggestions || [],
-          range: prev?.range || null,
-        }))
-      }
-    })
-    return cleanup
-  }, [])
 
   useEffect(() => {
     if (ctxMenu) {
       setCtxMenuMounted(true)
     } else {
-      const timer = setTimeout(() => setCtxMenuMounted(false), 100)
+      const timer = setTimeout(() => {
+        setCtxMenuMounted(false)
+        setCtxSpellcheck(null)
+        setCtxSubmenu(null)
+        setCtxTable(null)
+      }, 100)
       return () => clearTimeout(timer)
     }
   }, [ctxMenu])
 
+  const ctxMenuRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!ctxMenu) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (e.button === 0) {
+        if (ctxMenuRef.current && ctxMenuRef.current.contains(e.target as Node)) {
+          return
+        }
+        setCtxMenu(null)
+      }
+    }
+    window.addEventListener('mousedown', handleClickOutside)
+    return () => window.removeEventListener('mousedown', handleClickOutside)
+  }, [ctxMenu])
+
   const closeCtxMenu = () => {
     setCtxMenu(null)
-    setCtxSubmenu(null)
-    setCtxTable(null)
-    setCtxSpellcheck(null)
   }
 
   const handleApplySuggestion = (suggestion: string) => {
     if (!editorView || !ctxSpellcheck?.misspelledWord) return
     const { state: pmState, dispatch } = editorView
+    let tr = pmState.tr
     if (ctxSpellcheck.range) {
-      dispatch(pmState.tr.insertText(suggestion, ctxSpellcheck.range.from, ctxSpellcheck.range.to))
+      tr = tr.insertText(suggestion, ctxSpellcheck.range.from, ctxSpellcheck.range.to)
     } else {
       const { from, to } = pmState.selection
-      dispatch(pmState.tr.insertText(suggestion, from, to))
+      tr = tr.insertText(suggestion, from, to)
     }
+    dispatch(tr.setMeta('spellcheckRefresh', true))
     editorView.focus()
     closeCtxMenu()
   }
 
   const handleAddToDictionary = async () => {
     if (!ctxSpellcheck?.misspelledWord) return
-    await window.api.addCustomWord(ctxSpellcheck.misspelledWord)
-    editorView?.focus()
+    const word = ctxSpellcheck.misspelledWord
+    spellcheckService.addCustomWord(word)
+    await window.api?.addCustomWord(word)
+    if (editorView) {
+      editorView.dispatch(editorView.state.tr.setMeta('spellcheckRefresh', true))
+      editorView.focus()
+    }
     closeCtxMenu()
   }
 
@@ -714,25 +738,21 @@ export function MarkdownEditor() {
   }
 
   // Вычисление позиции меню с учётом viewport
+  const lastMenuStyleRef = useRef<React.CSSProperties | null>(null)
   const ctxMenuStyle = useMemo((): React.CSSProperties | null => {
-    if (!ctxMenu) return savedCtxMenuStyle
+    if (!ctxMenu) return lastMenuStyleRef.current
     const menuHeight = ctxSubmenu === 'table' ? 300 : ctxSubmenu === 'code' ? 260 : 400
     const vh = window.innerHeight
     const fitsBelow = ctxMenu.y + menuHeight <= vh - 10
-    const st = {
+    const st: React.CSSProperties = {
       top: fitsBelow ? ctxMenu.y : undefined,
       bottom: fitsBelow ? undefined : vh - ctxMenu.y,
       left: Math.min(ctxMenu.x, window.innerWidth - 270),
       minWidth: ctxSubmenu === 'table' ? '260px' : ctxSubmenu === 'code' ? '250px' : '230px',
     }
+    lastMenuStyleRef.current = st
     return st
-  }, [ctxMenu, ctxSubmenu, savedCtxMenuStyle])
-
-  useEffect(() => {
-    if (ctxMenu) {
-      setSavedCtxMenuStyle(ctxMenuStyle)
-    }
-  }, [ctxMenu, ctxMenuStyle])
+  }, [ctxMenu, ctxSubmenu])
 
   const applyFormat = (markName: string) => {
     if (!editorView) return
@@ -822,7 +842,7 @@ export function MarkdownEditor() {
     { label: t('editor.format.spoiler'), hotkey: 'Ctrl+Shift+S', command: 'spoiler' },
   ]
 
-  const sep = <div className="border-t border-[var(--border-default)] my-1.5 mx-2 opacity-80" />
+  const sep = <div className="border-t border-[var(--border-default)] my-1 mx-1.5 opacity-80" />
 
   const ctxMenuItem = (label: string, hotkey?: React.ReactNode, onClick?: () => void, extraClass?: string) => (
     <div
@@ -832,23 +852,23 @@ export function MarkdownEditor() {
       <span>{label}</span>
       {hotkey && (
         typeof hotkey === 'string'
-          ? <span className="text-[11px] text-[var(--text-dim)]">{hotkey}</span>
+          ? <span className="text-[10px] text-[var(--text-dim)]">{hotkey}</span>
           : hotkey
       )}
     </div>
   )
 
   const numInput = (label: string, value: number, setValue: (v: number) => void, min = 1, max = 10) => (
-    <div style={{ padding: '8px 20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+    <div style={{ padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
       <span className="text-xs text-[var(--text-dim)] w-16">{label}</span>
       <button
-        className="w-6 h-6 flex items-center justify-center rounded text-[var(--text-secondary)] hover:bg-[var(--menu-hover-bg)] disabled:opacity-30 text-sm"
+        className="w-5 h-5 flex items-center justify-center rounded text-[var(--text-secondary)] hover:bg-[var(--menu-hover-bg)] disabled:opacity-30 text-xs"
         disabled={value <= min}
         onClick={() => setValue(value - 1)}
       >−</button>
-      <span className="w-8 text-center text-sm text-[var(--text-secondary)]">{value}</span>
+      <span className="w-6 text-center text-xs text-[var(--text-secondary)]">{value}</span>
       <button
-        className="w-6 h-6 flex items-center justify-center rounded text-[var(--text-secondary)] hover:bg-[var(--menu-hover-bg)] disabled:opacity-30 text-sm"
+        className="w-5 h-5 flex items-center justify-center rounded text-[var(--text-secondary)] hover:bg-[var(--menu-hover-bg)] disabled:opacity-30 text-xs"
         disabled={value >= max}
         onClick={() => setValue(value + 1)}
       >+</button>
@@ -935,14 +955,25 @@ export function MarkdownEditor() {
         onScroll={handleScroll}
       />
 
+      {showAddNoteModal && (
+        <AddNoteModal
+          isOpen={showAddNoteModal}
+          onClose={() => setShowAddNoteModal(false)}
+          onSubmit={handleAddNoteSubmit}
+        />
+      )}
+
+      {/* Контекстные меню */}
       {ctxMenuMounted && ctxTable !== null && (
         <div
-          className={`fixed bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)] ${
+          ref={ctxMenuRef}
+          className={`fixed bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-lg shadow-xl z-50 py-0.5 flex flex-col text-[12px] text-[var(--text-secondary)] ${
             ctxMenu ? 'animate-in fade-in zoom-in-95 duration-100 ease-out' : 'animate-out fade-out zoom-out-95 duration-100 ease-in fill-mode-forwards'
           }`}
           style={ctxMenuStyle!}
           onContextMenu={(e) => e.preventDefault()}
           onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
         >
           {ctxMenuItem(t('editor.table.copy'), undefined, handleTableCopy)}
           {!isSuggestionActive && (
@@ -957,12 +988,14 @@ export function MarkdownEditor() {
 
       {ctxMenuMounted && !ctxSubmenu && ctxTable === null && (
         <div
-          className={`fixed bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)] ${
+          ref={ctxMenuRef}
+          className={`fixed bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-lg shadow-xl z-50 py-0.5 flex flex-col text-[12px] text-[var(--text-secondary)] ${
             ctxMenu ? 'animate-in fade-in zoom-in-95 duration-100 ease-out' : 'animate-out fade-out zoom-out-95 duration-100 ease-in fill-mode-forwards'
           }`}
           style={ctxMenuStyle!}
           onContextMenu={(e) => e.preventDefault()}
           onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
         >
           {/* Спеллчекер: варианты исправлений и добавление в словарь */}
           {ctxSpellcheck?.misspelledWord && (
@@ -999,12 +1032,12 @@ export function MarkdownEditor() {
                   onClick={() => applyFormat(item.command)}
                 >
                   <span>{item.label}</span>
-                  <span className="text-[11px] text-[var(--text-dim)]">{item.hotkey}</span>
+                  <span className="text-[10px] text-[var(--text-dim)]">{item.hotkey}</span>
                 </div>
               ))}
               {sep}
-              {ctxMenuItem(t('editor.menu.createTable'), <ChevronRight size={14} className="text-[var(--text-dim)]" />, () => setCtxSubmenu('table'))}
-              {ctxMenuItem(t('editor.menu.createCodeBlock'), <ChevronRight size={14} className="text-[var(--text-dim)]" />, () => setCtxSubmenu('code'))}
+              {ctxMenuItem(t('editor.menu.createTable'), <ChevronRight size={13} className="text-[var(--text-dim)]" />, () => setCtxSubmenu('table'))}
+              {ctxMenuItem(t('editor.menu.createCodeBlock'), <ChevronRight size={13} className="text-[var(--text-dim)]" />, () => setCtxSubmenu('code'))}
               {ctxMenuItem(t('editor.menu.createMathBlock'), undefined, insertMathBlock)}
             </>
           )}
@@ -1022,27 +1055,29 @@ export function MarkdownEditor() {
 
       {ctxMenuMounted && ctxSubmenu === 'table' && (
         <div
-          className={`fixed bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)] ${
+          ref={ctxMenuRef}
+          className={`fixed bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-lg shadow-xl z-50 py-0.5 flex flex-col text-[12px] text-[var(--text-secondary)] ${
             ctxMenu ? 'animate-in fade-in zoom-in-95 duration-100 ease-out' : 'animate-out fade-out zoom-out-95 duration-100 ease-in fill-mode-forwards'
           }`}
           style={ctxMenuStyle!}
           onContextMenu={(e) => e.preventDefault()}
           onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
         >
           {ctxMenuItem(t('common.back'), undefined, () => setCtxSubmenu(null))}
           {sep}
           {numInput(t('editor.table.columns'), tableCols, setTableCols)}
           {numInput(t('editor.table.rows'), tableRows, setTableRows)}
           {sep}
-          <div className="overflow-x-auto" style={{ padding: '8px 20px' }}>
+          <div className="overflow-x-auto" style={{ padding: '6px 14px' }}>
             <table className="w-full border-collapse border border-[var(--border-strong)]">
               <tbody>{tablePreview}</tbody>
             </table>
           </div>
           {sep}
-          <div style={{ padding: '6px 12px' }}>
+          <div style={{ padding: '4px 10px' }}>
             <button
-              className="w-full py-1.5 rounded text-white text-sm font-medium hover:opacity-90"
+              className="w-full py-1 rounded text-white text-xs font-medium hover:opacity-90"
               style={{ backgroundColor: 'var(--accent)' }}
               onClick={insertTable}
             >{t('common.create')}</button>
@@ -1052,20 +1087,22 @@ export function MarkdownEditor() {
 
       {ctxMenuMounted && ctxSubmenu === 'code' && (
         <div
-          className={`fixed bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-50 py-1 flex flex-col text-[13px] text-[var(--text-secondary)] ${
+          ref={ctxMenuRef}
+          className={`fixed bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-lg shadow-xl z-50 py-0.5 flex flex-col text-[12px] text-[var(--text-secondary)] ${
             ctxMenu ? 'animate-in fade-in zoom-in-95 duration-100 ease-out' : 'animate-out fade-out zoom-out-95 duration-100 ease-in fill-mode-forwards'
           }`}
           style={ctxMenuStyle!}
           onContextMenu={(e) => e.preventDefault()}
           onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
         >
           {ctxMenuItem(t('common.back'), undefined, () => setCtxSubmenu(null))}
           {sep}
-          <div style={{ padding: '8px 20px' }}>
-            <span className="text-xs text-[var(--text-dim)]">{t('editor.code.language')}</span>
+          <div style={{ padding: '6px 14px' }}>
+            <span className="text-[11px] text-[var(--text-dim)]">{t('editor.code.language')}</span>
             <div className="relative mt-1" ref={langDropdownRef}>
               <input
-                className="w-full bg-[var(--bg-base)] border border-[var(--border-strong)] rounded px-2 py-1 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--text-dim)]"
+                className="w-full bg-[var(--bg-base)] border border-[var(--border-strong)] rounded px-2 py-1 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--text-dim)]"
                 placeholder={t('editor.noLanguage')}
                 value={codeLang}
                 onChange={(e) => setCodeLang(e.target.value)}
@@ -1073,7 +1110,7 @@ export function MarkdownEditor() {
                 onBlur={() => setTimeout(() => setShowLangDropdown(false), 200)}
               />
               {showLangDropdown && (
-                <div className="absolute left-0 right-0 top-full mt-0.5 max-h-40 overflow-y-auto bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-[60] animate-in fade-in zoom-in-95 duration-100 ease-out">
+                <div className="absolute left-0 right-0 top-full mt-0.5 max-h-40 overflow-y-auto bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-lg shadow-xl z-[60] animate-in fade-in zoom-in-95 duration-100 ease-out">
                   {languagesList.filter(l => !codeLang || l.label.toLowerCase().includes(codeLang.toLowerCase()) || l.value.includes(codeLang)).map((l) => (
                     <div
                       key={l.value}
@@ -1086,27 +1123,21 @@ export function MarkdownEditor() {
             </div>
           </div>
           {sep}
-          <div style={{ padding: '6px 12px' }} className="flex gap-2">
+          <div style={{ padding: '4px 10px' }} className="flex gap-2">
             <button
-              className="flex-1 py-1.5 rounded text-white text-sm font-medium hover:opacity-90"
+              className="flex-1 py-1 rounded text-white text-xs font-medium hover:opacity-90"
               style={{ backgroundColor: 'var(--accent)' }}
               onClick={() => insertCodeBlock()}
             >{t('common.create')}</button>
             {codeLang && (
               <button
-                className="flex-1 py-1.5 rounded bg-[var(--bg-base)] border border-[var(--border-strong)] text-[var(--text-secondary)] text-sm hover:bg-[var(--menu-hover-bg)]"
+                className="flex-1 py-1 rounded bg-[var(--bg-base)] border border-[var(--border-strong)] text-[var(--text-secondary)] text-xs hover:bg-[var(--menu-hover-bg)]"
                 onClick={() => insertCodeBlock('')}
               >{t('editor.noLanguage')}</button>
             )}
           </div>
         </div>
       )}
-
-      <AddNoteModal
-        isOpen={showAddNoteModal}
-        onClose={() => setShowAddNoteModal(false)}
-        onSubmit={handleAddNoteSubmit}
-      />
 
       {zoomToast && (
         <div

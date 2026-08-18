@@ -4,6 +4,7 @@
  * Стилизация: единый дизайн с dropdown-меню (MenuBar).
  */
 import { useState, useEffect, useRef } from 'react'
+import { spellcheckService } from '@type-club/editor'
 import { useEditor } from '../context/EditorContext'
 
 interface SettingsPopupProps {
@@ -53,6 +54,7 @@ export function SettingsPopup({ onClose, onOpenSettingsModal }: SettingsPopupPro
   const handleSpellcheckToggle = async () => {
     const val = !spellcheck
     setSpellcheckState(val)
+    spellcheckService.setEnabled(val)
     window.api.setSpellcheck(val)
   }
 

@@ -71,34 +71,14 @@ export function MarkdownEditor({
       const { pos } = (e as CustomEvent<{ pos: number }>).detail;
       if (!viewRef.current || viewRef.current.isDestroyed) return;
       try {
-        const domNode = viewRef.current.nodeDOM(pos);
-        if (domNode instanceof Element) {
-          const rect = domNode.getBoundingClientRect();
-          const targetOffset = window.innerHeight * 0.25;
-
-          let scrollParent: Element | null = domNode.parentElement;
-          while (scrollParent && scrollParent !== document.body && scrollParent !== document.documentElement) {
-            const overflowY = window.getComputedStyle(scrollParent).overflowY;
-            if ((overflowY === "auto" || overflowY === "scroll") && scrollParent.scrollHeight > scrollParent.clientHeight) {
-              break;
-            }
-            scrollParent = scrollParent.parentElement;
-          }
-
-          if (scrollParent) {
-            const parentRect = scrollParent.getBoundingClientRect();
-            const relativeTop = rect.top - parentRect.top;
-            scrollParent.scrollTo({
-              top: scrollParent.scrollTop + relativeTop - targetOffset,
-              behavior: "smooth",
-            });
-          } else {
-            const absoluteTop = rect.top + window.scrollY;
-            window.scrollTo({
-              top: Math.max(0, absoluteTop - targetOffset),
-              behavior: "smooth",
-            });
-          }
+        let domNode: Node | null = null;
+        try { domNode = viewRef.current.nodeDOM(pos); } catch {}
+        if (!domNode) {
+          try { domNode = viewRef.current.domAtPos(pos).node; } catch {}
+        }
+        const el = domNode instanceof Element ? domNode : domNode?.parentElement;
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
         }
       } catch (err) {
         console.error("Scroll to TOC position failed:", err);
@@ -114,7 +94,7 @@ export function MarkdownEditor({
       if (!viewRef.current || viewRef.current.isDestroyed) return;
       try {
         const view = viewRef.current;
-        view.focus();
+        if (!readOnly) view.focus();
 
         const maxPos = view.state.doc.content.size;
         const validPos = Math.min(Math.max(0, pos), maxPos);
@@ -128,36 +108,18 @@ export function MarkdownEditor({
         } else {
           sel = TextSelection.create(view.state.doc, validPos);
         }
-        view.dispatch(view.state.tr.setSelection(sel).scrollIntoView());
+        if (!readOnly) {
+          view.dispatch(view.state.tr.setSelection(sel).scrollIntoView());
+        }
 
-        const domNode = view.nodeDOM(validPos);
-        if (domNode instanceof Element) {
-          const rect = domNode.getBoundingClientRect();
-          const targetOffset = window.innerHeight * 0.25;
-
-          let scrollParent: Element | null = domNode.parentElement;
-          while (scrollParent && scrollParent !== document.body && scrollParent !== document.documentElement) {
-            const overflowY = window.getComputedStyle(scrollParent).overflowY;
-            if ((overflowY === "auto" || overflowY === "scroll") && scrollParent.scrollHeight > scrollParent.clientHeight) {
-              break;
-            }
-            scrollParent = scrollParent.parentElement;
-          }
-
-          if (scrollParent) {
-            const parentRect = scrollParent.getBoundingClientRect();
-            const relativeTop = rect.top - parentRect.top;
-            scrollParent.scrollTo({
-              top: scrollParent.scrollTop + relativeTop - targetOffset,
-              behavior: "smooth",
-            });
-          } else {
-            const absoluteTop = rect.top + window.scrollY;
-            window.scrollTo({
-              top: Math.max(0, absoluteTop - targetOffset),
-              behavior: "smooth",
-            });
-          }
+        let domNode: Node | null = null;
+        try { domNode = view.nodeDOM(validPos); } catch {}
+        if (!domNode) {
+          try { domNode = view.domAtPos(validPos).node; } catch {}
+        }
+        const el = domNode instanceof Element ? domNode : domNode?.parentElement;
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
         }
       } catch (err) {
         console.error("Scroll to suggestion failed:", err);
@@ -165,7 +127,7 @@ export function MarkdownEditor({
     };
     window.addEventListener("editor-scroll-to-suggestion", handler);
     return () => window.removeEventListener("editor-scroll-to-suggestion", handler);
-  }, []);
+  }, [readOnly]);
 
   const handleAddNoteSubmit = (noteText: string) => {
     const view = viewRef.current;
@@ -236,31 +198,30 @@ export function MarkdownEditor({
   const handleTableCopy = () => {
     const view = viewRef.current;
     if (!view || ctxTable === null) return;
-    const node = view.state.doc.nodeAt(ctxTable);
-    if (node) {
-      navigator.clipboard.writeText(JSON.stringify(node.toJSON()));
-    }
+    const tr = view.state.tr.setSelection(NodeSelection.create(view.state.doc, ctxTable));
+    view.dispatch(tr);
+    view.dom.focus();
+    document.execCommand("copy");
     closeCtxMenu();
   };
 
   const handleTableCut = () => {
     const view = viewRef.current;
     if (!view || ctxTable === null) return;
-    const node = view.state.doc.nodeAt(ctxTable);
-    if (node) {
-      navigator.clipboard.writeText(JSON.stringify(node.toJSON()));
-      const tr = view.state.tr.delete(ctxTable, ctxTable + node.nodeSize);
-      view.dispatch(tr);
-    }
+    const tr = view.state.tr.setSelection(NodeSelection.create(view.state.doc, ctxTable));
+    view.dispatch(tr);
+    view.dom.focus();
+    document.execCommand("copy");
+    deleteTable(view.state, view.dispatch);
+    view.focus();
     closeCtxMenu();
   };
 
   const handleTableEdit = () => {
     const view = viewRef.current;
     if (!view || ctxTable === null) return;
-    const state = view.state;
-    const tr = state.tr.setMeta(tableEditPluginKey, { openAt: ctxTable });
-    view.dispatch(tr);
+    view.dispatch(view.state.tr.setMeta(tableEditPluginKey, ctxTable));
+    view.focus();
     closeCtxMenu();
   };
 
@@ -284,15 +245,7 @@ export function MarkdownEditor({
     } else if (action === "cut") {
       document.execCommand("cut");
     } else if (action === "paste") {
-      try {
-        const text = await navigator.clipboard.readText();
-        if (text) {
-          const { from, to } = view.state.selection;
-          view.dispatch(view.state.tr.insertText(text, from, to));
-        }
-      } catch {
-        document.execCommand("paste");
-      }
+      document.execCommand("paste");
     }
   };
 

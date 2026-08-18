@@ -1,18 +1,260 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, screen } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell, screen, clipboard } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
 import os from 'node:os'
 import Store from 'electron-store'
+import nspell from 'nspell'
+import dictRu from 'dictionary-ru'
+import dictEn from 'dictionary-en'
 
-// Отключаем Windows Native Spellchecker в пользу встроенного Hunspell,
-// чтобы webFrame.isWordMisspelled, webFrame.getWordSuggestions и
-// session.setSpellCheckerLanguages работали надёжно и одинаково на всех системах.
+// Используем встроенный оффлайн Hunspell вместо Windows Native Spellchecker.
 if (process.platform === 'win32') {
   app.commandLine.appendSwitch('disable-features', 'WinUseBrowserSpellChecker')
 }
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+import { createRequire } from 'node:module'
+import { MODERN_WORDS, RUSSIAN_PRODUCTIVE_PREFIXES, RUSSIAN_NOUN_SUFFIXES } from './modernWords'
+
+const esmRequire = createRequire(import.meta.url)
+let englishWordsSet = new Set<string>()
+
+try {
+  const englishArray = esmRequire('an-array-of-english-words')
+  if (Array.isArray(englishArray)) {
+    englishWordsSet = new Set(englishArray)
+  }
+} catch (err) {
+  console.error('[SPELLCHECK] Error loading extended english wordlist:', err)
+}
+
+// Локальный спеллчекер (0ms latency, оффлайн)
+let spellRu: any = null
+let spellEn: any = null
+const customWordsSet = new Set<string>()
+
+function initSpellchecker() {
+  try {
+    spellRu = nspell(dictRu)
+    spellEn = nspell(dictEn)
+    customWordsSet.clear()
+
+    // Добавляем расширенный словарь терминов
+    for (const w of MODERN_WORDS) {
+      if (spellRu) spellRu.add(w)
+      if (spellEn) spellEn.add(w)
+    }
+
+    const stored = (store.get('customDictionaryWords', []) as string[]) || []
+    for (const w of stored) {
+      const clean = w.trim().toLowerCase()
+      if (clean) {
+        customWordsSet.add(clean)
+        if (spellRu) spellRu.add(clean)
+        if (spellEn) spellEn.add(clean)
+      }
+    }
+  } catch (err) {
+    console.error('[SPELLCHECK] Error initializing spellchecker in main:', err)
+  }
+}
+
+function isWordValidInternal(word: string, checkRu: boolean, checkEn: boolean): boolean {
+  if (!word) return true
+  if (word.length <= 1) return true
+  const lower = word.toLowerCase()
+
+  if (customWordsSet.has(lower)) return true
+
+  // 1. Проверка по полному расширенному словарю английского языка SCOWL (275 000 слов)
+  if (checkEn && (englishWordsSet.has(lower) || englishWordsSet.has(word))) return true
+
+  // 2. Проверка прямого написания и в нижнем регистре по Hunspell
+  if (checkRu && spellRu) {
+    if (spellRu.correct(word) || spellRu.correct(lower)) return true
+  }
+  if (checkEn && spellEn) {
+    if (spellEn.correct(word) || spellEn.correct(lower)) return true
+  }
+
+  // 3. Проверка отвлеченных существительных от прилагательных (-ость, -ости, -остью)
+  if (checkRu && spellRu) {
+    for (const [ending, adjEnding] of RUSSIAN_NOUN_SUFFIXES) {
+      if (lower.endsWith(ending)) {
+        const stem = lower.slice(0, -ending.length)
+        if (
+          spellRu.correct(stem + adjEnding) ||
+          spellRu.correct(stem + 'ный') ||
+          spellRu.correct(stem + 'нный') ||
+          spellRu.correct(stem + 'ий')
+        ) {
+          return true
+        }
+      }
+    }
+  }
+
+  // 4. Проверка продуктивных приставок сложных слов (нейро-, меж-, микро-, поли-, etc.)
+  if (checkRu) {
+    for (const p of RUSSIAN_PRODUCTIVE_PREFIXES) {
+      if (lower.startsWith(p)) {
+        const rest = lower.slice(p.length)
+        if (rest.length >= 3 && isWordValidInternal(rest, checkRu, checkEn)) {
+          return true
+        }
+      }
+    }
+  }
+
+  // 5. Проверка сложных слов с соединительными гласными 'о' и 'е' (церковнославянский, иконографика)
+  if (checkRu && spellRu && lower.length >= 8) {
+    for (let i = 3; i <= lower.length - 4; i++) {
+      const char = lower[i]
+      if (char === 'о' || char === 'е') {
+        const stem1 = lower.slice(0, i)
+        const stem2 = lower.slice(i + 1)
+        const stem1Valid =
+          spellRu.correct(stem1) ||
+          spellRu.correct(stem1 + 'ый') ||
+          spellRu.correct(stem1 + 'ий') ||
+          spellRu.correct(stem1 + 'а') ||
+          spellRu.correct(stem1 + 'ь') ||
+          spellRu.correct(stem1 + 'о') ||
+          spellRu.correct(stem1 + 'ный')
+        if (stem1Valid && isWordValidInternal(stem2, checkRu, checkEn)) {
+          return true
+        }
+      }
+    }
+  }
+
+  // 6. Проверка русских дефисных слов (какой-то, из-за, по-русски, во-первых, всё-таки, Санкт-Петербург)
+  if (word.includes('-')) {
+    const parts = word.split('-')
+    const particles = ['то', 'либо', 'нибудь', 'ка', 'де', 'таки', 'с']
+
+    // Суффиксальные частицы (-то, -либо, -нибудь, -ка, -де, -таки, -с)
+    if (parts.length === 2 && particles.includes(parts[1].toLowerCase())) {
+      if (isWordValidInternal(parts[0], checkRu, checkEn)) return true
+    }
+
+    // Префиксальные частицы (кое-, кой-)
+    if (parts.length === 2 && (parts[0].toLowerCase() === 'кое' || parts[0].toLowerCase() === 'кой')) {
+      if (isWordValidInternal(parts[1], checkRu, checkEn)) return true
+    }
+
+    // Приставка по- (по-русски, по-моему, по-прежнему)
+    if (parts.length === 2 && parts[0].toLowerCase() === 'по') {
+      const base = parts[1]
+      if (
+        isWordValidInternal(base, checkRu, checkEn) ||
+        isWordValidInternal(base + 'й', checkRu, checkEn) ||
+        isWordValidInternal(base + 'ый', checkRu, checkEn)
+      ) {
+        return true
+      }
+    }
+
+    if (lower === 'из-за' || lower === 'из-под' || lower === 'всё-таки' || lower === 'все-таки') return true
+
+    // Проверка составных слов через дефис: если обе части валидны, всё слово валидно
+    if (parts.every((p) => p.length > 0 && isWordValidInternal(p, checkRu, checkEn))) {
+      return true
+    }
+  }
+
+  return false
+}
+
+function checkWordMisspelled(rawWord: string): boolean {
+  if (!rawWord) return false
+  const word = rawWord.trim()
+  if (word.length <= 1) return false
+
+  // 1. Игнорируем числа, спецсимволы, пути файлов, переменные и разметку
+  if (/\d/.test(word) || /[._/\\:@#%&*~^|<>=+$]/.test(word)) return false
+  if (/^[\d_#*`~+\-=\\/$@%^&()\[\]{}|<>]+$/.test(word)) return false
+
+  // 2. Акронимы и аббревиатуры из заглавных букв (API, JSON, HTTP, URL, CSS, HTML, UI, UX, TS, JS, ID, AI, IT, PDF, SQL)
+  if (/^[\p{Lu}]{2,}$/u.test(word)) {
+    return false
+  }
+
+  // 3. Верблюжий регистр / идентификаторы (TypeScript, JavaScript, GitHub, VSCode, KaTeX, OpenAI, MarkdownEditor)
+  if (/[a-z][A-Z]/.test(word) || /[а-яА-Яa-zA-Z][A-Z]/.test(word)) {
+    return false
+  }
+
+  const enabledLangs = (store.get('spellcheckLanguages', ['ru-RU', 'en-US']) as string[]) || ['ru-RU', 'en-US']
+  const checkRu = enabledLangs.some((l) => l.toLowerCase().startsWith('ru'))
+  const checkEn = enabledLangs.some((l) => l.toLowerCase().startsWith('en'))
+
+  const isCorrect = isWordValidInternal(word, checkRu, checkEn)
+  return !isCorrect
+}
+
+function getWordSuggestions(rawWord: string): string[] {
+  const clean = rawWord.trim().toLowerCase()
+  if (!clean) return []
+
+  const enabledLangs = (store.get('spellcheckLanguages', ['ru-RU', 'en-US']) as string[]) || ['ru-RU', 'en-US']
+  const checkRu = enabledLangs.some((l) => l.toLowerCase().startsWith('ru'))
+  const checkEn = enabledLangs.some((l) => l.toLowerCase().startsWith('en'))
+
+  const isCyrillic = /[\u0400-\u04FF]/u.test(clean)
+  const isLatin = /[a-zA-Z]/.test(clean)
+
+  const suggestions: string[] = []
+  if (isCyrillic && checkRu && spellRu) {
+    try {
+      suggestions.push(...spellRu.suggest(clean))
+    } catch { /* ignore */ }
+  } else if (isLatin && checkEn && spellEn) {
+    try {
+      suggestions.push(...spellEn.suggest(clean))
+    } catch { /* ignore */ }
+  } else {
+    if (checkRu && spellRu) {
+      try { suggestions.push(...spellRu.suggest(clean)) } catch { /* ignore */ }
+    }
+    if (checkEn && spellEn) {
+      try { suggestions.push(...spellEn.suggest(clean)) } catch { /* ignore */ }
+    }
+  }
+
+  return Array.from(new Set(suggestions)).slice(0, 5)
+}
+
+/** Проверка и копирование встроенных словарей в папку пользователя */
+function ensureDictionaries() {
+  try {
+    const userData = app.getPath('userData')
+    const dictDir = path.join(userData, 'Dictionaries')
+    if (!fs.existsSync(dictDir)) {
+      fs.mkdirSync(dictDir, { recursive: true })
+    }
+
+    const resourcesDir = app.isPackaged
+      ? path.join(process.resourcesPath, 'resources', 'dictionaries')
+      : path.join(__dirname, '..', 'resources', 'dictionaries')
+
+    if (fs.existsSync(resourcesDir)) {
+      const files = fs.readdirSync(resourcesDir)
+      for (const file of files) {
+        if (file.endsWith('.bdic')) {
+          const dest = path.join(dictDir, file)
+          if (!fs.existsSync(dest) || fs.statSync(dest).size === 0) {
+            fs.copyFileSync(path.join(resourcesDir, file), dest)
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[SPELLCHECK] Error ensuring dictionaries:', err)
+  }
+}
 
 /** Хранилище настроек приложения */
 const store = new Store({
@@ -122,28 +364,12 @@ let win: BrowserWindow | null
 /** Флаг: разрешено ли закрытие окна (после подтверждения renderer) */
 let allowClose = false
 
-/** Применить список языков для спеллчекера с валидацией доступных словарей */
+/** Применить список языков для спеллчекера */
 function applySpellCheckerLanguages(targetLangs: string[]) {
   if (!win) return
   try {
-    const available = win.webContents.session.availableSpellCheckerLanguages || []
-    if (available.length === 0) {
-      win.webContents.session.setSpellCheckerLanguages(targetLangs)
-      return
-    }
-    const resolved: string[] = []
-    for (const lang of targetLangs) {
-      if (available.includes(lang)) {
-        resolved.push(lang)
-      } else {
-        const prefix = lang.slice(0, 2).toLowerCase()
-        const match = available.find((a) => a.toLowerCase().startsWith(prefix))
-        if (match && !resolved.includes(match)) {
-          resolved.push(match)
-        }
-      }
-    }
-    win.webContents.session.setSpellCheckerLanguages(resolved)
+    ensureDictionaries()
+    win.webContents.session.setSpellCheckerLanguages(targetLangs)
   } catch (e) {
     console.error('Failed to set spellchecker languages:', e)
   }
@@ -185,7 +411,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.mjs'),
       contextIsolation: true,         // Изоляция контекста (безопасность)
       nodeIntegration: false,         // Запрет прямого доступа к Node.js
-      spellcheck: store.get('spellcheck', true) as boolean,
+      spellcheck: false,              // Отключаем встроенный спеллчекер Chromium (используем кастомный PM-плагин)
     },
   }
 
@@ -224,6 +450,18 @@ function createWindow() {
         event.preventDefault()
         win?.webContents.toggleDevTools()
       }
+    }
+  })
+
+  win.webContents.on('render-process-gone', (_event, details) => {
+    console.error('[MAIN] Render process gone (crashed):', details)
+  })
+  win.webContents.on('unresponsive', () => {
+    console.warn('[MAIN] Window unresponsive')
+  })
+  win.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    if (level >= 2) {
+      console.log(`[RENDERER ERROR] ${message} (${sourceId}:${line})`)
     }
   })
 
@@ -283,6 +521,9 @@ function createWindow() {
     event.preventDefault()
     shell.openExternal(url)
   })
+
+  // Инициализация локального спеллчекера nspell
+  initSpellchecker()
 
   // Настройка языков спеллчекера и пользовательских слов
   const enabledSpellcheckLangs = (store.get('spellcheckLanguages', ['ru-RU', 'en-US']) as string[]) || ['ru-RU', 'en-US']
@@ -403,6 +644,52 @@ ipcMain.handle('fs:delete', async (_event, filePath: string): Promise<void> => {
 // --- Показать в проводнике ---
 ipcMain.on('shell:showItemInFolder', (_event, filePath: string) => {
   shell.showItemInFolder(filePath)
+})
+
+// --- Копирование файла в системный буфер обмена как файла ---
+ipcMain.handle('clipboard:copyFile', async (_event, filePath: string): Promise<boolean> => {
+  try {
+    const normalizedPath = path.resolve(filePath)
+    if (!fs.existsSync(normalizedPath)) {
+      return false
+    }
+
+    if (process.platform === 'win32') {
+      // DROPFILES struct для Windows (CF_HDROP):
+      // DWORD pFiles = 20 (смещение до списка файлов)
+      // POINT pt = {0, 0} (8 байт)
+      // BOOL fNC = 0 (4 байта)
+      // BOOL fWide = 1 (4 байта, признак UTF-16LE)
+      const header = Buffer.alloc(20)
+      header.writeUInt32LE(20, 0) // pFiles
+      header.writeUInt32LE(0, 4)  // pt.x
+      header.writeUInt32LE(0, 8)  // pt.y
+      header.writeUInt32LE(0, 12) // fNC
+      header.writeUInt32LE(1, 16) // fWide
+
+      // Список файлов в формате двойного null-terminator UTF-16LE: "path\0\0"
+      const fileListBuffer = Buffer.from(normalizedPath + '\0\0', 'ucs2')
+      const hDropBuffer = Buffer.concat([header, fileListBuffer])
+
+      clipboard.writeBuffer('CF_HDROP', hDropBuffer)
+      clipboard.writeBuffer('FileNameW', Buffer.from(normalizedPath + '\0', 'ucs2'))
+      clipboard.writeText(normalizedPath)
+    } else if (process.platform === 'darwin') {
+      const plist = `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><array><string>${normalizedPath}</string></array></plist>`
+      clipboard.writeBuffer('NSFilenamesPboardType', Buffer.from(plist, 'utf8'))
+      clipboard.writeText(normalizedPath)
+    } else {
+      // Linux
+      const uri = `file://${encodeURI(normalizedPath)}`
+      clipboard.writeBuffer('text/uri-list', Buffer.from(`${uri}\r\n`, 'utf8'))
+      clipboard.writeBuffer('x-special/gnome-copied-files', Buffer.from(`copy\n${uri}\r\n`, 'utf8'))
+      clipboard.writeText(normalizedPath)
+    }
+    return true
+  } catch (err) {
+    console.error('Ошибка копирования файла в буфер обмена:', err)
+    return false
+  }
 })
 
 // --- Диалог: открыть папку ---
@@ -576,12 +863,33 @@ ipcMain.handle('spellcheck:getCustomWords', async () => {
   return (store.get('customDictionaryWords', []) as string[]) || []
 })
 
+/** Проверить, считается ли слово ошибочным */
+ipcMain.handle('spellcheck:isMisspelled', async (_event, word: string) => {
+  return checkWordMisspelled(word)
+})
+
+/** Получить варианты исправлений для слова */
+ipcMain.handle('spellcheck:getSuggestions', async (_event, word: string) => {
+  return getWordSuggestions(word)
+})
+
+/** Пакетная проверка списка слов */
+ipcMain.handle('spellcheck:checkWords', async (_event, words: string[]) => {
+  if (!Array.isArray(words)) return []
+  return words.filter((w) => checkWordMisspelled(w))
+})
+
 /** Добавить слово в пользовательский словарь */
 ipcMain.handle('spellcheck:addCustomWord', async (_event, word: string) => {
   const trimmed = word.trim()
   if (!trimmed) return false
+  const lower = trimmed.toLowerCase()
+  customWordsSet.add(lower)
+  if (spellRu) spellRu.add(lower)
+  if (spellEn) spellEn.add(lower)
+
   const current = (store.get('customDictionaryWords', []) as string[]) || []
-  if (!current.includes(trimmed)) {
+  if (!current.some((w) => w.toLowerCase() === lower)) {
     current.push(trimmed)
     store.set('customDictionaryWords', current)
   }
@@ -597,9 +905,12 @@ ipcMain.handle('spellcheck:addCustomWord', async (_event, word: string) => {
 
 /** Удалить слово из пользовательского словаря */
 ipcMain.handle('spellcheck:removeCustomWord', async (_event, word: string) => {
+  const lower = word.trim().toLowerCase()
+  customWordsSet.delete(lower)
   const current = (store.get('customDictionaryWords', []) as string[]) || []
-  const filtered = current.filter((w) => w !== word)
+  const filtered = current.filter((w) => w.toLowerCase() !== lower)
   store.set('customDictionaryWords', filtered)
+  initSpellchecker()
   if (win) {
     try {
       win.webContents.session.removeWordFromSpellCheckerDictionary(word)

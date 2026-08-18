@@ -597,6 +597,7 @@ export const markdownSerializer = new MarkdownSerializer(
         imageSerializeCache.set(node, cached)
       }
       state.write(cached)
+      state.closeBlock(node)
     },
   },
   {
@@ -937,10 +938,10 @@ export function generateExportHtml(markdown: string, theme: 'dark' | 'light' = '
     /* Заголовки */
     h1 { font-size: 2em; font-weight: 700; color: var(--editor-heading); line-height: 1.3; margin: 1em 0 0.4em 0; }
     h2 { font-size: 1.5em; font-weight: 650; color: var(--editor-heading); line-height: 1.35; margin: 0.8em 0 0.3em 0; }
-    h3 { font-size: 1.25em; font-weight: 600; color: var(--editor-heading-h3); line-height: 1.4; margin: 0.7em 0 0.3em 0; }
-    h4 { font-size: 1.1em; font-weight: 600; color: var(--editor-heading-h4); line-height: 1.45; margin: 0.6em 0 0.3em 0; }
-    h5 { font-size: 1.05em; font-weight: 600; color: var(--editor-heading-h5); line-height: 1.5; margin: 0.5em 0 0.2em 0; }
-    h6 { font-size: 1em; font-weight: 600; color: var(--editor-heading-h6); line-height: 1.5; margin: 0.5em 0 0.2em 0; }
+    h3 { font-size: 1.25em; font-weight: 600; color: var(--editor-heading); line-height: 1.4; margin: 0.7em 0 0.3em 0; }
+    h4 { font-size: 1.1em; font-weight: 600; color: var(--editor-heading); line-height: 1.45; margin: 0.6em 0 0.3em 0; }
+    h5 { font-size: 1.05em; font-weight: 600; color: var(--editor-heading); line-height: 1.5; margin: 0.5em 0 0.2em 0; }
+    h6 { font-size: 1em; font-weight: 600; color: var(--editor-heading); line-height: 1.5; margin: 0.5em 0 0.2em 0; }
 
     p { margin: 0 0 0.5em 0; }
 

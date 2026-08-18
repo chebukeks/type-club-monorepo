@@ -21,6 +21,12 @@
     "dist",
     "dist-electron"
   ],
+  "extraResources": [
+    {
+      "from": "resources/dictionaries",
+      "to": "resources/dictionaries"
+    }
+  ],
   "mac": {
     "target": [
       "dmg"

@@ -93,6 +93,12 @@ export const en = {
   'settings.theme.builtIn': 'Built-in Themes',
   'settings.theme.custom': 'Custom Themes',
   'settings.theme.noCustomThemes': 'No custom themes yet',
+  'settings.theme.dayTheme': 'Day',
+  'settings.theme.nightTheme': 'Night',
+  'settings.theme.systemTheme': 'System',
+  'settings.theme.selectDay': 'Set as Day theme',
+  'settings.theme.selectNight': 'Set as Night theme',
+  'settings.theme.activeMode': 'Active Mode',
   'settings.theme.import': 'Import Themes',
   'settings.theme.editor': 'Theme Editor',
   'settings.theme.themeName': 'Theme Name',
@@ -179,6 +185,9 @@ export const en = {
   'sidebar.filesNotFound': 'No files found',
   'sidebar.newArticle': 'New Article',
   'sidebar.rename': 'Rename',
+  'sidebar.newFileHere': 'New File Here',
+  'sidebar.newFolderHere': 'New Folder Here',
+  'sidebar.copyContent': 'Copy',
   'sidebar.copyPath': 'Copy Path',
   'sidebar.duplicate': 'Make a Copy',
   'sidebar.showInExplorer': 'Reveal in File Manager',
@@ -581,6 +590,15 @@ export const en = {
   'errorBoundary.title': 'Something went wrong',
   'errorBoundary.stackTrace': 'Stack trace',
   'errorBoundary.reload': 'Reload Page',
+
+  // Dialogs
+  'dialog.delete.title': 'Confirm Delete',
+  'dialog.delete.message': 'Are you sure you want to delete "{name}"?',
+  'dialog.delete.detail': 'The file or folder will be moved to the Trash.',
+  'dialog.exit.title': 'Unsaved Changes',
+  'dialog.exit.message': 'You have unsaved changes in the following files:',
+  'dialog.exit.question': 'Do you want to save changes before closing?',
+  'dialog.exit.discard': "Don't Save",
 } as const;
 
 export type TranslationKey = keyof typeof en;

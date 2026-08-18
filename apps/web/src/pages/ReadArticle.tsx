@@ -187,15 +187,15 @@ export default function ReadArticle() {
       {/* Desktop ToC sidebar in right margin without displacing centered article */}
       <div
         style={{
-          left: "calc(50vw + 408px)",
           right: "max(24px, calc(50vw - 384px - 280px - 24px))",
-          maxWidth: "280px",
-          minWidth: "180px",
+          width: "280px",
+          maxWidth: "calc(50vw - 408px - 24px)",
           top: "80px",
+          bottom: "24px",
         }}
-        className="right-toc-sidebar fixed z-30 pointer-events-none"
+        className="right-toc-sidebar fixed z-30 pointer-events-none flex flex-col"
       >
-        <div className="sticky top-20 pointer-events-auto w-full">
+        <div className="pointer-events-auto w-full h-full flex flex-col overflow-hidden">
           <TableOfContents variant="sidebar" toc={toc} />
         </div>
       </div>

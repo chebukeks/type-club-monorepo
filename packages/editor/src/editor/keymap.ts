@@ -455,8 +455,31 @@ function setHeadingLevel(level: number): Command {
   }
 }
 
+/** Выделение только текста внутри блока кода по Ctrl+A */
+const selectAllInCodeBlock: Command = (state, dispatch) => {
+  const { $from, $to } = state.selection
+  for (let d = $from.depth; d > 0; d--) {
+    const node = $from.node(d)
+    if (node.type === schema.nodes.code_block) {
+      const start = $from.start(d)
+      const end = $from.end(d)
+      if ($from.pos === start && $to.pos === end) {
+        return true
+      }
+      if (dispatch) {
+        dispatch(state.tr.setSelection(TextSelection.create(state.doc, start, end)))
+      }
+      return true
+    }
+  }
+  return false
+}
+
 /** Кастомные горячие клавиши */
 const customKeymap = keymap({
+  // Выделение всего текста внутри блока кода
+  'Mod-a': selectAllInCodeBlock,
+
   // Форматирование
   'Mod-b': toggleMark(schema.marks.strong),
   'Mod-i': toggleMark(schema.marks.em),

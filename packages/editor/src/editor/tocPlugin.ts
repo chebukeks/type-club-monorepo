@@ -8,6 +8,8 @@ import type { TocItem, SuggestionItem } from '../types'
 export function tocPlugin(onUpdate: (toc: TocItem[], suggestions: SuggestionItem[]) => void) {
   return new Plugin({
     view(editorView) {
+      let timer: ReturnType<typeof setTimeout> | null = null
+
       const scanToc = (view: any) => {
         const tempToc: TocItem[] = []
         const tempSuggestions: SuggestionItem[] = []
@@ -90,7 +92,10 @@ export function tocPlugin(onUpdate: (toc: TocItem[], suggestions: SuggestionItem
 
         pushGroup()
 
-        onUpdate(tempToc, tempSuggestions)
+        if (timer) clearTimeout(timer)
+        timer = setTimeout(() => {
+          onUpdate(tempToc, tempSuggestions)
+        }, 0)
       }
 
       // Initial scan
@@ -101,7 +106,10 @@ export function tocPlugin(onUpdate: (toc: TocItem[], suggestions: SuggestionItem
           if (!view.state.doc.eq(prevState.doc)) {
             scanToc(view)
           }
-        }
+        },
+        destroy() {
+          if (timer) clearTimeout(timer)
+        },
       }
     }
   })

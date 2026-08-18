@@ -23,6 +23,8 @@ export { MathInlineView } from "./editor/mathInlineView";
 export { tableEditPlugin, tableEditPluginKey } from "./editor/tableEditPlugin";
 export { pastePlugin, pastePluginKey, BLOCK_PASTE_NODES } from "./editor/pastePlugin";
 export { createCollaborationPlugins } from "./editor/collaborationPlugin";
+export { spellcheckPlugin, spellcheckPluginKey } from "./editor/spellcheckPlugin";
+export { spellcheckService } from "./editor/spellcheckService";
 
 export type { EditorMode, EditorProps, FocusMode, TocItem, SuggestionItem, CollaborationConfig } from "./types";
 export * from "./i18n";

@@ -5,7 +5,9 @@ import React, { createContext, useContext, useReducer, useCallback, useEffect, u
 import type { AppState, AppAction, FileEntry, ThemeMode, EditorMode, WordLimit, FocusMode, TocLayoutMode, StatsLayoutMode, AppTheme } from '../types'
 import { articlesApi } from '../api'
 import { Locale, TranslationKey, getTranslation } from '@type-club/editor'
-import { DARK_THEME, LIGHT_THEME, applyThemeToDOM as applyCustomThemeToDOM } from '../utils/themePresets'
+import { DARK_THEME, LIGHT_THEME, BUILTIN_THEMES, applyThemeToDOM as applyCustomThemeToDOM } from '../utils/themePresets'
+import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal'
+import { ConfirmExitModal } from '../components/ConfirmExitModal'
 
 // ============================================================
 // Начальное состояние
@@ -17,6 +19,8 @@ const initialState: AppState = {
   fileTree: [],
   creating: null,
   theme: 'dark',
+  lightThemeId: 'light',
+  darkThemeId: 'dark',
   customThemes: [],
   activeTheme: DARK_THEME,
   language: 'en',
@@ -141,6 +145,14 @@ function appReducer(state: AppState, action: AppAction): AppState {
         theme: action.payload.theme,
         activeTheme: action.payload.activeTheme || state.activeTheme,
       }
+    case 'SET_THEME_SLOTS':
+      return {
+        ...state,
+        lightThemeId: action.payload.lightThemeId ?? state.lightThemeId,
+        darkThemeId: action.payload.darkThemeId ?? state.darkThemeId,
+        theme: action.payload.themeMode ?? state.theme,
+        activeTheme: action.payload.activeTheme ?? state.activeTheme,
+      }
     case 'SET_CUSTOM_THEMES':
       return { ...state, customThemes: action.payload.customThemes }
     case 'SET_LANGUAGE':
@@ -237,7 +249,7 @@ interface EditorContextValue {
   createFile: (fileName: string, targetPath: string) => Promise<void>
   createFolder: (folderName: string, targetPath: string) => Promise<void>
   refreshFileTree: () => Promise<void>
-  startCreating: (type: 'file' | 'folder') => void
+  startCreating: (type: 'file' | 'folder', customTargetPath?: string) => void
   setActiveExplorerPath: (path: string | null) => void
   renameItem: (oldPath: string, newName: string, type: 'file' | 'folder') => Promise<void>
   deleteItem: (path: string, type: 'file' | 'folder', name: string) => Promise<void>
@@ -279,11 +291,16 @@ interface EditorContextValue {
   setTocLayoutMode: (mode: TocLayoutMode) => void
   setStatsLayoutMode: (mode: StatsLayoutMode) => void
   setTheme: (theme: ThemeMode, customThemeObj?: AppTheme) => Promise<void>
+  setThemeMode: (mode: ThemeMode) => Promise<void>
+  setLightThemeId: (themeId: string) => Promise<void>
+  setDarkThemeId: (themeId: string) => Promise<void>
   saveCustomTheme: (theme: AppTheme) => Promise<boolean>
   deleteCustomTheme: (themeId: string) => Promise<boolean>
   exportTheme: (theme: AppTheme) => Promise<boolean>
   importThemes: () => Promise<AppTheme[] | null>
   applyLiveTheme: (theme: AppTheme) => void
+  confirmDelete: (itemName: string) => Promise<boolean>
+  confirmExit: (fileNames: string[]) => Promise<'save' | 'discard' | 'cancel'>
 }
 
 const EditorContext = createContext<EditorContextValue | null>(null)
@@ -298,16 +315,33 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         const customThemes = (await window.api.getCustomThemes?.()) || []
         dispatch({ type: 'SET_CUSTOM_THEMES', payload: { customThemes } })
 
-        const savedTheme = (await window.api.storeGet('theme')) as ThemeMode | undefined
-        const theme = savedTheme || 'dark'
-        let activeTheme: AppTheme = DARK_THEME
-        if (theme === 'light') activeTheme = LIGHT_THEME
-        else if (theme === 'dark') activeTheme = DARK_THEME
-        else {
-          const found = customThemes.find((t: AppTheme) => t.id === theme)
-          if (found) activeTheme = found
+        const savedThemeMode = (await window.api.storeGet('theme')) as ThemeMode | undefined
+        const themeMode: ThemeMode = savedThemeMode || 'dark'
+
+        const savedLightId = (await window.api.storeGet('lightThemeId')) as string | undefined
+        const lightThemeId = savedLightId || 'light'
+
+        const savedDarkId = (await window.api.storeGet('darkThemeId')) as string | undefined
+        const darkThemeId = savedDarkId || 'dark'
+
+        const findTheme = (id: string) => {
+          return BUILTIN_THEMES.find(t => t.id === id) || customThemes.find((t: AppTheme) => t.id === id)
         }
-        dispatch({ type: 'SET_THEME', payload: { theme, activeTheme } })
+
+        let activeTheme: AppTheme = DARK_THEME
+        if (themeMode === 'light') {
+          activeTheme = findTheme(lightThemeId) || LIGHT_THEME
+        } else if (themeMode === 'dark') {
+          activeTheme = findTheme(darkThemeId) || DARK_THEME
+        } else {
+          const isDarkOS = window.matchMedia('(prefers-color-scheme: dark)').matches
+          activeTheme = findTheme(isDarkOS ? darkThemeId : lightThemeId) || (isDarkOS ? DARK_THEME : LIGHT_THEME)
+        }
+
+        dispatch({
+          type: 'SET_THEME_SLOTS',
+          payload: { themeMode, lightThemeId, darkThemeId, activeTheme },
+        })
         applyCustomThemeToDOM(activeTheme)
 
         const savedLang = await window.api.storeGet('language') as Locale | undefined
@@ -385,11 +419,13 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     const mql = window.matchMedia('(prefers-color-scheme: dark)')
     const handler = (e: MediaQueryListEvent | MediaQueryList) => {
       const isDark = 'matches' in e ? e.matches : mql.matches
-      applyCustomThemeToDOM(isDark ? DARK_THEME : LIGHT_THEME)
+      const allThemes = [...BUILTIN_THEMES, ...state.customThemes]
+      const targetTheme = allThemes.find(t => t.id === (isDark ? state.darkThemeId : state.lightThemeId)) || (isDark ? DARK_THEME : LIGHT_THEME)
+      applyCustomThemeToDOM(targetTheme)
     }
     mql.addEventListener('change', handler)
     return () => mql.removeEventListener('change', handler)
-  }, [state.theme])
+  }, [state.theme, state.darkThemeId, state.lightThemeId, state.customThemes])
   
   // --- Подписка на открытие новых файлов (когда приложение уже запущено) ---
   useEffect(() => {
@@ -590,24 +626,79 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     } catch (err) { /* ignore */ }
   }, [state.folderPath])
 
-  // --- Установить тему ---
-  const setTheme = useCallback(async (themeId: ThemeMode, customThemeObj?: AppTheme) => {
+  // --- Найти тему по ID ---
+  const findThemeById = useCallback((id: string, customList?: AppTheme[]): AppTheme => {
+    const list = customList || state.customThemes
+    const allThemes = [...BUILTIN_THEMES, ...list]
+    return allThemes.find(t => t.id === id) || (id === 'light' || id === 'peachy' ? LIGHT_THEME : DARK_THEME)
+  }, [state.customThemes])
+
+  // --- Установить режим темы (light | dark | system) ---
+  const setThemeMode = useCallback(async (mode: ThemeMode) => {
     let targetTheme: AppTheme = DARK_THEME
-    if (customThemeObj) {
-      targetTheme = customThemeObj
-    } else if (themeId === 'light') {
-      targetTheme = LIGHT_THEME
-    } else if (themeId === 'dark') {
-      targetTheme = DARK_THEME
+    if (mode === 'light') {
+      targetTheme = findThemeById(state.lightThemeId)
+    } else if (mode === 'dark') {
+      targetTheme = findThemeById(state.darkThemeId)
     } else {
-      const found = state.customThemes.find((t) => t.id === themeId)
-      if (found) targetTheme = found
+      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      targetTheme = findThemeById(isDark ? state.darkThemeId : state.lightThemeId)
     }
 
-    dispatch({ type: 'SET_THEME', payload: { theme: themeId, activeTheme: targetTheme } })
+    dispatch({ type: 'SET_THEME', payload: { theme: mode, activeTheme: targetTheme } })
     applyCustomThemeToDOM(targetTheme)
-    try { await window.api.storeSet('theme', themeId) } catch (e) { /* ignore */ }
-  }, [state.customThemes])
+    try { await window.api.storeSet('theme', mode) } catch (e) { /* ignore */ }
+  }, [state.lightThemeId, state.darkThemeId, findThemeById])
+
+  // --- Установить дневную тему ---
+  const setLightThemeId = useCallback(async (themeId: string) => {
+    const themeObj = findThemeById(themeId)
+    const isCurrentlyLight = state.theme === 'light' || (state.theme === 'system' && !window.matchMedia('(prefers-color-scheme: dark)').matches)
+    dispatch({
+      type: 'SET_THEME_SLOTS',
+      payload: {
+        lightThemeId: themeId,
+        activeTheme: isCurrentlyLight ? themeObj : state.activeTheme,
+      },
+    })
+    if (isCurrentlyLight) {
+      applyCustomThemeToDOM(themeObj)
+    }
+    try { await window.api.storeSet('lightThemeId', themeId) } catch (e) { /* ignore */ }
+  }, [state.theme, state.activeTheme, findThemeById])
+
+  // --- Установить ночную тему ---
+  const setDarkThemeId = useCallback(async (themeId: string) => {
+    const themeObj = findThemeById(themeId)
+    const isCurrentlyDark = state.theme === 'dark' || (state.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+    dispatch({
+      type: 'SET_THEME_SLOTS',
+      payload: {
+        darkThemeId: themeId,
+        activeTheme: isCurrentlyDark ? themeObj : state.activeTheme,
+      },
+    })
+    if (isCurrentlyDark) {
+      applyCustomThemeToDOM(themeObj)
+    }
+    try { await window.api.storeSet('darkThemeId', themeId) } catch (e) { /* ignore */ }
+  }, [state.theme, state.activeTheme, findThemeById])
+
+  // --- Установить тему (совместимость) ---
+  const setTheme = useCallback(async (themeId: ThemeMode, customThemeObj?: AppTheme) => {
+    if (themeId === 'light' || themeId === 'dark' || themeId === 'system') {
+      await setThemeMode(themeId)
+      return
+    }
+    const themeObj = customThemeObj || findThemeById(themeId)
+    if (themeObj.baseTheme === 'light') {
+      await setLightThemeId(themeObj.id)
+      await setThemeMode('light')
+    } else {
+      await setDarkThemeId(themeObj.id)
+      await setThemeMode('dark')
+    }
+  }, [setThemeMode, setLightThemeId, setDarkThemeId, findThemeById])
 
   // --- Сохранить пользовательскую тему ---
   const saveCustomTheme = useCallback(async (theme: AppTheme): Promise<boolean> => {
@@ -735,13 +826,13 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   // --- Начать создание элемента ---
-  const startCreating = useCallback((type: 'file' | 'folder') => {
+  const startCreating = useCallback((type: 'file' | 'folder', customTargetPath?: string) => {
     if (state.sidebarMode === 'online') {
       dispatch({ type: 'START_CREATING', payload: { itemType: 'file', targetPath: '__online__' } })
       return
     }
     if (!state.folderPath) return
-    const targetPath = state.activeExplorerPath || state.folderPath
+    const targetPath = customTargetPath || state.activeExplorerPath || state.folderPath
     dispatch({ type: 'START_CREATING', payload: { itemType: type, targetPath } })
   }, [state.activeExplorerPath, state.folderPath, state.sidebarMode])
 
@@ -802,9 +893,48 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     }
   }, [refreshFileTree])
 
+  // --- Состояния кастомных диалоговых окон ---
+  const [confirmDeleteDialog, setConfirmDeleteDialog] = React.useState<{
+    isOpen: boolean
+    itemName: string
+    resolve: (value: boolean) => void
+  } | null>(null)
+
+  const [confirmExitDialog, setConfirmExitDialog] = React.useState<{
+    isOpen: boolean
+    fileNames: string[]
+    resolve: (value: 'save' | 'discard' | 'cancel') => void
+  } | null>(null)
+
+  const confirmDelete = useCallback((itemName: string): Promise<boolean> => {
+    return new Promise((resolve) => {
+      setConfirmDeleteDialog({
+        isOpen: true,
+        itemName,
+        resolve: (val) => {
+          setConfirmDeleteDialog(null)
+          resolve(val)
+        },
+      })
+    })
+  }, [])
+
+  const confirmExit = useCallback((fileNames: string[]): Promise<'save' | 'discard' | 'cancel'> => {
+    return new Promise((resolve) => {
+      setConfirmExitDialog({
+        isOpen: true,
+        fileNames,
+        resolve: (val) => {
+          setConfirmExitDialog(null)
+          resolve(val)
+        },
+      })
+    })
+  }, [])
+
   // --- Удалить ---
   const deleteItem = useCallback(async (delPath: string, _type: 'file' | 'folder', name: string) => {
-    const confirm = await window.api.confirmDelete(name)
+    const confirm = await confirmDelete(name)
     if (!confirm) return
     try {
       await window.api.deleteItem(delPath)
@@ -818,7 +948,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.error(err)
     }
-  }, [state.tabs, refreshFileTree])
+  }, [state.tabs, refreshFileTree, confirmDelete])
 
   // --- Показать в проводнике ---
   const showInExplorer = useCallback((path: string) => {
@@ -888,7 +1018,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       }
     }
     prevActiveTabIdRef.current = state.activeTabId
-  }, [state.activeTabId, state.autosave])
+  }, [state.activeTabId, state.autosave, state.tabs])
 
   // --- Автосохранение онлайн-статей: интервал 20 сек ---
   useEffect(() => {
@@ -915,7 +1045,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         return
       }
       const fileNames = modifiedTabs.map(t => t.fileName)
-      const result = await window.api.confirmExit(fileNames)
+      const result = await confirmExit(fileNames)
       if (result === 'save') {
         // Сохраняем все несохранённые файлы
         for (const tab of modifiedTabs) {
@@ -934,7 +1064,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       // 'cancel' — ничего не делаем, окно не закроется
     })
     return unsubscribe
-  }, [])
+  }, [confirmExit])
 
   // --- Закрытие вкладки с проверкой несохранённых изменений ---
   const closeTab = useCallback(async (tabId: string) => {
@@ -944,7 +1074,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       return
     }
     if (tab?.isModified) {
-      const result = await window.api.confirmExit([tab.fileName])
+      const result = await confirmExit([tab.fileName])
       if (result === 'save') {
         try {
           await window.api.writeFile(tab.filePath, tab.content)
@@ -957,7 +1087,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     } else {
       dispatch({ type: 'CLOSE_TAB', payload: { tabId } })
     }
-  }, [state.tabs])
+  }, [state.tabs, confirmExit])
 
   // ============================================================
   // Online articles
@@ -1090,9 +1220,28 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       toggleSidebar, setSidebarOpen,
       toggleTabBar, setTabBarOpen,
       setTocLayoutMode, setStatsLayoutMode,
+      setThemeMode, setLightThemeId, setDarkThemeId,
       saveCustomTheme, deleteCustomTheme, exportTheme, importThemes, applyLiveTheme,
+      confirmDelete, confirmExit,
     }}>
       {children}
+      {confirmDeleteDialog && (
+        <ConfirmDeleteModal
+          isOpen={confirmDeleteDialog.isOpen}
+          itemName={confirmDeleteDialog.itemName}
+          onConfirm={() => confirmDeleteDialog.resolve(true)}
+          onCancel={() => confirmDeleteDialog.resolve(false)}
+        />
+      )}
+      {confirmExitDialog && (
+        <ConfirmExitModal
+          isOpen={confirmExitDialog.isOpen}
+          fileNames={confirmExitDialog.fileNames}
+          onSave={() => confirmExitDialog.resolve('save')}
+          onDiscard={() => confirmExitDialog.resolve('discard')}
+          onCancel={() => confirmExitDialog.resolve('cancel')}
+        />
+      )}
     </EditorContext.Provider>
   )
 }

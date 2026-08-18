@@ -17,10 +17,13 @@ import {
   Layout,
   FileText,
   Table,
+  Sun,
+  Moon,
+  Laptop,
 } from "lucide-react";
-import type { Locale } from "@type-club/editor";
+import { type Locale, spellcheckService } from "@type-club/editor";
 import type { AppTheme, ThemeColors, ThemeTypography } from "../types";
-import { DARK_THEME, LIGHT_THEME } from "../utils/themePresets";
+import { DARK_THEME, LIGHT_THEME, BUILTIN_THEMES } from "../utils/themePresets";
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -33,6 +36,9 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
   const {
     state,
     setTheme,
+    setThemeMode,
+    setLightThemeId,
+    setDarkThemeId,
     setLanguage,
     t,
     saveCustomTheme,
@@ -127,6 +133,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
       ? spellcheckLangs.filter((l) => l !== langCode)
       : [...spellcheckLangs, langCode];
     setSpellcheckLangs(next);
+    spellcheckService.setLanguages(next);
     await window.api.setSpellcheckLanguages(next);
   };
 
@@ -135,6 +142,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
     if (!trimmed) return;
     if (!customWords.includes(trimmed)) {
       setCustomWords((prev) => [...prev, trimmed]);
+      spellcheckService.addCustomWord(trimmed);
       await window.api.addCustomWord(trimmed);
     }
     setNewWordInput("");
@@ -142,15 +150,11 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
 
   const handleRemoveCustomWord = async (word: string) => {
     setCustomWords((prev) => prev.filter((w) => w !== word));
+    spellcheckService.removeCustomWord(word);
     await window.api.removeCustomWord(word);
   };
 
   // --- Theme Actions ---
-  const handleSelectTheme = (theme: AppTheme) => {
-    setTheme(theme.id, theme);
-    setDraftTheme({ ...theme });
-  };
-
   const handleUpdateDraftColor = (key: keyof ThemeColors, value: string) => {
     setDraftTheme((prev) => {
       const updated: AppTheme = {
@@ -269,11 +273,6 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
 
   const currentTabInfo = tabs.find((tItem) => tItem.key === activeTab) || tabs[0];
 
-  const allBuiltinThemes: AppTheme[] = useMemo(() => [
-    { ...DARK_THEME, name: t("settings.theme.themeDark") },
-    { ...LIGHT_THEME, name: t("settings.theme.themeLight") },
-  ], [t]);
-
   return (
     <div
       className={`modal-overlay ${activeTab === "theme" ? "no-blur" : ""} ${
@@ -382,7 +381,58 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
 
               {/* TAB: THEME SETTINGS & EDITOR */}
               {activeTab === "theme" && (
-                <div className="flex flex-col select-none" style={{ gap: "22px" }}>
+                <div className="flex flex-col select-none" style={{ gap: "20px" }}>
+                  {/* Mode Selector */}
+                  <div>
+                    <div
+                      className="text-[12px] font-semibold uppercase tracking-wider text-[var(--text-muted)]"
+                      style={{ marginBottom: "8px" }}
+                    >
+                      {t("settings.theme.activeMode")}
+                    </div>
+                    <div
+                      className="flex items-center bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl"
+                      style={{ padding: "4px", gap: "4px" }}
+                    >
+                      <button
+                        onClick={() => setThemeMode('light')}
+                        className={`flex-1 flex items-center justify-center rounded-lg text-[13px] font-medium transition-all cursor-pointer ${
+                          state.theme === 'light'
+                            ? 'bg-[var(--bg-base)] text-[var(--text-primary)] shadow-xs border border-[var(--border-default)]'
+                            : 'text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] border border-transparent'
+                        }`}
+                        style={{ padding: "8px 12px", gap: "8px" }}
+                      >
+                        <Sun size={15} className={state.theme === 'light' ? 'text-amber-500' : ''} />
+                        <span>{t('settings.theme.dayTheme')}</span>
+                      </button>
+                      <button
+                        onClick={() => setThemeMode('dark')}
+                        className={`flex-1 flex items-center justify-center rounded-lg text-[13px] font-medium transition-all cursor-pointer ${
+                          state.theme === 'dark'
+                            ? 'bg-[var(--bg-base)] text-[var(--text-primary)] shadow-xs border border-[var(--border-default)]'
+                            : 'text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] border border-transparent'
+                        }`}
+                        style={{ padding: "8px 12px", gap: "8px" }}
+                      >
+                        <Moon size={15} className={state.theme === 'dark' ? 'text-indigo-400' : ''} />
+                        <span>{t('settings.theme.nightTheme')}</span>
+                      </button>
+                      <button
+                        onClick={() => setThemeMode('system')}
+                        className={`flex-1 flex items-center justify-center rounded-lg text-[13px] font-medium transition-all cursor-pointer ${
+                          state.theme === 'system'
+                            ? 'bg-[var(--bg-base)] text-[var(--text-primary)] shadow-xs border border-[var(--border-default)]'
+                            : 'text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] border border-transparent'
+                        }`}
+                        style={{ padding: "8px 12px", gap: "8px" }}
+                      >
+                        <Laptop size={15} className={state.theme === 'system' ? 'text-[var(--accent)]' : ''} />
+                        <span>{t('settings.theme.systemTheme')}</span>
+                      </button>
+                    </div>
+                  </div>
+
                   {/* 1. Built-in Themes */}
                   <div>
                     <div
@@ -395,32 +445,66 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                       className="flex flex-col rounded-xl bg-[var(--bg-surface)] overflow-hidden"
                       style={{ padding: "4px" }}
                     >
-                      {allBuiltinThemes.map((bTheme) => {
-                        const isSelected = state.theme === bTheme.id;
+                      {BUILTIN_THEMES.map((bTheme) => {
+                        const isDay = state.lightThemeId === bTheme.id;
+                        const isNight = state.darkThemeId === bTheme.id;
+                        const isEditing = draftTheme.id === bTheme.id;
                         return (
                           <div
                             key={bTheme.id}
-                            onClick={() => handleSelectTheme(bTheme)}
-                            className="flex items-center justify-between rounded-lg cursor-pointer transition-colors hover:bg-[var(--bg-hover)]"
-                            style={{ padding: "9px 14px" }}
+                            onClick={() => {
+                              setDraftTheme({ ...bTheme });
+                              if (bTheme.baseTheme === 'light') {
+                                setLightThemeId(bTheme.id);
+                              } else {
+                                setDarkThemeId(bTheme.id);
+                              }
+                            }}
+                            className={`flex items-center justify-between rounded-lg cursor-pointer transition-colors hover:bg-[var(--bg-hover)] ${
+                              isEditing ? 'bg-[var(--bg-hover)]/60' : ''
+                            }`}
+                            style={{ padding: "8px 12px" }}
                           >
-                            <div className="flex items-center gap-2.5">
+                            <div className="flex items-center gap-2.5 min-w-0">
                               <div
-                                className="w-3.5 h-3.5 rounded-full border border-black/10 shadow-xs"
+                                className="w-3.5 h-3.5 rounded-full border border-black/10 shadow-xs flex-shrink-0"
                                 style={{ backgroundColor: bTheme.colors.bgBase }}
                               />
-                              <span className="text-[13px] text-[var(--text-primary)] font-medium">
+                              <span className="text-[13px] text-[var(--text-primary)] font-medium truncate">
                                 {bTheme.name}
                               </span>
                             </div>
-                            <div
-                              className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${
-                                isSelected
-                                  ? "bg-[var(--accent)] border-[var(--accent)] text-white"
-                                  : "border-[var(--border-strong)] bg-[var(--bg-base)]"
-                              }`}
-                            >
-                              {isSelected && <Check size={11} strokeWidth={3} />}
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setLightThemeId(bTheme.id);
+                                  setDraftTheme({ ...bTheme });
+                                }}
+                                title={t("settings.theme.selectDay")}
+                                className={`flex items-center justify-center w-7 h-7 rounded-lg transition-all cursor-pointer ${
+                                  isDay
+                                    ? "bg-amber-500/15 border border-amber-500/40 text-amber-500 shadow-xs"
+                                    : "text-[var(--text-dim)] hover:text-amber-500 hover:bg-[var(--bg-hover)] border border-transparent"
+                                }`}
+                              >
+                                <Sun size={15} strokeWidth={isDay ? 2.5 : 2} />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDarkThemeId(bTheme.id);
+                                  setDraftTheme({ ...bTheme });
+                                }}
+                                title={t("settings.theme.selectNight")}
+                                className={`flex items-center justify-center w-7 h-7 rounded-lg transition-all cursor-pointer ${
+                                  isNight
+                                    ? "bg-indigo-500/15 border border-indigo-500/40 text-indigo-400 shadow-xs"
+                                    : "text-[var(--text-dim)] hover:text-indigo-400 hover:bg-[var(--bg-hover)] border border-transparent"
+                                }`}
+                              >
+                                <Moon size={14} strokeWidth={isNight ? 2.5 : 2} />
+                              </button>
                             </div>
                           </div>
                         );
@@ -459,13 +543,24 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                         </div>
                       ) : (
                         state.customThemes.map((cTheme) => {
-                          const isSelected = state.theme === cTheme.id;
+                          const isDay = state.lightThemeId === cTheme.id;
+                          const isNight = state.darkThemeId === cTheme.id;
+                          const isEditing = draftTheme.id === cTheme.id;
                           return (
                             <div
                               key={cTheme.id}
-                              className="flex items-center justify-between rounded-lg transition-colors hover:bg-[var(--bg-hover)] group cursor-pointer"
+                              className={`flex items-center justify-between rounded-lg transition-colors hover:bg-[var(--bg-hover)] group cursor-pointer ${
+                                isEditing ? 'bg-[var(--bg-hover)]/60' : ''
+                              }`}
                               style={{ padding: "8px 12px" }}
-                              onClick={() => handleSelectTheme(cTheme)}
+                              onClick={() => {
+                                setDraftTheme({ ...cTheme });
+                                if (cTheme.baseTheme === 'light') {
+                                  setLightThemeId(cTheme.id);
+                                } else {
+                                  setDarkThemeId(cTheme.id);
+                                }
+                              }}
                             >
                               <div className="flex items-center gap-2.5 flex-1 min-w-0">
                                 <div
@@ -476,22 +571,43 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                                   {cTheme.name}
                                 </span>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <div
-                                  className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${
-                                    isSelected
-                                      ? "bg-[var(--accent)] border-[var(--accent)] text-white"
-                                      : "border-[var(--border-strong)] bg-[var(--bg-base)]"
+                              <div className="flex items-center gap-1.5 flex-shrink-0">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setLightThemeId(cTheme.id);
+                                    setDraftTheme({ ...cTheme });
+                                  }}
+                                  title={t("settings.theme.selectDay")}
+                                  className={`flex items-center justify-center w-7 h-7 rounded-lg transition-all cursor-pointer ${
+                                    isDay
+                                      ? "bg-amber-500/15 border border-amber-500/40 text-amber-500 shadow-xs"
+                                      : "text-[var(--text-dim)] hover:text-amber-500 hover:bg-[var(--bg-hover)] border border-transparent"
                                   }`}
                                 >
-                                  {isSelected && <Check size={11} strokeWidth={3} />}
-                                </div>
+                                  <Sun size={15} strokeWidth={isDay ? 2.5 : 2} />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDarkThemeId(cTheme.id);
+                                    setDraftTheme({ ...cTheme });
+                                  }}
+                                  title={t("settings.theme.selectNight")}
+                                  className={`flex items-center justify-center w-7 h-7 rounded-lg transition-all cursor-pointer ${
+                                    isNight
+                                      ? "bg-indigo-500/15 border border-indigo-500/40 text-indigo-400 shadow-xs"
+                                      : "text-[var(--text-dim)] hover:text-indigo-400 hover:bg-[var(--bg-hover)] border border-transparent"
+                                  }`}
+                                >
+                                  <Moon size={14} strokeWidth={isNight ? 2.5 : 2} />
+                                </button>
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleDeleteTheme(cTheme);
                                   }}
-                                  className="w-6 h-6 flex items-center justify-center rounded text-[var(--text-dim)] hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                  className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-red-400 hover:bg-red-500/10 transition-colors ml-1"
                                   title={t("common.delete")}
                                 >
                                   <X size={14} />

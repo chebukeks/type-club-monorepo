@@ -35,10 +35,10 @@
   --editor-caret: #6c8cff;
   --editor-selection: rgba(108, 140, 255, 0.2);
   --editor-heading: #e8eaed;
-  --editor-heading-h3: #d2d4d7;
-  --editor-heading-h4: #c0c3c8;
-  --editor-heading-h5: #b0b3b8;
-  --editor-heading-h6: #9ca0a8;
+  --editor-heading-h3: var(--editor-heading);
+  --editor-heading-h4: var(--editor-heading);
+  --editor-heading-h5: var(--editor-heading);
+  --editor-heading-h6: var(--editor-heading);
   --editor-prefix: #4a4d54;
   --editor-strong: #f0f0f2;
   --editor-em: #c8cad0;
@@ -133,10 +133,10 @@
   --editor-caret: #4472c4;
   --editor-selection: rgba(68, 114, 196, 0.2);
   --editor-heading: #1e1e1e;
-  --editor-heading-h3: #333333;
-  --editor-heading-h4: #444444;
-  --editor-heading-h5: #555555;
-  --editor-heading-h6: #666666;
+  --editor-heading-h3: var(--editor-heading);
+  --editor-heading-h4: var(--editor-heading);
+  --editor-heading-h5: var(--editor-heading);
+  --editor-heading-h6: var(--editor-heading);
   --editor-prefix: #bbbbbb;
   --editor-strong: #1e1e1e;
   --editor-em: #333333;
@@ -288,14 +288,16 @@ body {
 
 /* Пункты выпадающих меню */
 .menu-item {
-  margin: 1px 4px;
-  padding: 6px 10px;
+  margin: 1px 3px;
+  padding: 3.5px 8px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   white-space: nowrap;
-  border-radius: 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.35;
   transition: background 0.12s ease-out, color 0.12s ease-out;
 }
 

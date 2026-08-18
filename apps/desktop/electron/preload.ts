@@ -50,6 +50,11 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.send('shell:showItemInFolder', filePath)
   },
 
+  /** Скопировать файл в системный буфер обмена (как файл) */
+  copyFileToClipboard: (filePath: string): Promise<boolean> => {
+    return ipcRenderer.invoke('clipboard:copyFile', filePath)
+  },
+
   // ==========================================
   // Диалоговые окна
   // ==========================================
@@ -138,21 +143,18 @@ contextBridge.exposeInMainWorld('api', {
   },
 
   /** Проверить, считается ли слово ошибочным по спеллчекеру */
-  isWordMisspelled: (word: string): boolean => {
-    try {
-      return webFrame.isWordMisspelled(word)
-    } catch {
-      return false
-    }
+  isWordMisspelled: (word: string): Promise<boolean> => {
+    return ipcRenderer.invoke('spellcheck:isMisspelled', word)
   },
 
   /** Получить варианты исправлений для слова */
-  getWordSuggestions: (word: string): string[] => {
-    try {
-      return webFrame.getWordSuggestions(word)
-    } catch {
-      return []
-    }
+  getWordSuggestions: (word: string): Promise<string[]> => {
+    return ipcRenderer.invoke('spellcheck:getSuggestions', word)
+  },
+
+  /** Пакетная проверка списка слов */
+  checkWords: (words: string[]): Promise<string[]> => {
+    return ipcRenderer.invoke('spellcheck:checkWords', words)
   },
 
   /** Подписаться на данные контекстного меню спеллчекера */
