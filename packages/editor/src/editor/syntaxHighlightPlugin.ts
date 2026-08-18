@@ -139,9 +139,44 @@ export const syntaxHighlightPlugin = new Plugin({
     init(_, instance) {
       return getHighlightDecorations(instance.doc)
     },
-    apply(tr, oldDecorations, _oldState, newState) {
-      // Пересчитываем только если документ изменился
+    apply(tr, oldDecorations, oldState, newState) {
       if (!tr.docChanged) return oldDecorations
+
+      // Проверяем, затронули ли изменения хоть один code_block
+      let codeBlockTouched = false
+      for (const step of tr.steps) {
+        step.getMap().forEach((oldStart, oldEnd, newStart, newEnd) => {
+          if (codeBlockTouched) return
+          const $oldStart = oldState.doc.resolve(Math.min(oldStart, oldState.doc.content.size))
+          const $oldEnd = oldState.doc.resolve(Math.min(oldEnd, oldState.doc.content.size))
+          if (
+            $oldStart.parent.type.name === 'code_block' ||
+            $oldEnd.parent.type.name === 'code_block' ||
+            $oldStart.nodeAfter?.type.name === 'code_block' ||
+            $oldEnd.nodeBefore?.type.name === 'code_block'
+          ) {
+            codeBlockTouched = true
+            return
+          }
+          const $newStart = newState.doc.resolve(Math.min(newStart, newState.doc.content.size))
+          const $newEnd = newState.doc.resolve(Math.min(newEnd, newState.doc.content.size))
+          if (
+            $newStart.parent.type.name === 'code_block' ||
+            $newEnd.parent.type.name === 'code_block' ||
+            $newStart.nodeAfter?.type.name === 'code_block' ||
+            $newEnd.nodeBefore?.type.name === 'code_block'
+          ) {
+            codeBlockTouched = true
+            return
+          }
+        })
+        if (codeBlockTouched) break
+      }
+
+      if (!codeBlockTouched) {
+        return oldDecorations.map(tr.mapping, newState.doc)
+      }
+
       return getHighlightDecorations(newState.doc)
     },
   },

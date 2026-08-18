@@ -79,10 +79,10 @@ export const spellcheckPlugin = new Plugin({
       return getSpellcheckDecorations(instance.doc)
     },
     apply(tr, oldDecorations, _oldState, newState) {
-      if (tr.getMeta('spellcheckRefresh') || tr.docChanged) {
+      if (tr.getMeta('spellcheckRefresh')) {
         return getSpellcheckDecorations(newState.doc)
       }
-      return oldDecorations.map(tr.mapping, tr.doc)
+      return oldDecorations.map(tr.mapping, newState.doc)
     },
   },
   props: {
@@ -91,6 +91,8 @@ export const spellcheckPlugin = new Plugin({
     },
   },
   view(editorView) {
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null
+
     // Подписываемся на изменения словарей для мгновенного обновления
     const unsubscribe = spellcheckService.subscribe(() => {
       if (editorView && !editorView.isDestroyed) {
@@ -98,14 +100,27 @@ export const spellcheckPlugin = new Plugin({
       }
     })
 
-    // Первичная проверка при монтировании
-    getSpellcheckDecorations(editorView.state.doc, editorView)
+    // Первичная фоновая проверка при монтировании
+    setTimeout(() => {
+      if (editorView && !editorView.isDestroyed) {
+        getSpellcheckDecorations(editorView.state.doc, editorView)
+      }
+    }, 50)
 
     return {
-      update(view) {
-        getSpellcheckDecorations(view.state.doc, view)
+      update(view, prevState) {
+        if (!view.state.doc.eq(prevState.doc)) {
+          if (debounceTimer) clearTimeout(debounceTimer)
+          debounceTimer = setTimeout(() => {
+            if (view && !view.isDestroyed) {
+              getSpellcheckDecorations(view.state.doc, view)
+              view.dispatch(view.state.tr.setMeta('spellcheckRefresh', true))
+            }
+          }, 350)
+        }
       },
       destroy() {
+        if (debounceTimer) clearTimeout(debounceTimer)
         unsubscribe()
       },
     }

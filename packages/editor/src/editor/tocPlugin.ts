@@ -91,11 +91,7 @@ export function tocPlugin(onUpdate: (toc: TocItem[], suggestions: SuggestionItem
         })
 
         pushGroup()
-
-        if (timer) clearTimeout(timer)
-        timer = setTimeout(() => {
-          onUpdate(tempToc, tempSuggestions)
-        }, 0)
+        onUpdate(tempToc, tempSuggestions)
       }
 
       // Initial scan
@@ -104,7 +100,10 @@ export function tocPlugin(onUpdate: (toc: TocItem[], suggestions: SuggestionItem
       return {
         update(view, prevState) {
           if (!view.state.doc.eq(prevState.doc)) {
-            scanToc(view)
+            if (timer) clearTimeout(timer)
+            timer = setTimeout(() => {
+              scanToc(view)
+            }, 300)
           }
         },
         destroy() {

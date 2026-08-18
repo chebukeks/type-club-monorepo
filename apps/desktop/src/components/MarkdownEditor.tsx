@@ -382,10 +382,10 @@ export function MarkdownEditor() {
             }
           }
 
-          const needsUpdate = !view.state.selection.eq(prevState.selection) || !view.state.doc.eq(prevState.doc) || view.state !== prevState
+          const needsUpdate = !view.state.selection.eq(prevState.selection) || !view.state.doc.eq(prevState.doc)
           if (needsUpdate && !isMouseSelectingRef.current) {
             if (isTypewriterModeRef.current) typewriterScrollToHead(view)
-            else updateCaretDocY(view)
+            else if (state.focusMode === 'lines') updateCaretDocY(view)
           }
         },
         destroy() {

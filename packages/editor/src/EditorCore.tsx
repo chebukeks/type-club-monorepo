@@ -201,13 +201,32 @@ export function EditorCore({
 
     const syncPlugin = new Plugin({
       view() {
+        let syncTimer: ReturnType<typeof setTimeout> | null = null;
+        let lastDoc = doc;
+
+        const flush = (currentDoc: PMNode) => {
+          if (isUnmounted) return;
+          const md = serializeMarkdown(currentDoc);
+          lastEmittedRef.current = md;
+          onChangeRef.current(md);
+        };
+
         return {
           update(view, prevState) {
             if (isUnmounted) return;
             if (!view.state.doc.eq(prevState.doc)) {
-              const md = serializeMarkdown(view.state.doc);
-              lastEmittedRef.current = md;
-              onChangeRef.current(md);
+              lastDoc = view.state.doc;
+              if (syncTimer) clearTimeout(syncTimer);
+              syncTimer = setTimeout(() => {
+                flush(lastDoc);
+                syncTimer = null;
+              }, 200);
+            }
+          },
+          destroy() {
+            if (syncTimer) {
+              clearTimeout(syncTimer);
+              flush(lastDoc);
             }
           },
         };
