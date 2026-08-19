@@ -116,8 +116,12 @@ cd apps/web && npm run dev
 apps/desktop/
 ├── electron/                    # Electron (Main Process)
 │   ├── main.ts                  #   Главный процесс: окно, IPC, экспорт, store, spellcheck
+│   ├── modernWords.ts           #   Современный словарь технических терминов
 │   ├── preload.ts               #   Bridge: contextBridge → window.api
 │   └── electron-env.d.ts        #   Типы process.env
+│
+├── resources/                   # Статические ресурсы (словари Hunspell)
+│   └── dictionaries/            #   ru-RU-3-0.bdic, en-US-10-1.bdic
 │
 ├── src/                         # React + ProseMirror (Renderer)
 │   ├── main.tsx                 #   Точка входа React
@@ -135,11 +139,14 @@ apps/desktop/
 │       ├── TitleBar.tsx         #   Кастомный titlebar + кнопки auth/publish/settings
 │       ├── MenuBar.tsx          #   Меню: File, Edit, View
 │       ├── Sidebar.tsx          #   Файловый проводник + онлайн-статьи
-│       ├── TabBar.tsx           #   Панель вкладок
+│       ├── TabBar.tsx           #   Панель вкладок (закрытие на колесико, хитбоксы)
 │       ├── MarkdownEditor.tsx   #   Обёртка над EditorCore (zoom, data URI, typewriter)
 │       ├── SearchBar.tsx        #   Поиск по документу (Ctrl+F)
-│       ├── SettingsPopup.tsx    #   Настройки
+│       ├── SettingsModal.tsx    #   Модальное окно настроек (Тема, Язык и словари, Хоткеи)
+│       ├── SettingsPopup.tsx    #   Попап настроек в тулбаре
 │       ├── StatsToast.tsx       #   Статистика
+│       ├── ConfirmDeleteModal.tsx # Стилизованный диалог удаления файла
+│       ├── ConfirmExitModal.tsx   # Стилизованный диалог несохраненного выхода
 │       ├── AuthModal.tsx        #   Авторизация
 │       └── PublishModal.tsx     #   Публикация на type-club.ru
 │
@@ -181,6 +188,8 @@ packages/editor/
         ├── suggestionActionPlugin.ts # Плагин действий над советами (принять/отклонить)
         ├── suggestionNoteView.ts  # NodeView: примечания советчика
         ├── collaborationPlugin.ts # Yjs-синхронизация соавторства
+        ├── spellcheckPlugin.ts    # Подсветка орфографических ошибок (декорации ProseMirror)
+        ├── spellcheckService.ts   # Сервис валидации слов и предложений
         ├── codeBlockView.ts       # NodeView: блоки кода + highlight.js
         ├── mathBlockView.ts       # NodeView: блочные формулы (KaTeX)
         ├── mathInlineView.ts      # NodeView: инлайн-формулы
@@ -193,7 +202,7 @@ packages/editor/
         ├── imageView.ts           # NodeView: изображения + YouTube
         ├── interactivePlugin.ts   # Интерактивные элементы
         ├── pastePlugin.ts         # Умная вставка (блоки — после абзаца, текст — инлайн)
-        ├── tableEditPlugin.ts     # Режим редактирования таблиц (overlay, DnD)
+        ├── tableEditPlugin.ts     # Режим редактирования таблиц (overlay, DnD, позиционирование)
         ├── tocPlugin.ts           # Оглавление (Table of Contents)
         └── typographyPlugin.ts    # Авто-типографика (-- → —)
 ```
@@ -247,7 +256,8 @@ interface Tab {
 interface AppState {
   tabs: Tab[]; activeTabId: string | null; folderPath: string | null
   fileTree: FileEntry[]; creating: { type: 'file' | 'folder' } | null
-  theme: ThemeMode; autosave: boolean; wordLimit: WordLimit
+  theme: ThemeMode; dayTheme: string; nightTheme: string; customThemes: CustomTheme[]
+  autosave: boolean; wordLimit: WordLimit
   showStats: boolean; activeToc: TocItem[]
   typewriterMode: boolean; focusMode: FocusMode
 }
@@ -263,7 +273,9 @@ interface AppState {
 | `UPDATE_CONTENT` | Обновить содержимое |
 | `SET_FILE_TREE` | Установить дерево файлов |
 | `MARK_SAVED` | Пометить вкладку как сохранённую |
-| `SET_THEME` | Установить тему |
+| `SET_THEME` | Установить режим темы (light / dark / system) |
+| `SET_DAY_THEME` | Выбрать пресет для дневной темы |
+| `SET_NIGHT_THEME` | Выбрать пресет для ночной темы |
 | `SET_TAB_MODE` | Установить режим редактирования |
 | `REFRESH_TAB` | Принудительно обновить вкладку |
 | `SET_ACTIVE_TOC` | Обновить оглавление |
@@ -278,7 +290,7 @@ interface AppState {
 
 ### Инициализация при запуске
 
-Из `electron-store` восстанавливаются: тема, автосохранение, статистика, typewriter, focus mode, последняя папка, файлы из "Open with...".
+Из `electron-store` восстанавливаются: тема, пресеты дневной/ночной темы, автосохранение, статистика, typewriter, focus mode, последняя папка, файлы из "Open with...".
 
 ---
 
@@ -309,6 +321,12 @@ interface AppState {
 
 Важен: кастомные keymap-плагины должны идти перед `baseKeymap`, чтобы перехватывать клавиши первыми. Сборка плагинов — в `EditorCore.tsx`.
 
+### Редактирование таблиц (tableEditPlugin)
+
+1. **HTML5 Drag-and-Drop Lifecycle**: Для перетаскивания строк/столбцов транзакция `moveTableColumn`/`moveTableRow` откладывается до события `dragend` через `pendingColMove`/`pendingRowMove` и `setTimeout(..., 0)`. Это защищает нативную drag-сессию браузера от обрыва при пересоздании DOM-оверлея.
+2. **Устойчивость к коллаборации (Yjs)**: Метод `apply()` использует сопоставление с отрицательным смещением `tr.mapping.map(prev, -1)` и автоматический резолв объемлющей ноды `table` через `$pos.depth`. Это исключает потерю фокуса таблицы при сопутствующих Yjs-транзакциях.
+3. **Позиционирование и z-index**: Оверлей редактирования таблицы использует `z-index: 20` и слушатели `scroll` / `resize`, автоматически скрываясь (`display: none`), если таблица уходит за пределы видимой области редактора под шапку.
+
 ### Добавление нового элемента
 
 1. Добавить нод/марку в `packages/editor/src/editor/schema.ts`
@@ -323,7 +341,7 @@ interface AppState {
 
 ## IPC API (window.api) — Desktop
 
-### Файловая система
+### Файловая система и буфер обмена
 
 | Метод | Описание |
 |---|---|
@@ -331,6 +349,19 @@ interface AppState {
 | `writeFile(path, content)` | Запись файла |
 | `readDir(path)` | Рекурсивное чтение директории (.md) |
 | `createDir(path)` | Создание директории |
+| `copyFileToClipboard(path)` | Копирование самого файла в системный буфер обмена |
+
+### Проверка орфографии (Spellcheck)
+
+| Метод | Описание |
+|---|---|
+| `isWordMisspelled(word)` | Проверка слова на орфографическую ошибку |
+| `getWordSuggestions(word)` | Получение вариантов исправлений |
+| `addCustomWord(word)` | Добавление слова в пользовательский словарь |
+| `removeCustomWord(word)` | Удаление слова из пользовательского словаря |
+| `getCustomWords()` | Список пользовательских слов |
+| `getSpellcheckLanguages()` | Список активных словарей (ru-RU, en-US) |
+| `setSpellcheckLanguages(langs)` | Установка активных словарей |
 
 ### Диалоги
 

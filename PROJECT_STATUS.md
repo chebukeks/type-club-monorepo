@@ -1,6 +1,6 @@
 # Статус проекта Type-Club Monorepo
 
-Дата обновления: 15 августа 2026 г.
+Дата обновления: 19 августа 2026 г.
 
 ---
 
@@ -8,7 +8,8 @@
 
 - **Интернационализация и многоязычность (i18n)**: Полноценная поддержка переключения языков (English / Русский) в веб- и десктоп-приложениях с единым типобезопасным словарем в пакете `@type-club/editor`.
 - **Интерактивное и адаптивное оглавление (ToC)**: Единый UX оглавления и предложений на десктопе, вебе и в режиме чтения (`ReadArticle`), с поддержкой раздельного (сайдбар) и совмещенного (плавающая кнопка/дравер) режимов.
-- **Стандартизация дизайна меню и поп-апов**: Единый визуальный язык для контекстных меню, дропдаунов, попапов настроек и статистики с современными Enter & Exit анимациями и эффектами размытия (glassmorphism).
+- **Интерактивные умные таблицы**: Плавное и надежное визуальное редактирование, drag-and-drop колонок и строк, быстрое добавление/удаление по разделителям и rich-text вставка.
+- **Стандартизация дизайна меню, модалок и диалогов**: Единый визуальный язык для контекстных меню, дропдаунов, диалогов удаления/выхода, попапов настроек и статистики с современными анимациями и эффектами размытия (glassmorphism).
 - **Разграничение прав и режимов редактирования**: Изоляция режимов Автор (`author`), Соавтор (`co_author`) и Советчик (`editor`).
 - **Стабильность совместной работы и React SPA**: Исключение сбоев из-за портов Vite/CORS, предотвращение срывов React 18 в белый экран (ErrorBoundary) и защита от нарушения правил хуков (Rules of Hooks).
 
@@ -23,7 +24,7 @@
   - Экспортированы утилиты `getTranslation()`, `createTranslator()`, `applyLanguageToDOM()`.
 - **Локализация Desktop-приложения (`apps/desktop`)**:
   - Добавлено переключение языка в меню **View → Language → English / Русский** с сохранением в `electron-store` / `EditorContext`.
-  - Полностью локализованы: `MenuBar`, `TitleBar`, `TabBar`, `Sidebar`, `SearchBar`, `TableOfContents`, `SettingsPopup`, `StatsToast`, модальные окна (`AuthModal`, `PublishModal`, `CollaborationModal`, `AddNoteModal`, `RawModeWarningModal`, `UserAutocompleteInput`), контекстные меню редактора, конструкторы таблиц и блоков кода.
+  - Полностью локализованы: `MenuBar`, `TitleBar`, `TabBar`, `Sidebar`, `SearchBar`, `TableOfContents`, `SettingsPopup`, `StatsToast`, модальные окна (`AuthModal`, `PublishModal`, `CollaborationModal`, `AddNoteModal`, `RawModeWarningModal`, `UserAutocompleteInput`, `ConfirmDeleteModal`, `ConfirmExitModal`), контекстные меню редактора, конструкторы таблиц и блоков кода.
 - **Локализация Web-приложения (`apps/web`)**:
   - Создан `LanguageContext` с сохранением выбранного языка в `localStorage` (`typeclub_language`) и динамическим обновлением `document.documentElement.lang`.
   - Добавлен переключатель языка в шапку сайта рядом с темой (`ThemeSwitcher`).
@@ -35,7 +36,7 @@
 ### 2.2 Дизайн, адаптивность и логика Оглавления (ToC)
 - **Адаптивный вынос оглавления в правое поле редакторов**:
   - В десктопном и веб-редакторах динамически вычисляется свободное пространство справа от холста с учетом масштабирования документа (`docScale`). При достаточном месте оглавление отображается правым сайдбаром, при нехватке — автоматически переключается на плавающую кнопку.
-  - На странице `ReadArticle.tsx` оглавление позиционируется относительно центра статьи (`left: calc(50vw + 408px)`), с брейкпоинтом `@media (min-width: 1240px)`.
+  - На странице `ReadArticle.tsx` оглавление позиционируется относительно центра статьи с фиксированной шириной и ограничением `maxWidth: 280px`.
 - **Режимы отображения ToC (Вместе / Раздельно)**:
   - Режим `separate`: заголовки выводятся под открытым файлом в сайдбаре.
   - Режим `combined`: оглавление и предложения выносятся в плавующую панель (поповер/дравер).
@@ -76,6 +77,50 @@
   - При клике по ошибочному слову контекстное меню выводит варианты исправлений (клик сразу заменяет слово в документе) и кнопку **«Добавить в словарь»**.
   - Включение встроенного движка Hunspell (`--disable-features=WinUseBrowserSpellChecker`) для надежной и быстрой работы спеллчекера на всех версиях Windows.
 
+### 2.6 Редактирование таблиц: Drag-and-Drop, позиционирование и коллаборация (16–18 августа 2026 г.)
+- **Многократное перетаскивание строк и столбцов (HTML5 Drag-and-Drop)**:
+  - Вызов `moveTableColumn`/`moveTableRow` переведён на отложенный dispatch в событии `dragend` через `pendingColMove`/`pendingRowMove` и `setTimeout(..., 0)`. Это позволяет браузеру штатно завершить сессию Drag-and-Drop без срыва при перестроении оверлея.
+  - Восстановлены надёжные переменные памяти модуля (`dragColIdx`, `dragRowIdx`).
+- **Устойчивость к транзакциям Yjs (`ySyncPlugin`)**:
+  - В `tableEditPlugin.apply()` сопоставление позиции переведено на `tr.mapping.map(prev, -1)` с автоматическим резолвом родительского узла `table` через `$pos.depth`. Это исключает потерю фокуса таблицы при совместной работе.
+  - В обработчиках дропа и кнопках используется динамическое получение актуальной позиции `const currentPos = tableEditPluginKey.getState(view.state) ?? pos`.
+- **Точное позиционирование кнопок «+»**:
+  - Добавлена кнопка «+» слева от первого столбца (`addColumnBeforeAt(0)`) и сверху от первой строки (`addRowBeforeAt(0)`).
+  - Все остальные кнопки «+» на границах вызывают `addColumnAfterAt(i)` и `addRowAfterAt(i)`, точно совпадая с местом расположения плюса.
+- **Следование оверлея при скролле и z-index**:
+  - Добавлены слушатели `scroll` (в фазе захвата) и `resize`, вызывающие `updateOverlayPosition`.
+  - `z-index` оверлея уменьшен до `20` (под липкую шапку `z-50` и меню), а при скролле таблицы за границы экрана оверлей автоматически скрывается (`display: none`).
+- **Rich-text вставка и копирование таблиц на вебе**:
+  - Копирование выделенной таблицы формирует нативный `NodeSelection` и rich-text HTML в буфере, предотвращая вставку сырого JSON.
+
+### 2.7 Кастомные диалоговые окна и эргономика десктопа (16–18 августа 2026 г.)
+- **Кастомные диалоговые окна (`ConfirmDeleteModal.tsx`, `ConfirmExitModal.tsx`)**:
+  - Замена стандартных диалогов Windows (`electron.dialog.showMessageBoxSync`) на стилизованные модалки с размытием фона, кастомными кнопками и шорткатами (Escape / Enter).
+- **Центрирование селектора режимов**:
+  - Селектор режимов (Seamless / Raw / Preview) на верхней панели зафиксирован строго по центру экрана (`left: 50%`, `transform: translateX(-50%)`), исключая смещения влево-вправо при логине или смене открытого документа.
+- **Эргономика вкладок (`TabBar.tsx`)**:
+  - Увеличен хитбокс кнопки закрытия вкладки (крестика) без изменения визуального размера.
+  - Добавлено закрытие вкладки по клику средней кнопки мыши (нажатие на колёсико `e.button === 1`).
+- **Копирование файла в буфер обмена**:
+  - Пункт контекстного меню дерева файлов «Копировать файл» теперь помещает в буфер сам файл системы (для отправки в мессенджеры/почту), а не его текстовое содержимое.
+
+### 2.8 Система тем: встроенные пресеты и раздельный выбор дня/ночи (16–18 августа 2026 г.)
+- **Раздельный выбор дневной и ночной темы**:
+  - В меню настроек добавлены кнопки-иконки ☀️ и 🌙 для независимого выбора темы для светлого и тёмного режима.
+  - Меню **View → Theme** упрощено до трёх лаконичных пунктов: «Дневная», «Ночная», «Системная».
+- **Встроенные темы**:
+  - Темы `Peachy` и `Dissonance` интегрированы в приложение как стандартные встроенные пресеты.
+
+### 2.9 Оглавление (ToC) на вебе: адаптивность и плавный скролл (16–18 августа 2026 г.)
+- **Скрытие оглавления при отсутствии элементов**:
+  - `TableOfContents.tsx` возвращает `null`, если в документе нет заголовков и предложений (`!hasToc && !showSuggestions`).
+- **Плавный скролл к заголовкам в режиме зрителя (`ReadArticle.tsx`)**:
+  - Обработчик `editor-scroll-to` использует `nodeDOM` с фоллбэком на `domAtPos` и метод `el.scrollIntoView({ behavior: 'smooth', block: 'start' })`.
+- **Ограничение максимальной ширины ToC в вебе**:
+  - Контейнер ToC закреплен по правому краю (`right: 24px`) со строгим ограничением `maxWidth: 280px`, предотвращая растягивание при малом масштабе экрана.
+- **Единая высота оглавления**:
+  - В `ReadArticle.tsx` оглавлению заданы `top: 80px`, `bottom: 24px` и `h-full flex flex-col`, выравнивая его высоту с веб-редактором.
+
 ---
 
 ## 3. Ключевые технические решения и архитектура
@@ -83,15 +128,18 @@
 1. **Единый словарь локализации `@type-club/editor/i18n`**:
    - Словарь ключей `en.ts` выступает источником истины типов (`type TranslationKey = keyof typeof en`). Любое расхождение в `ru.ts` немедленно отслеживается компилятором.
    - Поддержка параметров интерполяции `t('key', { name: value })` для динамических строк.
-2. **Динамический расчет правого сайдбара**:
-   - `leftPos = containerWidth / 2 + docHalfWidth + 16`, где `docHalfWidth = 430 * docScale`.
-   - Позволяет плавно убирать/показывать сайдбар оглавления в зависимости от доступных пикселей справа от редактора.
-3. **CSS Grid Accordion Pattern**:
-   - Для раскрывающихся контейнеров без фиксированной JS-высоты используется CSS-сетка: `grid transition-all duration-200 ease-out grid-rows-[0fr]` → `grid-rows-[1fr]`, исключающая визуальные рывки.
-4. **Безопасное размонтирование поповеров**:
-   - Для сохранения анимаций скрытия в чистом React применяются либо таймеры задержки удержания монтирования (`mounted`), либо внутренний флаг `closing` перед вызовом родительского `onClose()`.
-5. **Безопасность слушателей ProseMirror**:
-   - Все обработчики событий прокрутки (`editor-scroll-to-suggestion`) проверяют `view.isDestroyed` и вычисляют родительский контейнер скролла, не ломая цепочку при неполной отрисовке DOM.
+2. **Отложенный dispatch в HTML5 Drag-and-Drop**:
+   - Запуск транзакций ProseMirror внутри события `dragend` через `pendingColMove`/`pendingRowMove` гарантирует, что браузер завершает жизненный цикл DnD до того, как оверлей перестраивается в DOM.
+3. **Безопасное сопоставление позиций ProseMirror при Yjs-коллаборации**:
+   - Использование `tr.mapping.map(prev, -1)` с резолвом объемлющего узла `table` через `$pos.depth` предотвращает смещение указателя на дочерние ноды `table_row`.
+4. **Динамический расчет правого сайдбара и ограничение ширины**:
+   - `leftPos = containerWidth / 2 + docHalfWidth + 16`, где `docHalfWidth = 430 * docScale`, с ограничением `maxWidth: 280px` и `right: 24px`.
+5. **CSS Grid Accordion Pattern**:
+   - Для раскрывающихся контейнеров без фиксированной JS-высоты используется CSS-сетка: `grid transition-all duration-200 ease-out grid-rows-[0fr]` → `grid-rows-[1fr]`.
+6. **Безопасное размонтирование поповеров**:
+   - Применяются таймеры задержки удержания монтирования (`mounted`) и флаги `closing` для 100ms плавных анимаций скрытия.
+7. **Стандартный скролл к узлам ProseMirror**:
+   - Использование `nodeDOM(pos)` с фоллбэком на `domAtPos(pos).node` и `el.scrollIntoView({ behavior: 'smooth', block: 'start' })`.
 
 ---
 
@@ -99,46 +147,61 @@
 
 | Файл | Описание изменений |
 |------|-------------------|
-| [`apps/desktop/src/components/SettingsModal.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/components/SettingsModal.tsx) | **[NEW]** Модалка настроек приложения с вкладками Тема, Язык и словари, Горячие клавиши, формой и списком пользовательского словаря. |
-| [`apps/desktop/src/components/MarkdownEditor.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/components/MarkdownEditor.tsx) | Точное извлечение слова `getWordAtDocPos`, вывод вариантов исправлений и кнопки «Добавить в словарь» в контекстном меню. |
-| [`apps/desktop/electron/main.ts`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/electron/main.ts) | Настройка Hunspell, IPC-хэндлеры для спеллчекер-словарей и пользовательских слов. |
-| [`apps/desktop/electron/preload.ts`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/electron/preload.ts) | Мост `window.api` для спеллчекера (`isWordMisspelled`, `getWordSuggestions`, `addCustomWord`, `removeCustomWord`). |
-| [`apps/desktop/src/types.ts`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/types.ts) | Типизация `IElectronAPI` для словарей и спеллчекера. |
-| [`apps/desktop/src/components/SettingsPopup.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/components/SettingsPopup.tsx) | Кликабельный пункт «Настройки» для открытия `SettingsModal`. |
-| [`apps/desktop/src/components/TitleBar.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/components/TitleBar.tsx) | Состояние модалки настроек и прослушивание события `open-settings`. |
-| [`packages/editor/src/EditorCore.tsx`](file:///c:/git/type-club/type-club-monorepo/packages/editor/src/EditorCore.tsx) | Явный атрибут `attributes: { spellcheck: 'true' }` на DOM-элементе ProseMirror. |
-| [`packages/editor/src/i18n/`](file:///c:/git/type-club/type-club-monorepo/packages/editor/src/i18n/) | Новые ключи для модалки настроек, словарей и пунктов контекстного меню. |
-| [`apps/web/src/context/LanguageContext.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/context/LanguageContext.tsx) | Контекст языка веб-приложения с персистенцией в `localStorage`. |
-| [`apps/web/src/components/ThemeSwitcher.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/components/ThemeSwitcher.tsx) | Переключатель языка (English / Русский) в шапке веб-приложения. |
-| [`apps/desktop/src/components/MenuBar.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/components/MenuBar.tsx) | Подменю **View → Language → English / Русский**, локализация пунктов меню. |
-| [`apps/web/src/components/CommentSection.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/components/CommentSection.tsx) | Полный перевод секции комментариев и относительного времени. |
-| [`apps/web/src/components/ArticleStats.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/components/ArticleStats.tsx) | Локализация счетчиков просмотров, лайков и копирования ссылки. |
-| [`apps/web/src/components/ErrorBoundary.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/components/ErrorBoundary.tsx) | Компонент предохранителя веб-приложения от упавших компонентов. |
-| [`apps/web/vite.config.ts`](file:///c:/git/type-club/type-club-monorepo/apps/web/vite.config.ts) | Зафиксирован `port: 5173` и `strictPort: true`. |
+| [`packages/editor/src/editor/tableEditPlugin.ts`](file:///c:/git/type-club/type-club-monorepo/packages/editor/src/editor/tableEditPlugin.ts) | Исправление DnD через отложенный dispatch в `dragend`, поддержка Yjs-маппинга, точные кнопки «+», `z-index: 20` и clipping при скролле. |
+| [`packages/editor/src/editor/spellcheckPlugin.ts`](file:///c:/git/type-club/type-club-monorepo/packages/editor/src/editor/spellcheckPlugin.ts) | **[NEW]** Плагин подсветки орфографических ошибок в ProseMirror. |
+| [`packages/editor/src/editor/spellcheckService.ts`](file:///c:/git/type-club/type-club-monorepo/packages/editor/src/editor/spellcheckService.ts) | **[NEW]** Сервис проверки орфографии и генерации подсказок. |
+| [`apps/desktop/src/components/ConfirmDeleteModal.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/components/ConfirmDeleteModal.tsx) | **[NEW]** Стилизованный диалог подтверждения удаления файла. |
+| [`apps/desktop/src/components/ConfirmExitModal.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/components/ConfirmExitModal.tsx) | **[NEW]** Стилизованный диалог подтверждения выхода с несохраненными файлами. |
+| [`apps/desktop/src/components/SettingsModal.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/components/SettingsModal.tsx) | Модалка настроек приложения: темы с кнопками ☀️/🌙, выбор словарей, список пользовательских слов, хоткеи. |
+| [`apps/desktop/src/components/TabBar.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/components/TabBar.tsx) | Увеличенный хитбокс закрытия вкладки, закрытие на клик колёсиком мыши (`auxclick` / `button === 1`). |
+| [`apps/desktop/src/components/TitleBar.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/components/TitleBar.tsx) | Центрирование селектора режимов, модалки подтверждения выхода и настроек. |
+| [`apps/desktop/src/utils/themePresets.ts`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/src/utils/themePresets.ts) | Встроенные темы `Peachy` и `Dissonance`. |
+| [`apps/desktop/electron/main.ts`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/electron/main.ts) | Копирование файлов в буфер, IPC-мосты спеллчекера и словарей, офлайн-словари Hunspell. |
+| [`apps/desktop/electron/modernWords.ts`](file:///c:/git/type-club/type-club-monorepo/apps/desktop/electron/modernWords.ts) | **[NEW]** Дополнительный словарь современных технических терминов. |
+| [`apps/web/src/components/TableOfContents.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/components/TableOfContents.tsx) | Скрытие ToC при отсутствии заголовков/предложений, адаптивная верстка. |
+| [`apps/web/src/pages/Editor.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/pages/Editor.tsx) | Привязка ToC к правому краю с `maxWidth: 280px`. |
+| [`apps/web/src/pages/ReadArticle.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/pages/ReadArticle.tsx) | Ограничение ширины ToC, выравнивание высоты (`top: 80px`, `bottom: 24px`) и плавный скролл к заголовкам. |
+| [`apps/web/src/components/MarkdownEditor.tsx`](file:///c:/git/type-club/type-club-monorepo/apps/web/src/components/MarkdownEditor.tsx) | Поддержка `editor-scroll-to` через `scrollIntoView`, богатая вставка таблиц через `NodeSelection`. |
 
 ---
 
 ## 5. Результаты тестирования и проверки
 
 - **Сборка Core (@type-club/editor)**: `npx tsc --noEmit -p packages/editor/tsconfig.json` → `0` ошибок.
-- **Сборка Desktop (TypeScript)**: `npx tsc --noEmit -p apps/desktop/tsconfig.json` → `0` ошибок.
-- **Сборка Web (Vite / TypeScript)**: `npm run build:web` → `0` ошибок.
+- **Сборка Desktop (TypeScript + Vite)**: `cd apps/desktop && npx tsc --noEmit && npx vite build` → `0` ошибок.
+- **Сборка Web (TypeScript + Vite)**: `cd apps/web && npx tsc --noEmit && npx vite build` → `0` ошибок.
 - **Проведенные сценарии проверки**:
-  - Переключение языка в веб-версии (`ThemeSwitcher`) → мгновенное обновление текста на странице, в шапке, на странице чтения `ReadArticle`, комментариях и редакторе без перезагрузки.
-  - Переключение языка в десктоп-версии (`View → Language`) → обновление всех меню, сайдбара, вкладок, ToC, диалогов и контекстных меню.
-  - Сохранение языка в `localStorage` на вебе и `electron-store` на десктопе при перезапуске приложения.
+  - Многократное перетаскивание строк и столбцов таблицы в десктопе (локальные файлы и онлайн-статьи) и веб-редакторе → стабильная работа без зависаний.
+  - Добавление столбца/строки через «+» на границе ячейки → вставка точно на место нажатого плюса.
+  - Скролл страницы с активным оверлеем таблицы → оверлей следует за таблицей и скрывается при уходе под липкую шапку.
+  - Клик по заголовкам в оглавлении в режиме зрителя (`ReadArticle`) → плавный скролл точно к выбранному разделу.
+  - Закрытие вкладок кликом на колёсико мыши → моментальное закрытие вкладки с вызовом диалога подтверждения при наличии несохраненных изменений.
+  - Удаление файла в сайдбаре → кастомное диалоговое окно `ConfirmDeleteModal` в едином дизайн-стиле.
+  - Выбор темы ☀️ / 🌙 → корректная привязка и переключение в зависимости от системной темы.
 
 ---
 
 ## 6. Опробованные, но не сработавшие подходы
 
 1. **Использование `left: calc(100% + 24px)` у `position: fixed` элементов в `ReadArticle.tsx`**:
-   - *Проблема*: `100%` для фиксированного элемента считывалось от ширины viewport (`100vw`), уводя сайдбар за правый край экрана (`X = 100vw + 24px`).
-   - *Решение*: Использование `left: calc(50vw + 408px)`, вычисляющего позицию от центра экрана и половины ширины статьи.
+   - *Проблема*: `100%` для фиксированного элемента считывалось от ширины viewport (`100vw`), уводя сайдбар за правый край экрана.
+   - *Решение*: Использование `left: calc(50vw + 408px)` и `right: 24px` с ограничением `maxWidth: 280px`.
 
 2. **Вызов `return null` до вызова всех React-хуков в `TableOfContents.tsx`**:
-   - *Проблема*: Нарушало правило "Rules of Hooks" при асинхронном появлении заголовков и ломало рендеринг React 18.
-   - *Решение*: Вынос всех вызовов `useState` и `useEffect` строго в верхнюю часть функции до любого условия раннего выхода.
+   - *Проблема*: Нарушало правило "Rules of Hooks" при асинхронном появлении заголовков.
+   - *Решение*: Вынос всех вызовов `useState` и `useEffect` строго в верхнюю часть функции.
+
+3. **Синхронный dispatch `moveTableColumn`/`moveTableRow` в событии `drop`**:
+   - *Проблема*: Синхронное обновление документа ProseMirror вызывало `hideAll()` и удаляло DOM-элемент из дерева до того, как браузер отправлял событие `dragend`. Chromium зависал в незавершенной сессии Drag-and-Drop и блокировал повторные `dragstart`.
+   - *Решение*: Сохранение намерения перемещения в `drop` и отложенное выполнение транзакции внутри `dragend` через `setTimeout(..., 0)`.
+
+4. **Прямой `nodeAt(tr.mapping.map(prev))` в ProseMirror при транзакциях Yjs**:
+   - *Проблема*: При вставке или перемещении ячеек `tr.mapping.map(prev)` смещал координату на 1 внутрь `table_row`, из-за чего проверка `type.name === 'table'` проваливалась и режим редактирования таблицы деактивировался.
+   - *Решение*: Использование `tr.mapping.map(prev, -1)` и поиск объемлющего узла `table` через `$pos.depth`.
+
+5. **Фиксированный `z-index: 1000` для оверлея редактирования таблицы**:
+   - *Проблема*: Оверлей и кнопка «Готово» перекрывали липкую шапку сайта (`z-50`) и меню десктопа при вертикальном скролле.
+   - *Решение*: Установка `z-index: 20` с динамической проверкой видимости через `getBoundingClientRect()` и скрытием (`display: none`) при выходе за пределы рабочей области редактора.
 
 ---
 
