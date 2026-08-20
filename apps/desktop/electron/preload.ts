@@ -6,6 +6,9 @@ import { ipcRenderer, contextBridge, webFrame } from 'electron'
  * Renderer-процесс получает доступ через window.api.
  */
 contextBridge.exposeInMainWorld('api', {
+  /** Платформа операционной системы (win32, darwin, linux) */
+  platform: process.platform,
+
   // ==========================================
   // Файловая система
   // ==========================================

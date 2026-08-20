@@ -12,6 +12,7 @@
     "dev:desktop:local": "npm run dev:local -w apps/desktop",
     "build:web": "npm run build -w apps/web",
     "build:desktop": "npm run build -w apps/desktop",
+    "build:desktop:mac": "npm run build:mac -w apps/desktop",
     "build": "npm run build:web && npm run build:desktop"
   },
   "optionalDependencies": {

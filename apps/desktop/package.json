@@ -9,6 +9,9 @@
     "dev": "vite",
     "dev:local": "cross-env VITE_SITE_URL=http://localhost:8000 vite",
     "build": "tsc && vite build && electron-builder --linux --win",
+    "build:mac": "tsc && vite build && electron-builder --mac",
+    "build:all": "tsc && vite build && electron-builder --linux --win --mac",
+    "build:dir": "tsc && vite build && electron-builder --dir",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },

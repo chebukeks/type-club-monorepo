@@ -249,6 +249,7 @@ export type AppAction =
 
 /** API, доступный из Renderer-процесса через contextBridge */
 export interface IElectronAPI {
+  platform: string;
   readFile: (filePath: string) => Promise<string>;
   writeFile: (filePath: string, content: string) => Promise<void>;
   readDir: (dirPath: string) => Promise<FileEntry[]>;

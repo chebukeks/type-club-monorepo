@@ -183,11 +183,13 @@ export function TitleBar() {
     changeModeWithSpinner(targetMode)
   }, [state.editorMode, isOnlineArticle, changeModeWithSpinner])
 
+  const isMac = typeof window !== 'undefined' && window.api?.platform === 'darwin'
+
   return (
     <>
       <div
         className="relative flex items-center h-9 bg-[var(--bg-surface)] select-none"
-        style={{ paddingLeft: '8px', paddingRight: '0' }}
+        style={{ paddingLeft: isMac ? '78px' : '8px', paddingRight: '0' }}
       >
         {/* Область перетаскивания окна — левая часть */}
         <div
@@ -397,32 +399,36 @@ export function TitleBar() {
 
 
 
-          {/* Кнопки управления окном */}
-          <button
-            onClick={() => window.api.minimizeWindow()}
-            className="w-11 h-full flex items-center justify-center text-[var(--text-dim)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)] transition-colors"
-          >
-            <svg width="10" height="1" viewBox="0 0 10 1">
-              <rect width="10" height="1" fill="currentColor" />
-            </svg>
-          </button>
-          <button
-            onClick={() => window.api.maximizeWindow()}
-            className="w-11 h-full flex items-center justify-center text-[var(--text-dim)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)] transition-colors"
-          >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1">
-              <rect x="0.5" y="0.5" width="9" height="9" />
-            </svg>
-          </button>
-          <button
-            onClick={() => window.api.closeWindow()}
-            className="w-11 h-full flex items-center justify-center text-[var(--text-dim)] hover:bg-[var(--close-hover-bg)] hover:text-white transition-colors"
-          >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2">
-              <line x1="1" y1="1" x2="9" y2="9" />
-              <line x1="9" y1="1" x2="1" y2="9" />
-            </svg>
-          </button>
+          {/* Кнопки управления окном (только для Windows и Linux) */}
+          {!isMac && (
+            <>
+              <button
+                onClick={() => window.api.minimizeWindow()}
+                className="w-11 h-full flex items-center justify-center text-[var(--text-dim)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)] transition-colors"
+              >
+                <svg width="10" height="1" viewBox="0 0 10 1">
+                  <rect width="10" height="1" fill="currentColor" />
+                </svg>
+              </button>
+              <button
+                onClick={() => window.api.maximizeWindow()}
+                className="w-11 h-full flex items-center justify-center text-[var(--text-dim)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)] transition-colors"
+              >
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1">
+                  <rect x="0.5" y="0.5" width="9" height="9" />
+                </svg>
+              </button>
+              <button
+                onClick={() => window.api.closeWindow()}
+                className="w-11 h-full flex items-center justify-center text-[var(--text-dim)] hover:bg-[var(--close-hover-bg)] hover:text-white transition-colors"
+              >
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2">
+                  <line x1="1" y1="1" x2="9" y2="9" />
+                  <line x1="9" y1="1" x2="1" y2="9" />
+                </svg>
+              </button>
+            </>
+          )}
         </div>
       </div>
 
