@@ -2,6 +2,7 @@ export { EditorCore, injectEditorStyles } from "./EditorCore";
 
 export { schema } from "./editor/schema";
 export { parseMarkdown, serializeMarkdown, generateExportHtml } from "./editor/markdownConfig";
+export { htmlToMarkdown, isMeaningfulHtml } from "./editor/htmlToMarkdown";
 export { getEditorStyles } from "./editor/editorTheme";
 export { getKeymapPlugins } from "./editor/keymap";
 export { getInputRulesPlugin } from "./editor/inputRules";
@@ -18,6 +19,17 @@ export { typographyPlugin } from "./editor/typographyPlugin";
 export { CodeBlockView } from "./editor/codeBlockView";
 export { HeadingView } from "./editor/headingView";
 export { ImageView } from "./editor/imageView";
+export {
+  parseVideoEmbed,
+  isVideoUrl,
+  parseYouTubeUrl,
+  parseVkVideoUrl,
+  parseRutubeUrl,
+  parseTwitchUrl,
+  parseVimeoUrl,
+  parseDzenUrl,
+} from "./editor/videoUtils";
+export type { VideoEmbedInfo } from "./editor/videoUtils";
 export { MathBlockView } from "./editor/mathBlockView";
 export { MathInlineView } from "./editor/mathInlineView";
 export { tableEditPlugin, tableEditPluginKey } from "./editor/tableEditPlugin";

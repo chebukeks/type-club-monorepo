@@ -48,7 +48,7 @@ function taskListPlugin(md: MarkdownIt) {
   })
 }
 
-// Фикс для texmath: превращаем одинарный токен math_inline в тройку (open, text, close)
+// Фикс для texmath: превращаем одинарный токен math_inline / math_inline_double в тройку (open, text, close)
 // чтобы ProseMirror мог распарсить content: 'text*'
 function texmathFixPlugin(md: MarkdownIt) {
   md.core.ruler.after('inline', 'texmath_fix', (state: any) => {
@@ -57,7 +57,7 @@ function texmathFixPlugin(md: MarkdownIt) {
       if (tokens[i].type === 'inline' && tokens[i].children) {
         const children = tokens[i].children
         for (let j = children.length - 1; j >= 0; j--) {
-          if (children[j].type === 'math_inline') {
+          if (children[j].type === 'math_inline' || children[j].type === 'math_inline_double') {
             const content = children[j].content
             
             // Используем обычные объекты, совместимые с prosemirror-markdown,
@@ -263,7 +263,9 @@ function extractStyleVar(str: string, varName: string): string {
 }
 
 // Создаём markdown-it экземпляр с поддержкой таблиц, strikethrough, mark и нашего taskListPlugin
+// Отключаем 'code' (4-space indented code blocks), чтобы отступы в обычном тексте не превращались в блоки кода
 const md = new MarkdownIt('default', { html: true })
+  .disable('code')
   .enable('table')
   .enable('strikethrough')
   .use(markPlugin)
@@ -335,6 +337,7 @@ export const markdownParser = new MarkdownParser(schema, md, {
   // КРИТИЧЕСКИЙ ФИКС: Используем `block` вместо `node`, чтобы MarkdownParser
   // зарегистрировал обработчики _open и _close для инлайн-ноды, позволив ей содержать текст!
   math_inline: { block: 'math_inline' },
+  math_inline_double: { block: 'math_inline' },
   
   math_block: { block: 'math_block', noCloseToken: true },
   math_display: { block: 'math_block', noCloseToken: true },
@@ -804,6 +807,7 @@ export function generateExportHtml(markdown: string, theme: 'dark' | 'light' = '
     breaks: true,
     linkify: true,
   })
+    .disable('code')
     .use(texmath, { engine: katex, delimiters: 'dollars' })
     .use(taskListsPlugin, { enabled: true, label: true })
     .use(markPlugin)

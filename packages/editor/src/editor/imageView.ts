@@ -11,31 +11,8 @@
 import { Node as PMNode } from 'prosemirror-model'
 import { EditorView, NodeView } from 'prosemirror-view'
 
-function parseYouTubeUrl(url: string): { videoId: string, start?: string } | null {
-  if (!url) return null;
-  const regExp = /^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
-  const match = url.match(regExp);
-  if (!match) return null;
-  
-  const videoId = match[1];
-  let start = '';
-  const tMatch = url.match(/[?&]t=([0-9hms]+)/);
-  if (tMatch) {
-    start = tMatch[1];
-    if (start.includes('h') || start.includes('m') || start.includes('s')) {
-      let seconds = 0;
-      const h = start.match(/(\d+)h/);
-      const m = start.match(/(\d+)m/);
-      const s = start.match(/(\d+)s/);
-      if (h) seconds += parseInt(h[1]) * 3600;
-      if (m) seconds += parseInt(m[1]) * 60;
-      if (s) seconds += parseInt(s[1]);
-      start = seconds.toString();
-    }
-  }
-
-  return { videoId, start };
-}
+import { parseVideoEmbed, isVideoUrl, parseYouTubeUrl } from './videoUtils'
+export { parseYouTubeUrl, parseVideoEmbed, isVideoUrl }
 
 // Кеш blob URL: data URI → blob URL.
 // Ключ = длина строки + первые 64 символа (достаточно для уникальности, избегаем хеширования МБ).
@@ -112,13 +89,11 @@ export class ImageView implements NodeView {
     this.mediaContainer.innerHTML = ''
     this.currentSrc = this.node.attrs.src || ''
 
-    const yt = parseYouTubeUrl(this.currentSrc)
-    if (yt) {
+    const video = parseVideoEmbed(this.currentSrc)
+    if (video) {
       const iframe = document.createElement('iframe')
-      let src = `https://www.youtube.com/embed/${yt.videoId}`
-      if (yt.start) src += `?start=${yt.start}`
-      iframe.src = src
-      iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture'
+      iframe.src = video.embedUrl
+      iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen'
       iframe.allowFullscreen = true
       iframe.style.width = '100%'
       iframe.style.aspectRatio = '16 / 9'
@@ -217,7 +192,7 @@ export class ImageView implements NodeView {
 
     if (this.currentSrc !== (node.attrs.src || '')) {
       this.renderMedia()
-    } else if (!parseYouTubeUrl(this.currentSrc)) {
+    } else if (!isVideoUrl(this.currentSrc)) {
       const img = this.mediaContainer.querySelector('img')
       if (img) {
         img.alt = node.attrs.alt || ''
