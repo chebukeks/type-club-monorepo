@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /editor
+Disallow: /settings
+Disallow: /my-articles
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /verify-email
+Disallow: /join/
+
+Sitemap: https://type-club.ru/api/sitemap.xml
