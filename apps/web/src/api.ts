@@ -91,10 +91,12 @@ export const authApi = {
     password?: string;
     confirm_password?: string;
   }) => api.patch<User>("/auth/me", data),
-  verifyEmail: (token: string) =>
-    api.post<{ message: string }>("/auth/verify-email", { token }),
-  resendVerification: () =>
-    api.post<{ message: string }>("/auth/resend-verification"),
+  verifyEmail: (data: { code?: string; token?: string; email?: string } | string) => {
+    const payload = typeof data === "string" ? { code: data } : data;
+    return api.post<{ message: string }>("/auth/verify-email", payload);
+  },
+  resendVerification: (data?: { email?: string }) =>
+    api.post<{ message: string }>("/auth/resend-verification", data),
   forgotPassword: (email: string) =>
     api.post<{ message: string }>("/auth/forgot-password", { email }),
   resetPassword: (token: string, password: string, confirm_password: string) =>
@@ -271,3 +273,98 @@ export const collaborationApi = {
   joinByToken: (token: string) =>
     api.post<Collaborator>(`/articles/shared/${token}/join`),
 };
+
+// ── Notifications ──
+
+export interface NotificationItem {
+  id: number;
+  user_id: number;
+  sender_id?: number | null;
+  sender_nickname?: string | null;
+  sender_avatar_url?: string | null;
+  article_id?: number | null;
+  article_title?: string | null;
+  article_slug?: string | null;
+  article_author_nickname?: string | null;
+  type: "comment" | "collab_invite" | "system" | string;
+  title: string;
+  message: string;
+  link: string | null;
+  data?: string | null;
+  read?: boolean;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface NotificationListResponse {
+  items: NotificationItem[];
+  unread_count: number;
+  total: number;
+}
+
+export const notificationsApi = {
+  list: (params?: { page?: number; size?: number; unread_only?: boolean }) => {
+    const qs = new URLSearchParams();
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.size) qs.set("size", String(params.size));
+    if (params?.unread_only) qs.set("unread_only", "true");
+    const query = qs.toString();
+    return api.get<NotificationListResponse>(`/notifications${query ? `?${query}` : ""}`);
+  },
+  markRead: (id: number) =>
+    api.patch<NotificationItem>(`/notifications/${id}/read`),
+  markAllRead: () =>
+    api.post<{ message: string }>("/notifications/read-all"),
+  delete: (id: number) =>
+    api.delete<void>(`/notifications/${id}`),
+};
+
+export function formatNotificationItem(
+  n: NotificationItem,
+  t: (key: any, params?: Record<string, any>) => string
+): { title: string; message: string; link: string | null } {
+  let role = "advisor";
+  let snippet = "";
+  let articleTitle = n.article_title || "";
+
+  if (n.data) {
+    try {
+      const parsed = typeof n.data === "string" ? JSON.parse(n.data) : n.data;
+      if (parsed.role) role = parsed.role;
+      if (parsed.snippet) snippet = parsed.snippet;
+      if (parsed.article_title && !articleTitle) articleTitle = parsed.article_title;
+    } catch {}
+  }
+
+  const user = n.sender_nickname || t("notifications.user");
+  const article = articleTitle || t("notifications.article");
+
+  let title = n.title;
+  let message = n.message;
+  let link = n.link;
+
+  if (n.type === "comment") {
+    title = t("notifications.comment", { user, article });
+    message = snippet || t("notifications.newComment");
+    if (!link) {
+      if (n.article_author_nickname && n.article_slug) {
+        link = `/${n.article_author_nickname}/${n.article_slug}#comments`;
+      } else if (n.article_id) {
+        link = `/editor/${n.article_id}`;
+      }
+    }
+  } else if (n.type === "collab_invite") {
+    if (role === "coauthor" || role === "co_author") {
+      title = t("notifications.collabInviteCoAuthorTitle");
+      message = t("notifications.collabInviteCoAuthor", { user, article });
+    } else {
+      title = t("notifications.collabInviteAdvisorTitle");
+      message = t("notifications.collabInviteAdvisor", { user, article });
+    }
+    if (!link && n.article_id) {
+      link = `/editor/${n.article_id}`;
+    }
+  }
+
+  return { title: title || n.title, message: message || n.message, link };
+}

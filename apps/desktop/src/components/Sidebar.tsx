@@ -4,7 +4,7 @@ import { config } from '../config'
 import { useAuth } from '../context/AuthContext'
 import type { FileEntry, TocItem } from '../types'
 import type { ArticleListItem } from '../api'
-import { Search, X } from 'lucide-react'
+import { Search, X, Pin } from 'lucide-react'
 
 export function Sidebar({ width }: { width: number }) {
   const { user } = useAuth()
@@ -29,6 +29,13 @@ export function Sidebar({ width }: { width: number }) {
     deleteOnlineArticle,
     renameOnlineArticle,
     duplicateOnlineArticle,
+    pinLocalPath,
+    unpinLocalPath,
+    reorderPinnedLocalPaths,
+    pinOnlineArticle,
+    unpinOnlineArticle,
+    reorderPinnedOnlineArticles,
+    createOnlineArticle,
     t,
   } = useEditor()
   const [copied, setCopied] = useState(false)
@@ -42,12 +49,20 @@ export function Sidebar({ width }: { width: number }) {
   }
 
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({})
+  const [isPinnedLocalCollapsed, setIsPinnedLocalCollapsed] = useState(false)
+  const [isPinnedOnlineCollapsed, setIsPinnedOnlineCollapsed] = useState(false)
 
   useEffect(() => {
     window.api.storeGet('expandedFolders').then((saved) => {
       if (saved && typeof saved === 'object') {
         setExpandedFolders(saved as Record<string, boolean>)
       }
+    }).catch(() => {})
+    window.api.storeGet('isPinnedLocalCollapsed').then((val) => {
+      if (typeof val === 'boolean') setIsPinnedLocalCollapsed(val)
+    }).catch(() => {})
+    window.api.storeGet('isPinnedOnlineCollapsed').then((val) => {
+      if (typeof val === 'boolean') setIsPinnedOnlineCollapsed(val)
     }).catch(() => {})
   }, [])
 
@@ -207,6 +222,29 @@ export function Sidebar({ width }: { width: number }) {
       setSelectedFilePath(path)
     }
     setContextMenu({ x: e.clientX, y: e.clientY, path, type, name })
+  }
+
+  const normalizePath = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+
+  const findEntryByPath = (nodes: FileEntry[], targetPath: string): FileEntry | null => {
+    const targetNorm = normalizePath(targetPath)
+    for (const node of nodes) {
+      if (normalizePath(node.path) === targetNorm) return node
+      if (node.isDirectory && node.children) {
+        const found = findEntryByPath(node.children, targetPath)
+        if (found) return found
+      }
+    }
+    return null
+  }
+
+  const resolveFileEntry = (path: string): FileEntry => {
+    const found = findEntryByPath(state.fileTree, path)
+    if (found) return found
+    const sep = path.includes('/') ? '/' : '\\'
+    const name = path.substring(path.lastIndexOf(sep) + 1) || path
+    const isDir = !name.includes('.')
+    return { name, path, isDirectory: isDir }
   }
 
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
@@ -384,7 +422,117 @@ export function Sidebar({ width }: { width: number }) {
         {isOnline ? (
           /* --- Online Articles --- */
           <div className="px-1">
-            {state.onlineArticles.length === 0 ? (
+            {state.creating && (
+              <OnlineCreateInput
+                onSubmit={async (name) => {
+                  try {
+                    await createOnlineArticle(name)
+                  } catch (err) {
+                    console.error('Failed to create online article:', err)
+                  }
+                  dispatch({ type: 'STOP_CREATING' })
+                }}
+                onCancel={() => dispatch({ type: 'STOP_CREATING' })}
+              />
+            )}
+
+            {/* Pinned online articles */}
+            {state.pinnedOnlineArticleIds.length > 0 && !searchQuery.trim() && (
+              <div
+                style={{
+                  paddingLeft: '6px',
+                  paddingRight: '6px',
+                  marginBottom: '8px',
+                  paddingBottom: '4px',
+                  borderBottom: '1px solid var(--border-default)',
+                }}
+              >
+                <div
+                  onClick={() => {
+                    setIsPinnedOnlineCollapsed((prev) => {
+                      const next = !prev
+                      window.api.storeSet('isPinnedOnlineCollapsed', next).catch(() => {})
+                      return next
+                    })
+                  }}
+                  className="flex items-center justify-between px-2 py-1 text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider select-none cursor-pointer hover:text-[var(--text-primary)] rounded transition-colors"
+                  style={{ marginBottom: '2px' }}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <Pin size={11} className="opacity-70 rotate-45" />
+                    <span>{t('sidebar.pinned')}</span>
+                    <span className="text-[10px] opacity-60">({state.pinnedOnlineArticleIds.length})</span>
+                  </div>
+                  <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 12 12"
+                    style={{
+                      transform: isPinnedOnlineCollapsed ? 'rotate(90deg)' : 'rotate(0deg)',
+                      transition: 'transform 0.15s',
+                    }}
+                    fill="currentColor"
+                    className="opacity-70"
+                  >
+                    <path d="M2 4l4 4 4-4z" />
+                  </svg>
+                </div>
+                {!isPinnedOnlineCollapsed && (
+                  <div className="flex flex-col gap-0.5">
+                    {state.pinnedOnlineArticleIds.map((articleId, idx) => {
+                      const article = state.onlineArticles.find((a) => a.id === articleId)
+                      if (!article) return null
+                      return (
+                        <div
+                          key={`pinned-online-${article.id}`}
+                          draggable
+                          onDragStart={(e) => {
+                            e.stopPropagation()
+                            e.dataTransfer.setData('application/x-type-club-pinned-online', String(idx))
+                            e.dataTransfer.effectAllowed = 'move'
+                          }}
+                          onDragOver={(e) => {
+                            if (e.dataTransfer.types.includes('application/x-type-club-pinned-online')) {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              e.dataTransfer.dropEffect = 'move'
+                            }
+                          }}
+                          onDrop={(e) => {
+                            if (e.dataTransfer.types.includes('application/x-type-club-pinned-online')) {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              const fromIdx = Number(e.dataTransfer.getData('application/x-type-club-pinned-online'))
+                              if (!isNaN(fromIdx) && fromIdx !== idx) {
+                                const next = [...state.pinnedOnlineArticleIds]
+                                const [item] = next.splice(fromIdx, 1)
+                                next.splice(idx, 0, item)
+                                reorderPinnedOnlineArticles(next)
+                              }
+                            }
+                          }}
+                        >
+                          <OnlineArticleItem
+                            article={article}
+                            activeTabArticleId={activeTab?.articleId}
+                            activeToc={activeTab?.articleId === article.id ? state.activeToc : []}
+                            onOpen={() => openOnlineArticle(article.id)}
+                            onContextMenu={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setOnlineMenu({ x: e.clientX, y: e.clientY, article })
+                            }}
+                            onRename={(title) => renameOnlineArticle(article.id, title)}
+                          />
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {state.onlineArticles.length === 0 && !state.creating ? (
               <EmptyState
                 isOnline
                 onCreateArticle={() => startCreating('file')}
@@ -394,21 +542,9 @@ export function Sidebar({ width }: { width: number }) {
                 {t('sidebar.articlesNotFound')}
               </div>
             ) : (
-              <>
-                {state.creating && (
-                  <OnlineCreateInput
-                    onSubmit={(name) => {
-                      // Create empty article tab (not yet on server)
-                      dispatch({
-                        type: 'OPEN_FILE',
-                        payload: { filePath: `__online_new__/${Date.now()}`, fileName: name, content: '' }
-                      })
-                      dispatch({ type: 'STOP_CREATING' })
-                    }}
-                    onCancel={() => dispatch({ type: 'STOP_CREATING' })}
-                  />
-                )}
-                {filteredOnlineArticles.map((article) => (
+              filteredOnlineArticles
+                .filter((article) => searchQuery.trim() ? true : !state.pinnedOnlineArticleIds.includes(article.id))
+                .map((article) => (
                   <OnlineArticleItem
                     key={article.id}
                     article={article}
@@ -422,8 +558,7 @@ export function Sidebar({ width }: { width: number }) {
                     }}
                     onRename={(title) => renameOnlineArticle(article.id, title)}
                   />
-                ))}
-              </>
+                ))
             )}
           </div>
         ) : (
@@ -470,6 +605,102 @@ export function Sidebar({ width }: { width: number }) {
               <div className="px-1" onClick={(e) => {
                 if (e.target === e.currentTarget) setActiveExplorerPath(null)
               }}>
+                {/* Pinned local items */}
+                {state.pinnedLocalPaths.length > 0 && !isLocalSearching && (
+                  <div
+                    style={{
+                      paddingLeft: '6px',
+                      paddingRight: '6px',
+                      marginBottom: '8px',
+                      paddingBottom: '4px',
+                      borderBottom: '1px solid var(--border-default)',
+                    }}
+                  >
+                    <div
+                      onClick={() => {
+                        setIsPinnedLocalCollapsed((prev) => {
+                          const next = !prev
+                          window.api.storeSet('isPinnedLocalCollapsed', next).catch(() => {})
+                          return next
+                        })
+                      }}
+                      className="flex items-center justify-between px-2 py-1 text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider select-none cursor-pointer hover:text-[var(--text-primary)] rounded transition-colors"
+                      style={{ marginBottom: '2px' }}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <Pin size={11} className="opacity-70 rotate-45" />
+                        <span>{t('sidebar.pinned')}</span>
+                        <span className="text-[10px] opacity-60">({state.pinnedLocalPaths.length})</span>
+                      </div>
+                      <svg
+                        width="10"
+                        height="10"
+                        viewBox="0 0 12 12"
+                        style={{
+                          transform: isPinnedLocalCollapsed ? 'rotate(90deg)' : 'rotate(0deg)',
+                          transition: 'transform 0.15s',
+                        }}
+                        fill="currentColor"
+                        className="opacity-70"
+                      >
+                        <path d="M2 4l4 4 4-4z" />
+                      </svg>
+                    </div>
+                    {!isPinnedLocalCollapsed && (
+                      <div className="flex flex-col gap-0.5">
+                        {state.pinnedLocalPaths.map((pinnedPath, idx) => {
+                          const entry = resolveFileEntry(pinnedPath)
+                          return (
+                            <div
+                              key={`pinned-local-${pinnedPath}`}
+                              draggable
+                              onDragStart={(e) => {
+                                e.stopPropagation()
+                                e.dataTransfer.setData('application/x-type-club-pinned-local', String(idx))
+                                e.dataTransfer.effectAllowed = 'move'
+                              }}
+                              onDragOver={(e) => {
+                                if (e.dataTransfer.types.includes('application/x-type-club-pinned-local')) {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  e.dataTransfer.dropEffect = 'move'
+                                }
+                              }}
+                              onDrop={(e) => {
+                                if (e.dataTransfer.types.includes('application/x-type-club-pinned-local')) {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  const fromIdx = Number(e.dataTransfer.getData('application/x-type-club-pinned-local'))
+                                  if (!isNaN(fromIdx) && fromIdx !== idx) {
+                                    const next = [...state.pinnedLocalPaths]
+                                    const [item] = next.splice(fromIdx, 1)
+                                    next.splice(idx, 0, item)
+                                    reorderPinnedLocalPaths(next)
+                                  }
+                                }
+                              }}
+                            >
+                              <FileTreeItem
+                                entry={entry}
+                                depth={0}
+                                isPinned={true}
+                                onFileClick={(filePath, fileName) => {
+                                  setSelectedFilePath(filePath)
+                                  openFile(filePath, fileName)
+                                }}
+                                onContextMenu={handleContextMenu}
+                                activeFilePath={activeTab?.filePath || null}
+                                activeToc={state.activeToc || []}
+                                expandedFolders={expandedFolders}
+                                toggleFolderExpanded={toggleFolderExpanded}
+                              />
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
                 {state.creating && state.creating.targetPath === state.folderPath && (
                   <InlineCreateInput
                     type={state.creating.type}
@@ -482,21 +713,21 @@ export function Sidebar({ width }: { width: number }) {
                   />
                 )}
                 {visibleTree.map((entry) => (
-                  <FileTreeItem
-                    key={entry.path}
-                    entry={entry}
-                    depth={0}
-                    onFileClick={(filePath, fileName) => {
-                      setSelectedFilePath(filePath)
-                      openFile(filePath, fileName)
-                    }}
-                    onContextMenu={handleContextMenu}
-                    activeFilePath={activeTab?.filePath || null}
-                    activeToc={state.activeToc || []}
-                    expandedFolders={expandedFolders}
-                    toggleFolderExpanded={toggleFolderExpanded}
-                  />
-                ))}
+                    <FileTreeItem
+                      key={entry.path}
+                      entry={entry}
+                      depth={0}
+                      onFileClick={(filePath, fileName) => {
+                        setSelectedFilePath(filePath)
+                        openFile(filePath, fileName)
+                      }}
+                      onContextMenu={handleContextMenu}
+                      activeFilePath={activeTab?.filePath || null}
+                      activeToc={state.activeToc || []}
+                      expandedFolders={expandedFolders}
+                      toggleFolderExpanded={toggleFolderExpanded}
+                    />
+                  ))}
               </div>
             )}
           </>
@@ -550,6 +781,15 @@ export function Sidebar({ width }: { width: number }) {
                   setContextMenu(null)
                 }}>
                   {t('sidebar.copyPath')}
+                </button>
+                <div className="border-t border-[var(--border-default)] my-1 mx-1.5 opacity-80" />
+                <button className="menu-item enabled" onClick={() => {
+                  const isPinned = state.pinnedLocalPaths.some(p => normalizePath(p) === normalizePath(menu.path))
+                  if (isPinned) unpinLocalPath(menu.path)
+                  else pinLocalPath(menu.path)
+                  setContextMenu(null)
+                }}>
+                  {state.pinnedLocalPaths.some(p => normalizePath(p) === normalizePath(menu.path)) ? t('sidebar.unpin') : t('sidebar.pin')}
                 </button>
                 <div className="border-t border-[var(--border-default)] my-1 mx-1.5 opacity-80" />
                 <button className="menu-item enabled" style={{ color: 'var(--text-danger)' }} onClick={() => { deleteItem(menu.path, menu.type, menu.name); setContextMenu(null) }}>
@@ -622,6 +862,15 @@ export function Sidebar({ width }: { width: number }) {
                   {t('sidebar.copyPath')}
                 </button>
                 <div className="border-t border-[var(--border-default)] my-1 mx-1.5 opacity-80" />
+                <button className="menu-item enabled" onClick={() => {
+                  const isPinned = state.pinnedLocalPaths.some(p => normalizePath(p) === normalizePath(menu.path))
+                  if (isPinned) unpinLocalPath(menu.path)
+                  else pinLocalPath(menu.path)
+                  setContextMenu(null)
+                }}>
+                  {state.pinnedLocalPaths.some(p => normalizePath(p) === normalizePath(menu.path)) ? t('sidebar.unpin') : t('sidebar.pin')}
+                </button>
+                <div className="border-t border-[var(--border-default)] my-1 mx-1.5 opacity-80" />
                 <button className="menu-item enabled" style={{ color: 'var(--text-danger)' }} onClick={() => { deleteItem(menu.path, menu.type, menu.name); setContextMenu(null) }}>
                   {t('common.delete')}
                 </button>
@@ -639,6 +888,7 @@ export function Sidebar({ width }: { width: number }) {
       {onlineMenuMounted && (onlineMenu || savedOnlineMenu) && (() => {
         const menu = onlineMenu || savedOnlineMenu!
         const isAuthor = !menu.article.my_roles || menu.article.my_roles.includes('author')
+        const isPinned = state.pinnedOnlineArticleIds.includes(menu.article.id)
         return (
           <div
             className={`fixed bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-lg shadow-xl z-50 py-0.5 flex flex-col text-[12px] text-[var(--text-secondary)] ${
@@ -647,6 +897,20 @@ export function Sidebar({ width }: { width: number }) {
             style={{ top: menu.y, left: menu.x, minWidth: '150px' }}
             onContextMenu={(e) => e.preventDefault()}
           >
+            <button className="menu-item enabled" onClick={() => {
+              if (isPinned) unpinOnlineArticle(menu.article.id)
+              else pinOnlineArticle(menu.article.id)
+              setOnlineMenu(null)
+            }}>
+              {isPinned ? t('sidebar.unpin') : t('sidebar.pin')}
+            </button>
+            <button className="menu-item enabled" onClick={() => {
+              startCreating('file')
+              setOnlineMenu(null)
+            }}>
+              {t('sidebar.createArticle')}
+            </button>
+            <div className="border-t border-[var(--border-default)] my-1 mx-1.5 opacity-80" />
             {isAuthor && (
               <button className="menu-item enabled" onClick={() => {
                 startRenaming(`__online__/${menu.article.id}`, 'file')
@@ -950,7 +1214,7 @@ function InlineCreateInput({ type, depth, onSubmit, onCancel }: {
   )
 }
 
-function FileTreeItem({ entry, depth, onFileClick, onContextMenu, activeFilePath, activeToc, expandedFolders, toggleFolderExpanded }: {
+function FileTreeItem({ entry, depth, onFileClick, onContextMenu, activeFilePath, activeToc, expandedFolders, toggleFolderExpanded, isPinned = false }: {
   entry: FileEntry; depth: number;
   onFileClick: (filePath: string, fileName: string) => void;
   onContextMenu: (e: React.MouseEvent, path: string, type: 'file' | 'folder', name: string) => void;
@@ -958,6 +1222,7 @@ function FileTreeItem({ entry, depth, onFileClick, onContextMenu, activeFilePath
   activeToc: TocItem[];
   expandedFolders: Record<string, boolean>;
   toggleFolderExpanded: (path: string, defaultOpen: boolean) => void;
+  isPinned?: boolean;
 }) {
   const { state, dispatch, createFile, createFolder, setActiveExplorerPath, renameItem, moveItem } = useEditor()
   const defaultOpen = depth < 1
@@ -1026,12 +1291,12 @@ function FileTreeItem({ entry, depth, onFileClick, onContextMenu, activeFilePath
           />
         ) : (
           <button
-            draggable
-            onDragStart={handleDragStart}
-            onDragOver={handleDragOver}
-            onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
+            draggable={!isPinned}
+            onDragStart={!isPinned ? handleDragStart : undefined}
+            onDragOver={!isPinned ? handleDragOver : undefined}
+            onDragEnter={!isPinned ? handleDragEnter : undefined}
+            onDragLeave={!isPinned ? handleDragLeave : undefined}
+            onDrop={!isPinned ? handleDrop : undefined}
             onContextMenu={(e) => onContextMenu(e, entry.path, 'folder', entry.name)}
             onClick={() => {
               setActiveExplorerPath(entry.path)
@@ -1096,13 +1361,13 @@ function FileTreeItem({ entry, depth, onFileClick, onContextMenu, activeFilePath
         />
       ) : (
         <div 
-          draggable
+          draggable={!isPinned}
           data-sidebar-file={entry.path}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDragEnter={handleDragEnter}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
+          onDragStart={!isPinned ? handleDragStart : undefined}
+          onDragOver={!isPinned ? handleDragOver : undefined}
+          onDragEnter={!isPinned ? handleDragEnter : undefined}
+          onDragLeave={!isPinned ? handleDragLeave : undefined}
+          onDrop={!isPinned ? handleDrop : undefined}
           className={`w-full flex items-center gap-1.5 text-[13px] rounded transition-colors group ${
             isDragOver ? 'bg-[var(--accent)] text-white' : isActiveFile ? 'bg-[var(--bg-hover)] text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
           }`} style={{ paddingLeft: `${depth * 12 + (isActiveFile && state.tocLayoutMode === 'separate' && activeToc.length > 0 ? 8 : 26)}px`, paddingRight: '8px' }}>

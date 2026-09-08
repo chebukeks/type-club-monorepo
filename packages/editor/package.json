@@ -30,5 +30,8 @@
     "y-prosemirror": "^1.2",
     "y-protocols": "^1.0",
     "yjs": "^13.6"
+  },
+  "dependencies": {
+    "mermaid": "^11.17.2"
   }
 }

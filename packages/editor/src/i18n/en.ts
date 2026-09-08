@@ -591,7 +591,6 @@ export const en = {
   'errorBoundary.stackTrace': 'Stack trace',
   'errorBoundary.reload': 'Reload Page',
 
-  // Dialogs
   'dialog.delete.title': 'Confirm Delete',
   'dialog.delete.message': 'Are you sure you want to delete "{name}"?',
   'dialog.delete.detail': 'The file or folder will be moved to the Trash.',
@@ -599,6 +598,50 @@ export const en = {
   'dialog.exit.message': 'You have unsaved changes in the following files:',
   'dialog.exit.question': 'Do you want to save changes before closing?',
   'dialog.exit.discard': "Don't Save",
+
+  // Pinned items
+  'sidebar.pin': 'Pin',
+  'sidebar.unpin': 'Unpin',
+  'sidebar.pinned': 'Pinned',
+
+  // Collab status
+  'collab.statusConnected': 'Connected to collaboration server',
+  'collab.statusConnecting': 'Connecting to collaboration server...',
+  'collab.statusDisconnected': 'Disconnected from collaboration server',
+
+  // Code block language change
+  'editor.code.changeLanguage': 'Change Language',
+
+  // Mermaid
+  'editor.mermaid.code': 'Code',
+  'editor.mermaid.diagram': 'Diagram',
+  'editor.mermaid.error': 'Mermaid syntax error',
+
+  // Code verification & registration
+  'auth.verifyEmailTitle': 'Account Verification',
+  'auth.enterVerificationCode': 'Enter the 6-digit code sent to {email}',
+  'auth.verificationCodePlaceholder': '000000',
+  'auth.verifyCode': 'Verify Code',
+  'auth.resendCode': 'Resend code',
+  'auth.resendCodeIn': 'Resend code in {seconds}s',
+  'auth.codeResent': 'New code sent to your email',
+  'auth.invalidCode': 'Invalid or expired verification code',
+  'auth.nicknameInvalid': 'Nickname must be 2-30 characters (Latin letters, digits, _ -)',
+
+  // Notifications
+  'notifications.title': 'Notifications',
+  'notifications.empty': 'No notifications',
+  'notifications.markAllRead': 'Mark all as read',
+  'notifications.all': 'All',
+  'notifications.unread': 'Unread',
+  'notifications.comment': '{user} commented on "{article}"',
+  'notifications.collabInviteCoAuthor': '{user} invited you as co-author to "{article}"',
+  'notifications.collabInviteAdvisor': '{user} invited you as advisor to "{article}"',
+  'notifications.user': 'User',
+  'notifications.article': 'Article',
+  'notifications.newComment': 'Left a new comment',
+  'notifications.collabInviteCoAuthorTitle': 'Co-author invitation',
+  'notifications.collabInviteAdvisorTitle': 'Advisor invitation',
 } as const;
 
 export type TranslationKey = keyof typeof en;

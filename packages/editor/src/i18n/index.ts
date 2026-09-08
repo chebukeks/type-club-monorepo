@@ -20,7 +20,7 @@ export function getTranslation(
 
   if (params) {
     Object.entries(params).forEach(([paramKey, value]) => {
-      text = text.replace(new RegExp(`\\{${paramKey}\\}`, 'g'), String(value));
+      text = text.replace(new RegExp(`\\{\\{?${paramKey}\\}?\\}`, 'g'), String(value));
     });
   }
 

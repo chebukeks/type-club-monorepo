@@ -42,6 +42,10 @@ const initialState: AppState = {
   tabBarOpen: true,
   tocLayoutMode: 'combined',
   statsLayoutMode: 'right',
+  pinnedLocalPaths: [],
+  pinnedLocalPathsByFolder: {},
+  pinnedOnlineArticleIds: [],
+  collabStatus: 'idle',
 }
 
 // ============================================================
@@ -107,8 +111,16 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ),
       }
     }
-    case 'SET_FILE_TREE':
-      return { ...state, folderPath: action.payload.folderPath, fileTree: action.payload.fileTree }
+    case 'SET_FILE_TREE': {
+      const folderKey = action.payload.folderPath || '__default__'
+      const folderPinned = state.pinnedLocalPathsByFolder[folderKey] || []
+      return {
+        ...state,
+        folderPath: action.payload.folderPath,
+        fileTree: action.payload.fileTree,
+        pinnedLocalPaths: folderPinned,
+      }
+    }
     case 'MARK_SAVED':
       return { ...state, tabs: state.tabs.map((t) =>
         t.id === action.payload.tabId ? { ...t, isModified: false } : t
@@ -230,6 +242,59 @@ function appReducer(state: AppState, action: AppAction): AppState {
       window.api.storeSet('tabBarOpen', action.payload.open).catch(() => {})
       return { ...state, tabBarOpen: action.payload.open }
     }
+    case 'PIN_LOCAL_PATH': {
+      const folderKey = state.folderPath || '__default__'
+      const currentPinned = state.pinnedLocalPathsByFolder[folderKey] || []
+      const norm = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+      if (currentPinned.some(p => norm(p) === norm(action.payload.path))) return state
+      const nextForFolder = [...currentPinned, action.payload.path]
+      const nextByFolder = { ...state.pinnedLocalPathsByFolder, [folderKey]: nextForFolder }
+      window.api.storeSet('pinnedLocalPathsByFolder', nextByFolder).catch(() => {})
+      return { ...state, pinnedLocalPathsByFolder: nextByFolder, pinnedLocalPaths: nextForFolder }
+    }
+    case 'UNPIN_LOCAL_PATH': {
+      const folderKey = state.folderPath || '__default__'
+      const currentPinned = state.pinnedLocalPathsByFolder[folderKey] || []
+      const norm = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+      const nextForFolder = currentPinned.filter(p => norm(p) !== norm(action.payload.path))
+      const nextByFolder = { ...state.pinnedLocalPathsByFolder, [folderKey]: nextForFolder }
+      window.api.storeSet('pinnedLocalPathsByFolder', nextByFolder).catch(() => {})
+      return { ...state, pinnedLocalPathsByFolder: nextByFolder, pinnedLocalPaths: nextForFolder }
+    }
+    case 'REORDER_PINNED_LOCAL_PATHS': {
+      const folderKey = state.folderPath || '__default__'
+      const nextByFolder = { ...state.pinnedLocalPathsByFolder, [folderKey]: action.payload.paths }
+      window.api.storeSet('pinnedLocalPathsByFolder', nextByFolder).catch(() => {})
+      return { ...state, pinnedLocalPathsByFolder: nextByFolder, pinnedLocalPaths: action.payload.paths }
+    }
+    case 'PIN_ONLINE_ARTICLE': {
+      if (state.pinnedOnlineArticleIds.includes(action.payload.articleId)) return state
+      const next = [...state.pinnedOnlineArticleIds, action.payload.articleId]
+      window.api.storeSet('pinnedOnlineArticleIds', next).catch(() => {})
+      return { ...state, pinnedOnlineArticleIds: next }
+    }
+    case 'UNPIN_ONLINE_ARTICLE': {
+      const next = state.pinnedOnlineArticleIds.filter(id => id !== action.payload.articleId)
+      window.api.storeSet('pinnedOnlineArticleIds', next).catch(() => {})
+      return { ...state, pinnedOnlineArticleIds: next }
+    }
+    case 'REORDER_PINNED_ONLINE_ARTICLES': {
+      window.api.storeSet('pinnedOnlineArticleIds', action.payload.articleIds).catch(() => {})
+      return { ...state, pinnedOnlineArticleIds: action.payload.articleIds }
+    }
+    case 'SET_PINNED_ITEMS': {
+      const folderKey = state.folderPath || '__default__'
+      const byFolder = action.payload.localPathsByFolder ?? state.pinnedLocalPathsByFolder
+      const folderPinned = byFolder[folderKey] ?? action.payload.localPaths ?? state.pinnedLocalPaths
+      return {
+        ...state,
+        pinnedLocalPathsByFolder: byFolder,
+        pinnedLocalPaths: folderPinned,
+        pinnedOnlineArticleIds: action.payload.onlineArticleIds ?? state.pinnedOnlineArticleIds,
+      }
+    }
+    case 'SET_COLLAB_STATUS':
+      return { ...state, collabStatus: action.payload.status }
     default:
       return state
   }
@@ -275,6 +340,13 @@ interface EditorContextValue {
   clearRecentFolders: () => Promise<void>
   removeRecentFile: (filePath: string) => Promise<void>
   removeRecentFolder: (folderPath: string) => Promise<void>
+  pinLocalPath: (path: string) => void
+  unpinLocalPath: (path: string) => void
+  reorderPinnedLocalPaths: (paths: string[]) => void
+  pinOnlineArticle: (articleId: number) => void
+  unpinOnlineArticle: (articleId: number) => void
+  reorderPinnedOnlineArticles: (articleIds: number[]) => void
+  createOnlineArticle: (title: string) => Promise<any>
   // --- Online articles ---
   fetchOnlineArticles: () => Promise<void>
   openOnlineArticle: (id: number) => Promise<void>
@@ -384,6 +456,23 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
 
         const savedDocZoom = await window.api.storeGet('documentZoom') as number | undefined
         if (savedDocZoom) dispatch({ type: 'SET_DOCUMENT_ZOOM', payload: { zoom: savedDocZoom } })
+
+        let savedPinnedByFolder = (await window.api.storeGet('pinnedLocalPathsByFolder')) as Record<string, string[]> | undefined
+        if (!savedPinnedByFolder || typeof savedPinnedByFolder !== 'object') {
+          savedPinnedByFolder = {}
+          const savedPinnedLocal = await window.api.storeGet('pinnedLocalPaths')
+          if (Array.isArray(savedPinnedLocal) && savedPinnedLocal.length > 0) {
+            savedPinnedByFolder['__default__'] = savedPinnedLocal as string[]
+          }
+        }
+        const savedPinnedOnline = await window.api.storeGet('pinnedOnlineArticleIds')
+        dispatch({
+          type: 'SET_PINNED_ITEMS',
+          payload: {
+            localPathsByFolder: savedPinnedByFolder,
+            onlineArticleIds: Array.isArray(savedPinnedOnline) ? (savedPinnedOnline as number[]) : [],
+          },
+        })
 
         const lastFolder = await window.api.storeGet('lastFolderPath') as string | undefined
         if (lastFolder) {
@@ -1198,6 +1287,56 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     try { await window.api.storeSet('statsLayoutMode', mode) } catch (e) { /* ignore */ }
   }, [])
 
+  const pinLocalPath = useCallback((path: string) => {
+    dispatch({ type: 'PIN_LOCAL_PATH', payload: { path } })
+  }, [])
+
+  const unpinLocalPath = useCallback((path: string) => {
+    dispatch({ type: 'UNPIN_LOCAL_PATH', payload: { path } })
+  }, [])
+
+  const reorderPinnedLocalPaths = useCallback((paths: string[]) => {
+    dispatch({ type: 'REORDER_PINNED_LOCAL_PATHS', payload: { paths } })
+  }, [])
+
+  const pinOnlineArticle = useCallback((articleId: number) => {
+    dispatch({ type: 'PIN_ONLINE_ARTICLE', payload: { articleId } })
+  }, [])
+
+  const unpinOnlineArticle = useCallback((articleId: number) => {
+    dispatch({ type: 'UNPIN_ONLINE_ARTICLE', payload: { articleId } })
+  }, [])
+
+  const reorderPinnedOnlineArticles = useCallback((articleIds: number[]) => {
+    dispatch({ type: 'REORDER_PINNED_ONLINE_ARTICLES', payload: { articleIds } })
+  }, [])
+
+  const createOnlineArticle = useCallback(async (title: string) => {
+    try {
+      const baseSlug = title.toLowerCase().replace(/[^a-z0-9а-яё-]+/gi, '-').replace(/^-|-$/g, '') || 'untitled'
+      const slug = `${baseSlug}-${Date.now().toString(36)}`
+      const article = await articlesApi.create({
+        title,
+        content: `# ${title}\n\n`,
+        slug,
+      })
+      await fetchOnlineArticles()
+      dispatch({
+        type: 'OPEN_FILE',
+        payload: {
+          filePath: `__online__/${article.id}`,
+          fileName: article.title,
+          content: article.content,
+          articleId: article.id,
+        }
+      })
+      return article
+    } catch (err) {
+      console.error('Ошибка создания онлайн-статьи:', err)
+      throw err
+    }
+  }, [fetchOnlineArticles])
+
   return (
     <EditorContext.Provider value={{
       state, dispatch,
@@ -1207,6 +1346,9 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       startCreating, setActiveExplorerPath,
       renameItem, deleteItem, showInExplorer, startRenaming, moveItem,
       closeTab,
+      pinLocalPath, unpinLocalPath, reorderPinnedLocalPaths,
+      pinOnlineArticle, unpinOnlineArticle, reorderPinnedOnlineArticles,
+      createOnlineArticle,
       setTheme, setLanguage, t, setEditorMode, refreshTab,
       setAutosave, setShowStats, setWordLimit,
       setTypewriterMode, setFocusMode, setShowEmptyFolders,

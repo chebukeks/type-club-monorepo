@@ -10,7 +10,7 @@ from sqlalchemy import text
 from app.config import settings
 from app.models import Base
 from app.database import engine
-from app.routers import auth, articles, users, comments, stats, og, og_image, sitemap
+from app.routers import auth, articles, users, comments, stats, og, og_image, sitemap, notifications
 
 logging.basicConfig(level=settings.log_level.upper())
 logger = logging.getLogger(__name__)
@@ -34,6 +34,7 @@ app.include_router(stats.router)
 app.include_router(og.router)
 app.include_router(og_image.router)
 app.include_router(sitemap.router)
+app.include_router(notifications.router)
 
 uploads_dir = settings.uploads_dir
 os.makedirs(uploads_dir, exist_ok=True)

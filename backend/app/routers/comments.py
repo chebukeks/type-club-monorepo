@@ -1,9 +1,10 @@
+import json
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
-from app.models import Article, Comment, User
+from app.models import Article, Comment, Notification, User
 from app.routers.auth import get_current_user, get_optional_user, get_verified_user
 from app.schemas import CommentCreateRequest, CommentResponse, CommentUpdateRequest
 
@@ -102,6 +103,18 @@ async def create_comment(
         content=data.content,
     )
     session.add(comment)
+
+    if article.author_id != current_user.id:
+        snippet = data.content[:100] + "..." if len(data.content) > 100 else data.content
+        notif = Notification(
+            user_id=article.author_id,
+            sender_id=current_user.id,
+            article_id=article_id,
+            type="comment",
+            data=json.dumps({"snippet": snippet, "article_title": article.title}),
+        )
+        session.add(notif)
+
     await session.commit()
     await session.refresh(comment)
 

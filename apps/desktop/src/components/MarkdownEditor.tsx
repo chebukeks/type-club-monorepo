@@ -172,12 +172,52 @@ export function MarkdownEditor() {
   const suggestionModeActive = articleId != null && (activeTab?.suggestionMode ?? false)
 
   useEffect(() => {
+    if (articleId != null) {
+      dispatch({ type: 'SET_COLLAB_STATUS', payload: { status: collab.status } })
+    } else {
+      dispatch({ type: 'SET_COLLAB_STATUS', payload: { status: 'idle' } })
+    }
+  }, [articleId, collab.status, dispatch])
+
+  useEffect(() => {
     if (articleId != null && userRole === 'editor' && activeTab && !activeTab.suggestionMode) {
       dispatch({ type: 'SET_SUGGESTION_MODE', payload: { tabId: activeTab.id, active: true } })
     }
   }, [articleId, userRole, activeTab?.id, activeTab?.suggestionMode, dispatch])
 
+  const [codeLangPicker, setCodeLangPicker] = useState<{
+    pos: number
+    currentLang: string
+    rect: { top: number; left: number; bottom: number; right: number }
+  } | null>(null)
+
   const isReadOnly = state.editorMode === 'preview' || (articleId != null && userRole == null)
+
+  useEffect(() => {
+    const handleCodeBlockLang = (e: Event) => {
+      if (state.editorMode !== 'seamless' || isReadOnly) return
+      const { pos, currentLang, rect } = (e as CustomEvent).detail
+      setCodeLangPicker({ pos, currentLang, rect })
+    }
+    window.addEventListener('editor-change-code-block-lang', handleCodeBlockLang)
+    return () => window.removeEventListener('editor-change-code-block-lang', handleCodeBlockLang)
+  }, [state.editorMode, isReadOnly])
+
+  const handleSelectCodeLang = useCallback((newLang: string) => {
+    if (editorView && codeLangPicker) {
+      const tr = editorView.state.tr
+      const node = editorView.state.doc.nodeAt(codeLangPicker.pos)
+      if (node && (node.type.name === 'code_block' || node.type.name === 'fence')) {
+        tr.setNodeMarkup(codeLangPicker.pos, null, {
+          ...node.attrs,
+          params: newLang === 'plaintext' ? '' : newLang,
+        })
+        editorView.dispatch(tr)
+        editorView.focus()
+      }
+    }
+    setCodeLangPicker(null)
+  }, [editorView, codeLangPicker])
 
   const replaceDataUris = useCallback((md: string): string => {
     const map = new Map<string, string>()
@@ -1222,6 +1262,158 @@ export function MarkdownEditor() {
       {state.showStats && state.statsLayoutMode === 'right' && (
         <StatsToast mode="right" containerWidth={containerWidth} />
       )}
+
+      {codeLangPicker && (
+        <CodeBlockLangPopover
+          currentLang={codeLangPicker.currentLang}
+          rect={codeLangPicker.rect}
+          onSelect={handleSelectCodeLang}
+          onClose={() => setCodeLangPicker(null)}
+          t={t}
+        />
+      )}
     </div>
   )
 }
+
+const POPULAR_LANGUAGES = [
+  'javascript', 'typescript', 'python', 'bash', 'html', 'css', 'json', 'mermaid',
+  'markdown', 'sql', 'cpp', 'c', 'csharp', 'java', 'go', 'rust', 'ruby', 'php',
+  'yaml', 'xml', 'dockerfile', 'graphql', 'diff', 'latex'
+]
+
+function CodeBlockLangPopover({
+  currentLang,
+  rect,
+  onSelect,
+  onClose,
+  t,
+}: {
+  currentLang: string
+  rect: { top: number; left: number; bottom: number; right: number }
+  onSelect: (lang: string) => void
+  onClose: () => void
+  t: (key: any) => string
+}) {
+  const [search, setSearch] = useState(currentLang || '')
+  const popoverRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleDown = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        onClose()
+      }
+    }
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    const handleScroll = (e: Event) => {
+      if (popoverRef.current && popoverRef.current.contains(e.target as Node)) {
+        return
+      }
+      onClose()
+    }
+    window.addEventListener('mousedown', handleDown)
+    window.addEventListener('keydown', handleKey)
+    window.addEventListener('scroll', handleScroll, true)
+    return () => {
+      window.removeEventListener('mousedown', handleDown)
+      window.removeEventListener('keydown', handleKey)
+      window.removeEventListener('scroll', handleScroll, true)
+    }
+  }, [onClose])
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return POPULAR_LANGUAGES
+    return POPULAR_LANGUAGES.filter(l => l.toLowerCase().includes(q))
+  }, [search])
+
+  const top = Math.min(window.innerHeight - 280, rect.bottom + 6)
+  const left = Math.max(12, Math.min(window.innerWidth - 230, rect.left))
+
+  return (
+    <div
+      ref={popoverRef}
+      className="fixed z-50 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-lg shadow-2xl flex flex-col backdrop-blur-xl"
+      style={{
+        top,
+        left,
+        width: '220px',
+        padding: '8px 10px',
+        gap: '6px',
+        boxSizing: 'border-box',
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div
+        style={{
+          fontSize: '11px',
+          fontWeight: 600,
+          color: 'var(--text-dim)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+          padding: '2px 4px',
+        }}
+      >
+        {t('editor.code.language')}
+      </div>
+      <input
+        type="text"
+        autoFocus
+        value={search}
+        placeholder={t('editor.noLanguage')}
+        onChange={(e) => setSearch(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            onSelect(search.trim())
+          }
+        }}
+        className="w-full bg-[var(--bg-input)] border border-[var(--border-default)] rounded text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+        style={{ padding: '6px 10px', boxSizing: 'border-box' }}
+      />
+      <div
+        className="max-h-44 overflow-y-auto flex flex-col"
+        style={{ gap: '2px', paddingRight: '2px' }}
+      >
+        <button
+          className={`text-left text-xs rounded hover:bg-[var(--bg-hover)] transition-colors ${
+            !search ? 'font-semibold text-[var(--accent)]' : 'text-[var(--text-secondary)]'
+          }`}
+          style={{ padding: '6px 10px', border: 'none', background: 'transparent', cursor: 'pointer' }}
+          onClick={() => onSelect('')}
+        >
+          {t('editor.noLanguage')}
+        </button>
+        {filtered.map((lang) => (
+          <button
+            key={lang}
+            className={`text-left text-xs rounded hover:bg-[var(--bg-hover)] transition-colors ${
+              lang === currentLang ? 'font-semibold text-[var(--accent)] bg-[var(--bg-active)]' : 'text-[var(--text-secondary)]'
+            }`}
+            style={{
+              padding: '6px 10px',
+              border: 'none',
+              background: lang === currentLang ? 'var(--bg-active)' : 'transparent',
+              cursor: 'pointer',
+            }}
+            onClick={() => onSelect(lang)}
+          >
+            {lang}
+          </button>
+        ))}
+      </div>
+      {search.trim() && !filtered.includes(search.trim().toLowerCase()) && (
+        <button
+          className="w-full rounded bg-[var(--accent)] text-white text-xs font-medium hover:bg-[var(--accent-hover)] transition-colors"
+          style={{ padding: '6px 12px', border: 'none', cursor: 'pointer', marginTop: '4px' }}
+          onClick={() => onSelect(search.trim())}
+        >
+          {search.trim()}
+        </button>
+      )}
+    </div>
+  )
+}
+

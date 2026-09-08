@@ -1,3 +1,4 @@
+import json
 import logging
 import secrets
 
@@ -6,7 +7,7 @@ from sqlalchemy import func, select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
-from app.models import Article, ArticleLike, CollaborationMember, User
+from app.models import Article, ArticleLike, CollaborationMember, Notification, User
 from app.config import settings
 from app.routers.auth import get_current_user, get_moderator_user, get_optional_user, get_verified_user
 from app.schemas import (
@@ -415,6 +416,16 @@ async def invite_collaborator(
         source="invite",
     )
     session.add(member)
+
+    notif = Notification(
+        user_id=target.id,
+        sender_id=current_user.id,
+        article_id=article_id,
+        type="collab_invite",
+        data=json.dumps({"role": data.role, "article_title": article.title}),
+    )
+    session.add(notif)
+
     await session.commit()
     await session.refresh(member)
 

@@ -593,7 +593,6 @@ export const ru: Record<TranslationKey, string> = {
   'errorBoundary.stackTrace': 'Стек вызовов',
   'errorBoundary.reload': 'Перезагрузить страницу',
 
-  // Dialogs
   'dialog.delete.title': 'Подтверждение удаления',
   'dialog.delete.message': 'Вы действительно хотите удалить «{name}»?',
   'dialog.delete.detail': 'Файл или папка будет перемещена в корзину.',
@@ -601,4 +600,48 @@ export const ru: Record<TranslationKey, string> = {
   'dialog.exit.message': 'У вас есть несохранённые изменения в файлах:',
   'dialog.exit.question': 'Сохранить изменения перед закрытием?',
   'dialog.exit.discard': 'Не сохранять',
+
+  // Pinned items
+  'sidebar.pin': 'Закрепить',
+  'sidebar.unpin': 'Открепить',
+  'sidebar.pinned': 'Закрепленные',
+
+  // Collab status
+  'collab.statusConnected': 'Подключено к серверу совместной работы',
+  'collab.statusConnecting': 'Подключение к серверу...',
+  'collab.statusDisconnected': 'Отключено от сервера',
+
+  // Code block language change
+  'editor.code.changeLanguage': 'Изменить язык',
+
+  // Mermaid
+  'editor.mermaid.code': 'Код',
+  'editor.mermaid.diagram': 'Диаграмма',
+  'editor.mermaid.error': 'Ошибка синтаксиса Mermaid',
+
+  // Code verification & registration
+  'auth.verifyEmailTitle': 'Подтверждение аккаунта',
+  'auth.enterVerificationCode': 'Введите 6-значный код, отправленный на {email}',
+  'auth.verificationCodePlaceholder': '000000',
+  'auth.verifyCode': 'Подтвердить код',
+  'auth.resendCode': 'Отправить код повторно',
+  'auth.resendCodeIn': 'Отправить код повторно через {seconds} сек',
+  'auth.codeResent': 'Новый код отправлен на почту',
+  'auth.invalidCode': 'Неверный или просроченный код подтверждения',
+  'auth.nicknameInvalid': 'Никнейм должен содержать 2-30 символов (латиница, цифры, _ -)',
+
+  // Notifications
+  'notifications.title': 'Уведомления',
+  'notifications.empty': 'Нет уведомлений',
+  'notifications.markAllRead': 'Прочитать все',
+  'notifications.all': 'Все',
+  'notifications.unread': 'Непрочитанные',
+  'notifications.comment': '{user} оставил(а) комментарий к статье «{article}»',
+  'notifications.collabInviteCoAuthor': '{user} пригласил(а) вас соавтором статьи «{article}»',
+  'notifications.collabInviteAdvisor': '{user} пригласил(а) вас советчиком статьи «{article}»',
+  'notifications.user': 'Пользователь',
+  'notifications.article': 'Статья',
+  'notifications.newComment': 'Оставил(а) новый комментарий',
+  'notifications.collabInviteCoAuthorTitle': 'Приглашение в соавторы',
+  'notifications.collabInviteAdvisorTitle': 'Приглашение стать советчиком',
 };

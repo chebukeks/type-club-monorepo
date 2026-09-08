@@ -202,6 +202,14 @@ export interface AppState {
   tocLayoutMode: TocLayoutMode;
   /** Режим расположения плашки статистики (справа от документа или в сайдбаре) */
   statsLayoutMode: StatsLayoutMode;
+  /** Список закреплённых локальных путей (файлы и папки для текущей папки) */
+  pinnedLocalPaths: string[];
+  /** Карта закреплённых путей по папкам */
+  pinnedLocalPathsByFolder: Record<string, string[]>;
+  /** Список закреплённых ID онлайн-статей */
+  pinnedOnlineArticleIds: number[];
+  /** Статус подключения к серверу коллаборации */
+  collabStatus: 'connected' | 'connecting' | 'disconnected' | 'idle';
 }
 
 /** Действия для редьюсера состояния */
@@ -244,7 +252,15 @@ export type AppAction =
   | { type: 'SET_SIDEBAR_OPEN'; payload: { open: boolean } }
   | { type: 'TOGGLE_TAB_BAR' }
   | { type: 'SET_TAB_BAR_OPEN'; payload: { open: boolean } }
-  | { type: 'SET_STATS_LAYOUT_MODE'; payload: { mode: StatsLayoutMode } };
+  | { type: 'SET_STATS_LAYOUT_MODE'; payload: { mode: StatsLayoutMode } }
+  | { type: 'PIN_LOCAL_PATH'; payload: { path: string } }
+  | { type: 'UNPIN_LOCAL_PATH'; payload: { path: string } }
+  | { type: 'REORDER_PINNED_LOCAL_PATHS'; payload: { paths: string[] } }
+  | { type: 'PIN_ONLINE_ARTICLE'; payload: { articleId: number } }
+  | { type: 'UNPIN_ONLINE_ARTICLE'; payload: { articleId: number } }
+  | { type: 'REORDER_PINNED_ONLINE_ARTICLES'; payload: { articleIds: number[] } }
+  | { type: 'SET_PINNED_ITEMS'; payload: { localPaths?: string[]; localPathsByFolder?: Record<string, string[]>; onlineArticleIds?: number[] } }
+  | { type: 'SET_COLLAB_STATUS'; payload: { status: 'connected' | 'connecting' | 'disconnected' | 'idle' } };
 
 
 /** API, доступный из Renderer-процесса через contextBridge */

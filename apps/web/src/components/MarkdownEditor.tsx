@@ -13,7 +13,7 @@ import AddNoteModal from "./AddNoteModal";
 export type { EditorMode } from "@type-club/editor";
 
 const CODE_LANGUAGES = [
-  "javascript", "typescript", "python", "bash", "html", "css", "json", "sql",
+  "javascript", "typescript", "python", "bash", "html", "css", "json", "mermaid", "sql",
   "rust", "go", "java", "cpp", "c", "ruby", "php", "yaml", "xml", "diff",
   "markdown", "dockerfile", "graphql"
 ];
@@ -56,9 +56,40 @@ export function MarkdownEditor({
   const [codeLang, setCodeLang] = useState("");
   const [showLangDropdown, setShowLangDropdown] = useState(false);
   const [showAddNoteModal, setShowAddNoteModal] = useState(false);
+  const [codeLangPicker, setCodeLangPicker] = useState<{
+    pos: number;
+    currentLang: string;
+    rect: { top: number; left: number; bottom: number; right: number };
+  } | null>(null);
   const viewRef = useRef<EditorView | null>(null);
 
   const isSuggestionActive = userRole === "editor" || (suggestionModeActive ?? false);
+
+  useEffect(() => {
+    const handleCodeBlockLang = (e: Event) => {
+      if (readOnly || editorMode !== "seamless" || isSuggestionActive) return;
+      const { pos, currentLang, rect } = (e as CustomEvent).detail;
+      setCodeLangPicker({ pos, currentLang, rect });
+    };
+    window.addEventListener("editor-change-code-block-lang", handleCodeBlockLang);
+    return () => window.removeEventListener("editor-change-code-block-lang", handleCodeBlockLang);
+  }, [readOnly, editorMode, isSuggestionActive]);
+
+  const handleSelectCodeLang = (newLang: string) => {
+    if (viewRef.current && codeLangPicker) {
+      const tr = viewRef.current.state.tr;
+      const node = viewRef.current.state.doc.nodeAt(codeLangPicker.pos);
+      if (node && (node.type.name === "code_block" || node.type.name === "fence")) {
+        tr.setNodeMarkup(codeLangPicker.pos, null, {
+          ...node.attrs,
+          params: newLang === "plaintext" ? "" : newLang,
+        });
+        viewRef.current.dispatch(tr);
+        viewRef.current.focus();
+      }
+    }
+    setCodeLangPicker(null);
+  };
 
   useEffect(() => {
     const handleOpenModal = () => setShowAddNoteModal(true);
@@ -561,11 +592,133 @@ export function MarkdownEditor({
         </div>
       )}
 
+      {codeLangPicker && (
+        <WebCodeBlockLangPopover
+          currentLang={codeLangPicker.currentLang}
+          rect={codeLangPicker.rect}
+          onSelect={handleSelectCodeLang}
+          onClose={() => setCodeLangPicker(null)}
+          t={t}
+        />
+      )}
+
       <AddNoteModal
         isOpen={showAddNoteModal}
         onClose={() => setShowAddNoteModal(false)}
         onSubmit={handleAddNoteSubmit}
       />
+    </div>
+  );
+}
+
+function WebCodeBlockLangPopover({
+  currentLang,
+  rect,
+  onSelect,
+  onClose,
+  t,
+}: {
+  currentLang: string;
+  rect: { top: number; left: number; bottom: number; right: number };
+  onSelect: (lang: string) => void;
+  onClose: () => void;
+  t: (key: any) => string;
+}) {
+  const [search, setSearch] = useState(currentLang || "");
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleDown = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    const handleScroll = (e: Event) => {
+      if (popoverRef.current && popoverRef.current.contains(e.target as Node)) {
+        return;
+      }
+      onClose();
+    };
+    window.addEventListener("mousedown", handleDown);
+    window.addEventListener("keydown", handleKey);
+    window.addEventListener("scroll", handleScroll, true);
+    return () => {
+      window.removeEventListener("mousedown", handleDown);
+      window.removeEventListener("keydown", handleKey);
+      window.removeEventListener("scroll", handleScroll, true);
+    };
+  }, [onClose]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return CODE_LANGUAGES;
+    return CODE_LANGUAGES.filter((l) => l.toLowerCase().includes(q));
+  }, [search]);
+
+  const top = Math.min(window.innerHeight - 280, rect.bottom + 6);
+  const left = Math.max(12, Math.min(window.innerWidth - 230, rect.left));
+
+  return (
+    <div
+      ref={popoverRef}
+      className="fixed z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-2xl p-2 flex flex-col gap-1.5 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-100"
+      style={{ top, left, width: "210px" }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-1">
+        {t("editor.code.language")}
+      </div>
+      <input
+        type="text"
+        autoFocus
+        value={search}
+        placeholder={t("editor.noLanguage")}
+        onChange={(e) => setSearch(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            onSelect(search.trim());
+          }
+        }}
+        className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-xs text-gray-800 dark:text-gray-200 outline-none focus:border-blue-500"
+      />
+      <div className="max-h-40 overflow-y-auto flex flex-col gap-0.5">
+        <button
+          type="button"
+          className={`text-left px-2 py-1 text-xs rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
+            !search ? "font-semibold text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-gray-300"
+          }`}
+          onClick={() => onSelect("")}
+        >
+          {t("editor.noLanguage")}
+        </button>
+        {filtered.map((lang) => (
+          <button
+            key={lang}
+            type="button"
+            className={`text-left px-2 py-1 text-xs rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
+              lang === currentLang
+                ? "font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40"
+                : "text-gray-700 dark:text-gray-300"
+            }`}
+            onClick={() => onSelect(lang)}
+          >
+            {lang}
+          </button>
+        ))}
+      </div>
+      {search.trim() && !filtered.includes(search.trim().toLowerCase()) && (
+        <button
+          type="button"
+          className="w-full mt-1 py-1 rounded bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-colors"
+          onClick={() => onSelect(search.trim())}
+        >
+          {search.trim()}
+        </button>
+      )}
     </div>
   );
 }

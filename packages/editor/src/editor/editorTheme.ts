@@ -533,11 +533,85 @@ html[data-lang="ru"] figure[data-sug-delete]::after {
   background: var(--codeblock-header);
   user-select: none;
 }
+.code-block-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .code-block-lang {
   color: var(--codeblock-lang);
   font-size: 12px;
   font-weight: 500;
   text-transform: lowercase;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  cursor: default;
+}
+.code-block-lang.interactive {
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.code-block-lang.interactive:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.08));
+  color: var(--text-primary, #fff);
+}
+.code-block-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--bg-hover, rgba(255, 255, 255, 0.05));
+  padding: 2px;
+  border-radius: 6px;
+}
+.code-block-tab-btn {
+  background: transparent;
+  border: none;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: var(--text-dim, #888);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.code-block-tab-btn:hover {
+  color: var(--text-primary, #fff);
+}
+.code-block-tab-btn.active {
+  background: var(--bg-active, rgba(255, 255, 255, 0.15));
+  color: var(--accent, #6c8cff);
+  font-weight: 600;
+}
+.mermaid-render-wrapper {
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: var(--codeblock-bg);
+  overflow-x: auto;
+  min-height: 80px;
+}
+.mermaid-render-wrapper svg {
+  max-width: 100%;
+  height: auto;
+}
+.mermaid-empty {
+  font-size: 12px;
+  color: var(--text-dim, #888);
+  font-style: italic;
+}
+.mermaid-error {
+  padding: 8px 16px;
+  font-size: 12px;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  border-top: 1px solid rgba(239, 68, 68, 0.2);
+  font-family: monospace;
+  white-space: pre-wrap;
 }
 .code-block-copy {
   background: none;

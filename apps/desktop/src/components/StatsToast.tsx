@@ -140,7 +140,7 @@ export function StatsToast({ mode = 'right', sidebarWidth = 240, containerWidth 
         width: isExpanded ? 'max-content' : `${collapsedSidebarWidth}px`,
         minWidth: isExpanded ? `${expandedSidebarWidth}px` : 'auto',
         maxWidth: isExpanded ? '360px' : `${collapsedSidebarWidth}px`,
-        zIndex: 40,
+        zIndex: isExpanded ? 50 : 40,
       }
     : {
         position: 'absolute',
@@ -149,7 +149,7 @@ export function StatsToast({ mode = 'right', sidebarWidth = 240, containerWidth 
         width: isExpanded ? 'max-content' : `${collapsedRightWidth}px`,
         minWidth: isExpanded ? `${expandedRightWidth}px` : `${collapsedRightWidth}px`,
         maxWidth: '360px',
-        zIndex: 30,
+        zIndex: isExpanded ? 50 : 30,
       }
 
   return (

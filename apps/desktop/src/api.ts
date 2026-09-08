@@ -74,6 +74,10 @@ export const authApi = {
   me: () => api.get<User>("/auth/me"),
   updateMe: (data: { nickname?: string; password?: string; confirm_password?: string }) =>
     api.patch<User>("/auth/me", data),
+  verifyEmail: (data: { code: string; email?: string }) =>
+    api.post<{ message: string }>("/auth/verify-email", data),
+  resendVerification: (data?: { email?: string }) =>
+    api.post<{ message: string }>("/auth/resend-verification", data),
 };
 
 // ── Articles ──

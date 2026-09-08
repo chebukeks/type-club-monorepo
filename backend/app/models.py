@@ -75,7 +75,7 @@ class VerificationToken(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("typeclub_users.id"), nullable=False, index=True)
-    token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    token: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     purpose: Mapped[str] = mapped_column(String(20), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -131,3 +131,26 @@ class Comment(Base):
 
     article: Mapped["Article"] = relationship(back_populates="comments")
     user: Mapped["User"] = relationship(back_populates="comments")
+
+
+class Notification(Base):
+    __tablename__ = "typeclub_notifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("typeclub_users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    sender_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("typeclub_users.id", ondelete="SET NULL"), nullable=True
+    )
+    article_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("typeclub_articles.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    type: Mapped[str] = mapped_column(String(50), nullable=False)  # 'comment', 'collab_invite'
+    data: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped["User"] = relationship(foreign_keys=[user_id], lazy="selectin")
+    sender: Mapped[Optional["User"]] = relationship(foreign_keys=[sender_id], lazy="selectin")
+    article: Mapped[Optional["Article"]] = relationship(foreign_keys=[article_id], lazy="selectin")

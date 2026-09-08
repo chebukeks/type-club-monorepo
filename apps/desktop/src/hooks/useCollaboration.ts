@@ -9,6 +9,7 @@ import type { CollaborationConfig } from "@type-club/editor";
 interface CollaborationState {
   config: CollaborationConfig | null;
   connected: boolean;
+  status: 'connected' | 'connecting' | 'disconnected';
   synced: boolean;
   peers: number;
 }
@@ -19,6 +20,7 @@ export function useCollaboration(
   userRole?: string | null
 ): CollaborationState {
   const [connected, setConnected] = useState(false);
+  const [status, setStatus] = useState<'connected' | 'connecting' | 'disconnected'>('connecting');
   const [synced, setSynced] = useState(false);
   const [peers, setPeers] = useState(0);
 
@@ -79,7 +81,9 @@ export function useCollaboration(
     const { provider, awareness } = collabObj;
 
     const onStatus = (event: { status: string }) => {
-      setConnected(event.status === "connected");
+      const s = event.status as 'connected' | 'connecting' | 'disconnected';
+      setStatus(s);
+      setConnected(s === "connected");
     };
     const onSync = (isSynced: boolean) => {
       setSynced(isSynced);
@@ -118,6 +122,7 @@ export function useCollaboration(
   return {
     config: collabObj ? collabObj.configObj : null,
     connected,
+    status,
     synced,
     peers,
   };

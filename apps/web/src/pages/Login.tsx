@@ -53,7 +53,12 @@ export default function Login() {
       </p>
       <p className="text-center mt-4 text-sm text-gray-500">
         {t('auth.noAccount')}{" "}
-        <Link to="/register" className="text-blue-600 hover:underline">{t('auth.register')}</Link>
+        <Link
+          to={redirect && redirect !== "/" ? `/register?redirect=${encodeURIComponent(redirect)}` : "/register"}
+          className="text-blue-600 hover:underline"
+        >
+          {t('auth.register')}
+        </Link>
       </p>
     </div>
   );

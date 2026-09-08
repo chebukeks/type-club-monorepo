@@ -1,11 +1,19 @@
 import datetime
 import logging
+from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, status
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import create_jwt, decode_jwt, generate_token, hash_password, verify_password
+from app.auth import (
+    create_jwt,
+    decode_jwt,
+    generate_token,
+    generate_verification_code,
+    hash_password,
+    verify_password,
+)
 from app.config import settings
 from app.database import get_session
 from app.mail import send_reset_password_email, send_verification_email
@@ -78,17 +86,17 @@ async def get_moderator_user(
 
 
 async def _create_and_send_verification(user: User, session: AsyncSession) -> None:
-    token_str = generate_token()
+    code_str = generate_verification_code()
     token = VerificationToken(
         user_id=user.id,
-        token=token_str,
+        token=code_str,
         purpose="email_verify",
         expires_at=datetime.datetime.now(datetime.timezone.utc)
         + datetime.timedelta(minutes=settings.verify_email_token_minutes),
     )
     session.add(token)
     await session.commit()
-    await send_verification_email(user.email, user.nickname, token_str)
+    await send_verification_email(user.email, user.nickname, code_str)
 
 
 @router.post("/register", response_model=TokenResponse, status_code=201)
@@ -172,24 +180,38 @@ async def update_me(
 
 
 @router.post("/verify-email", response_model=ResendVerificationResponse)
-async def verify_email(data: VerifyEmailRequest, session: AsyncSession = Depends(get_session)):
-    token = (
-        await session.execute(
-            select(VerificationToken).where(
-                VerificationToken.token == data.token,
-                VerificationToken.purpose == "email_verify",
-                VerificationToken.used == False,
-            )
-        )
-    ).scalar_one_or_none()
+async def verify_email(
+    data: VerifyEmailRequest,
+    current_user: User | None = Depends(get_optional_user),
+    session: AsyncSession = Depends(get_session),
+):
+    code_to_check = (data.code or data.token or "").strip()
+    if not code_to_check:
+        raise HTTPException(status_code=400, detail="Verification code is required")
+
+    target_user_id = current_user.id if current_user else None
+    if not target_user_id and data.email:
+        u = (await session.execute(select(User).where(User.email == data.email))).scalar_one_or_none()
+        if u:
+            target_user_id = u.id
+
+    query = select(VerificationToken).where(
+        VerificationToken.token == code_to_check,
+        VerificationToken.purpose == "email_verify",
+        VerificationToken.used == False,
+    )
+    if target_user_id:
+        query = query.where(VerificationToken.user_id == target_user_id)
+
+    token = (await session.execute(query.order_by(VerificationToken.created_at.desc()))).scalars().first()
 
     if not token:
-        raise HTTPException(status_code=400, detail="Invalid or expired token")
+        raise HTTPException(status_code=400, detail="Invalid or expired verification code")
 
     if token.expires_at < datetime.datetime.now(datetime.timezone.utc):
         await session.delete(token)
         await session.commit()
-        raise HTTPException(status_code=400, detail="Token has expired")
+        raise HTTPException(status_code=400, detail="Verification code has expired")
 
     user = await session.get(User, token.user_id)
     if not user:
@@ -203,26 +225,34 @@ async def verify_email(data: VerifyEmailRequest, session: AsyncSession = Depends
 
 @router.post("/resend-verification", response_model=ResendVerificationResponse)
 async def resend_verification(
-    current_user: User = Depends(get_current_user),
+    data: Optional[VerifyEmailRequest] = None,
+    current_user: User | None = Depends(get_optional_user),
     session: AsyncSession = Depends(get_session),
 ):
-    if current_user.email_verified:
+    user = current_user
+    if not user and data and data.email:
+        user = (await session.execute(select(User).where(User.email == data.email))).scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated or email not found")
+
+    if user.email_verified:
         return ResendVerificationResponse(message="Email already verified")
 
     await session.execute(
         update(VerificationToken)
         .where(
-            VerificationToken.user_id == current_user.id,
+            VerificationToken.user_id == user.id,
             VerificationToken.purpose == "email_verify",
             VerificationToken.used == False,
         )
         .values(used=True)
     )
 
-    token_str = generate_token()
+    code_str = generate_verification_code()
     token = VerificationToken(
-        user_id=current_user.id,
-        token=token_str,
+        user_id=user.id,
+        token=code_str,
         purpose="email_verify",
         expires_at=datetime.datetime.now(datetime.timezone.utc)
         + datetime.timedelta(minutes=settings.verify_email_token_minutes),
@@ -231,14 +261,14 @@ async def resend_verification(
     await session.commit()
 
     try:
-        await send_verification_email(current_user.email, current_user.nickname, token_str)
+        await send_verification_email(user.email, user.nickname, code_str)
     except Exception:
-        logger.exception("Failed to send verification email to %s", current_user.email)
+        logger.exception("Failed to send verification email to %s", user.email)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Could not send the verification email right now. Please try again later.",
         )
-    return ResendVerificationResponse(message="Verification email sent")
+    return ResendVerificationResponse(message="Verification code sent")
 
 
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)

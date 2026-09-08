@@ -39,6 +39,7 @@
     "markdown-it-task-lists": "^2.1.1",
     "markdown-it-texmath": "^1.0.0",
     "marked": "^17.0.5",
+    "mermaid": "^11.17.2",
     "nspell": "^2.1.5",
     "prosemirror-commands": "^1.7.1",
     "prosemirror-dropcursor": "^1.8.2",

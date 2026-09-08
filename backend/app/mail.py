@@ -55,10 +55,9 @@ async def send_email(to: str, subject: str, html: str) -> None:
         raise
 
 
-async def send_verification_email(to: str, nickname: str, token: str) -> None:
-    link = f"{settings.frontend_url}/verify-email?token={token}"
-    html = _render("verify_email.html", nickname=nickname, link=link)
-    await send_email(to, "Verify your email — Type Club", html)
+async def send_verification_email(to: str, nickname: str, code: str) -> None:
+    html = _render("verify_email.html", nickname=nickname, code=code)
+    await send_email(to, f"Код подтверждения Type Club: {code}", html)
 
 
 async def send_reset_password_email(to: str, nickname: str, token: str) -> None:

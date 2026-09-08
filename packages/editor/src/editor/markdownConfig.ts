@@ -813,6 +813,15 @@ export function generateExportHtml(markdown: string, theme: 'dark' | 'light' = '
     .use(markPlugin)
     .use(spoilerInlinePlugin)
 
+  const defaultFence = exportMd.renderer.rules.fence
+  exportMd.renderer.rules.fence = (tokens, idx, options, env, self) => {
+    const token = tokens[idx]
+    if (token.info.trim() === 'mermaid') {
+      return `<div class="mermaid" style="text-align: center; margin: 24px 0;">${token.content}</div>`
+    }
+    return defaultFence ? defaultFence(tokens, idx, options, env, self) : self.renderToken(tokens, idx, options)
+  }
+
   // Конвертируем Markdown в HTML тело
   const bodyHtml = exportMd.render(markdown)
   
@@ -833,6 +842,10 @@ export function generateExportHtml(markdown: string, theme: 'dark' | 'light' = '
   
   <!-- KaTeX CSS для математики -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: '${theme === "light" ? "default" : "dark"}' });
+  </script>
   
   <style>
     /* === Тёмная тема (по умолчанию) === */

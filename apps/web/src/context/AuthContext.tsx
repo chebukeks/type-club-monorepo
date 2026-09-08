@@ -6,6 +6,8 @@ interface AuthState {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (nickname: string, email: string, password: string, confirm: string) => Promise<void>;
+  verifyEmail: (code: string, email?: string) => Promise<void>;
+  resendVerification: (email?: string) => Promise<void>;
   logout: () => void;
   refresh: () => Promise<void>;
 }
@@ -49,13 +51,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(u);
   };
 
+  const verifyEmail = async (code: string, email?: string) => {
+    await authApi.verifyEmail({ code, email });
+    await refresh();
+  };
+
+  const resendVerification = async (email?: string) => {
+    await authApi.resendVerification({ email });
+  };
+
   const logout = () => {
     setToken(null);
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refresh }}>
+    <AuthContext.Provider value={{ user, loading, login, register, verifyEmail, resendVerification, logout, refresh }}>
       {children}
     </AuthContext.Provider>
   );

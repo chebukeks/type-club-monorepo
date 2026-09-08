@@ -4,6 +4,9 @@ from typing import Optional
 from pydantic import BaseModel, EmailStr, field_validator
 
 
+import re
+
+
 # ── Auth ──
 
 class RegisterRequest(BaseModel):
@@ -14,10 +17,21 @@ class RegisterRequest(BaseModel):
 
     @field_validator("nickname")
     @classmethod
-    def nickname_not_empty(cls, v: str) -> str:
+    def validate_nickname(cls, v: str) -> str:
         v = v.strip()
         if not v or len(v) < 2:
             raise ValueError("Nickname must be at least 2 characters")
+        if len(v) > 30:
+            raise ValueError("Nickname must be at most 30 characters")
+        if not re.match(r"^[a-zA-Z0-9_-]+$", v):
+            raise ValueError("Nickname can only contain Latin letters, numbers, underscores and hyphens")
+        return v
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if len(v) < 6:
+            raise ValueError("Password must be at least 6 characters")
         return v
 
     @field_validator("confirm_password")
@@ -70,7 +84,9 @@ class UpdateProfileRequest(BaseModel):
 # ── Email verification / password reset ──
 
 class VerifyEmailRequest(BaseModel):
-    token: str
+    code: Optional[str] = None
+    token: Optional[str] = None
+    email: Optional[EmailStr] = None
 
 
 class ResendVerificationResponse(BaseModel):
@@ -301,3 +317,33 @@ class CheckAccessResponse(BaseModel):
 
 class SyncStateRequest(BaseModel):
     content: str
+
+
+# ── Notifications ──
+
+class NotificationResponse(BaseModel):
+    id: int
+    user_id: int
+    sender_id: Optional[int] = None
+    sender_nickname: Optional[str] = None
+    sender_avatar_url: Optional[str] = None
+    article_id: Optional[int] = None
+    article_title: Optional[str] = None
+    article_slug: Optional[str] = None
+    article_author_nickname: Optional[str] = None
+    type: str  # 'comment', 'collab_invite'
+    data: Optional[str] = None
+    read: bool
+    is_read: bool = False
+    title: str = ""
+    message: str = ""
+    link: Optional[str] = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class NotificationListResponse(BaseModel):
+    items: list[NotificationResponse]
+    unread_count: int
+    total: int

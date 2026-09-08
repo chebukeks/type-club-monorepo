@@ -1,9 +1,10 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
-import { PenTool, BookOpen, User, LogOut, LogIn, Menu, X } from "lucide-react";
-import { useState } from "react";
+import { PenTool, BookOpen, User, LogOut, LogIn, Menu, X, Bell, MessageSquare, Users } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import ThemeSwitcher from "./ThemeSwitcher";
+import { notificationsApi, NotificationItem, formatNotificationItem } from "../api";
 
 interface SiteHeaderProps {
   onLogoClick?: () => void;
@@ -15,6 +16,75 @@ export default function SiteHeader({ onLogoClick }: SiteHeaderProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  const fetchNotifications = useCallback(async () => {
+    if (!user) return;
+    try {
+      const res = await notificationsApi.list({ page: 1, size: 8 });
+      setNotifications(res.items);
+      setUnreadCount(res.unread_count);
+    } catch {
+      // silent
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 45000);
+    const onFocus = () => fetchNotifications();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [user, fetchNotifications]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
+    };
+    if (notifOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [notifOpen]);
+
+  const handleMarkAllRead = async () => {
+    try {
+      await notificationsApi.markAllRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true, read: true })));
+      setUnreadCount(0);
+    } catch {
+      // silent
+    }
+  };
+
+  const handleItemClick = async (item: NotificationItem) => {
+    const isRead = item.is_read ?? item.read ?? false;
+    if (!isRead) {
+      try {
+        await notificationsApi.markRead(item.id);
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === item.id ? { ...n, is_read: true, read: true } : n))
+        );
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+      } catch {
+        // silent
+      }
+    }
+    setNotifOpen(false);
+    const formatted = formatNotificationItem(item, t);
+    if (formatted.link || item.link) {
+      navigate(formatted.link || item.link!);
+    }
+  };
 
   const navLinks = [
     { to: "/articles", label: t('nav.articles'), icon: BookOpen },
@@ -68,6 +138,102 @@ export default function SiteHeader({ onLogoClick }: SiteHeaderProps) {
                 >
                   {t('nav.newArticle')}
                 </Link>
+
+                {/* Notifications Dropdown */}
+                <div className="relative" ref={notifRef}>
+                  <button
+                    type="button"
+                    onClick={() => setNotifOpen(!notifOpen)}
+                    className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-700 dark:text-gray-300"
+                    title={t('notifications.title')}
+                  >
+                    <Bell size={18} />
+                    {unreadCount > 0 && (
+                      <span className="absolute top-1 right-1 flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white leading-none">
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {notifOpen && (
+                    <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xl z-50 overflow-hidden text-sm animate-in fade-in zoom-in-95 duration-100">
+                      <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-950/70">
+                        <span className="font-semibold text-gray-900 dark:text-gray-100 text-xs">
+                          {t('notifications.title')}
+                        </span>
+                        {unreadCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={handleMarkAllRead}
+                            className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                          >
+                            {t('notifications.markAllRead')}
+                          </button>
+                        )}
+                      </div>
+                      <div className="max-h-80 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800/60">
+                        {notifications.length === 0 ? (
+                          <div className="py-8 text-center text-xs text-gray-400">
+                            {t('notifications.empty')}
+                          </div>
+                        ) : (
+                          notifications.map((n) => {
+                            const isRead = n.is_read ?? n.read ?? false;
+                            const { title, message } = formatNotificationItem(n, t);
+                            return (
+                              <div
+                                key={n.id}
+                                onClick={() => handleItemClick(n)}
+                                className={`p-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors flex gap-2.5 ${
+                                  !isRead ? "bg-blue-50/40 dark:bg-blue-950/20" : ""
+                                }`}
+                              >
+                                <div className="mt-0.5 shrink-0">
+                                  {n.type === "comment" ? (
+                                    <MessageSquare size={16} className="text-blue-500" />
+                                  ) : n.type === "collab_invite" ? (
+                                    <Users size={16} className="text-emerald-500" />
+                                  ) : (
+                                    <Bell size={16} className="text-purple-500" />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between gap-1">
+                                    <span
+                                      className={`text-xs truncate ${
+                                        !isRead
+                                          ? "font-semibold text-gray-900 dark:text-gray-100"
+                                          : "text-gray-700 dark:text-gray-300"
+                                      }`}
+                                    >
+                                      {title}
+                                    </span>
+                                    {!isRead && (
+                                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0" />
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">
+                                    {message}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                      <div className="p-2 border-t border-gray-200 dark:border-gray-800 text-center bg-gray-50/70 dark:bg-gray-950/70">
+                        <Link
+                          to={`/${user.nickname}?tab=notifications`}
+                          onClick={() => setNotifOpen(false)}
+                          className="text-xs text-blue-600 dark:text-blue-400 hover:underline block py-0.5"
+                        >
+                          {t('notifications.all')}
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <Link
                   to={`/${user.nickname}`}
                   className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${location.pathname === `/${user.nickname}` ? "bg-gray-100 dark:bg-gray-800" : "hover:bg-gray-100 dark:hover:bg-gray-800"}`}

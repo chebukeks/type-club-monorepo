@@ -35,3 +35,7 @@ def decode_jwt(token: str) -> int | None:
 
 def generate_token() -> str:
     return secrets.token_hex(32)
+
+
+def generate_verification_code() -> str:
+    return f"{secrets.randbelow(900000) + 100000}"

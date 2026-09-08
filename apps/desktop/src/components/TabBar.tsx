@@ -86,20 +86,50 @@ export function TabBar() {
               borderLeftStyle: 'solid',
             }}
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 opacity-50">
-              {tab.articleId ? (
-                <>
+            {tab.articleId ? (
+              <span
+                className={`inline-flex items-center justify-center flex-shrink-0 transition-colors ${
+                  isActive
+                    ? state.collabStatus === 'connected'
+                      ? 'text-emerald-500 opacity-100'
+                      : state.collabStatus === 'connecting'
+                        ? 'text-amber-500 opacity-100 animate-pulse'
+                        : state.collabStatus === 'disconnected'
+                          ? 'text-[var(--text-danger)] opacity-100'
+                          : 'opacity-50 text-[var(--text-dim)]'
+                    : 'opacity-50 text-[var(--text-dim)]'
+                }`}
+                title={
+                  isActive
+                    ? state.collabStatus === 'connected'
+                      ? t('collab.statusConnected')
+                      : state.collabStatus === 'connecting'
+                        ? t('collab.statusConnecting')
+                        : state.collabStatus === 'disconnected'
+                          ? t('collab.statusDisconnected')
+                          : t('publish.collabBtn')
+                    : t('publish.collabBtn')
+                }
+              >
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <circle cx="12" cy="12" r="10" />
                   <line x1="2" y1="12" x2="22" y2="12" />
                   <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" />
-                </>
-              ) : (
-                <>
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <polyline points="14 2 14 8 20 8" />
-                </>
-              )}
-            </svg>
+                </svg>
+              </span>
+            ) : (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 opacity-50">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+              </svg>
+            )}
             <span className="text-[13px] truncate">{tab.fileName}</span>
             {!state.autosave && tab.isModified && (
               <span className="w-2 h-2 rounded-full bg-[var(--accent)] flex-shrink-0" />
