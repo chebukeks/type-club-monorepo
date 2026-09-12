@@ -169,6 +169,12 @@ export const articlesApi = {
   delete: (id: number) => api.delete<void>(`/articles/${id}`),
   moderate: (id: number, action: "block" | "unblock") =>
     api.post<{ message: string }>(`/articles/${id}/moderate`, { action }),
+  uploadImage: async (articleId: number, file: File | Blob) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await rawRequest(`/articles/${articleId}/images`, { method: "POST", body: formData });
+    return res.json() as Promise<{ url: string }>;
+  },
 };
 
 // ── Comments ──

@@ -289,14 +289,14 @@ body {
 /* Пункты выпадающих меню */
 .menu-item {
   margin: 1px 3px;
-  padding: 3.5px 8px;
+  padding: 6px 12px !important;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
   white-space: nowrap;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 12px !important;
   line-height: 1.35;
   transition: background 0.12s ease-out, color 0.12s ease-out;
 }

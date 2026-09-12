@@ -201,6 +201,7 @@ export default function Editor() {
           userId={user?.id}
           userNickname={user?.nickname}
           suggestionModeActive={suggestionModeActive}
+          articleId={articleId}
           onTocUpdate={(t, s) => {
             setToc(t);
             if (s) setSuggestions(s);

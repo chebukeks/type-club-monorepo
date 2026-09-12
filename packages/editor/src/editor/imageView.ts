@@ -11,6 +11,7 @@
 import { Node as PMNode } from 'prosemirror-model'
 import { EditorView, NodeView } from 'prosemirror-view'
 
+import { ImageLightbox } from './ImageLightbox'
 import { parseVideoEmbed, isVideoUrl, parseYouTubeUrl } from './videoUtils'
 export { parseYouTubeUrl, parseVideoEmbed, isVideoUrl }
 
@@ -122,11 +123,48 @@ export class ImageView implements NodeView {
       // и решает проблему GPU растеризатора Chromium (16 МБ лимит).
       if (this.currentSrc.startsWith('data:')) {
         img.src = dataUriToBlobUrl(this.currentSrc)
+      } else if (this.currentSrc.startsWith('/uploads/') && typeof window !== 'undefined' && (window as any).__TYPE_CLUB_SITE_URL__) {
+        img.src = `${(window as any).__TYPE_CLUB_SITE_URL__}${this.currentSrc}`
       } else {
         img.src = this.currentSrc
       }
       if (this.node.attrs.alt) img.alt = this.node.attrs.alt
       if (this.node.attrs.title) img.title = this.node.attrs.title
+      
+      const isPreview = this.view.dom.closest('.preview-mode') !== null || !this.view.editable
+      if (isPreview) {
+        img.style.cursor = 'zoom-in'
+        img.onclick = (e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          ImageLightbox.open({ src: img.src, alt: img.alt })
+        }
+      } else {
+        const handleContextMenu = (e: MouseEvent) => {
+          e.preventDefault()
+          e.stopPropagation()
+          const pos = this.getPos()
+          if (pos === undefined) return
+          const detail = {
+            pos,
+            src: this.currentSrc,
+            alt: this.node.attrs.alt,
+            title: this.node.attrs.title,
+            clientX: e.clientX,
+            clientY: e.clientY,
+          }
+          const event = new CustomEvent('editor-image-context-menu', {
+            bubbles: true,
+            composed: true,
+            detail,
+          })
+          this.view.dom.dispatchEvent(event)
+          window.dispatchEvent(new CustomEvent('editor-image-context-menu', { detail }))
+        }
+        img.addEventListener('contextmenu', handleContextMenu)
+        this.mediaContainer.addEventListener('contextmenu', handleContextMenu)
+      }
+      
       this.mediaContainer.appendChild(img)
     }
   }
@@ -205,6 +243,9 @@ export class ImageView implements NodeView {
   }
 
   stopEvent(e: Event) {
+    if (e.type === 'contextmenu') {
+      return true
+    }
     const target = e.target as HTMLElement
     if (this.caption.contains(target) || (this.captionInput && this.captionInput.contains(target))) {
       return true

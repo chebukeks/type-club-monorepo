@@ -612,6 +612,20 @@ ipcMain.handle('fs:writeFile', async (_event, filePath: string, content: string)
   fs.writeFileSync(filePath, content, 'utf-8')
 })
 
+// --- Сохранение локального изображения ---
+ipcMain.handle('fs:saveLocalImage', async (_event, docPath: string, filename: string, base64Data: string): Promise<string | null> => {
+  try {
+    const dir = path.dirname(docPath)
+    const imgPath = path.join(dir, filename)
+    const buffer = Buffer.from(base64Data, 'base64')
+    fs.writeFileSync(imgPath, buffer)
+    return `./${filename}`
+  } catch (err) {
+    console.error('Failed to save local image', err)
+    return null
+  }
+})
+
 // --- Чтение директории (рекурсивно) ---
 ipcMain.handle('fs:readDir', async (_event, dirPath: string): Promise<FileEntry[]> => {
   return readDirRecursive(dirPath)

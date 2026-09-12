@@ -170,6 +170,7 @@ export default function ReadArticle() {
             editorMode="preview"
             onChange={() => {}}
             readOnly
+            articleId={article.id}
             onTocUpdate={setToc}
           />
         </div>

@@ -1,5 +1,83 @@
 import { ipcRenderer, contextBridge, webFrame } from 'electron'
 
+function normalizePathSeparators(p: string): string {
+  return p.replace(/[/\\]+/g, '/')
+}
+
+function getPathSep(p?: string): string {
+  return (process.platform === 'win32' || (p && p.includes('\\'))) ? '\\' : '/'
+}
+
+function dirname(p: string): string {
+  if (!p) return '.'
+  const isWinDrive = /^[a-zA-Z]:[/\\]?$/.test(p)
+  if (isWinDrive) return p
+  
+  const norm = normalizePathSeparators(p).replace(/\/$/, '')
+  const lastSlash = norm.lastIndexOf('/')
+  if (lastSlash === -1) return '.'
+  if (lastSlash === 0) return '/'
+  if (lastSlash === 2 && norm[1] === ':') {
+    return p.substring(0, 3)
+  }
+  return p.substring(0, lastSlash)
+}
+
+function joinPath(...paths: string[]): string {
+  const sep = getPathSep(paths[0])
+  const cleaned: string[] = []
+  for (let i = 0; i < paths.length; i++) {
+    let part = paths[i]
+    if (!part) continue
+    if (i > 0) part = part.replace(/^[/\\]+/, '')
+    if (i < paths.length - 1) part = part.replace(/[/\\]+$/, '')
+    if (part) cleaned.push(part)
+  }
+  return cleaned.join(sep)
+}
+
+function resolvePath(...paths: string[]): string {
+  if (paths.length === 0) return ''
+  const base = paths[0] || ''
+  const rel = paths[1] || ''
+
+  // If rel is already an absolute path
+  if (/^([a-zA-Z]:[/\\]|[/\\])/.test(rel)) {
+    return rel
+  }
+
+  const sep = getPathSep(base)
+  const normBase = normalizePathSeparators(base).replace(/\/$/, '')
+  const normRel = normalizePathSeparators(rel)
+
+  const combined = (normBase + '/' + normRel).split('/')
+  const resolved: string[] = []
+
+  for (const seg of combined) {
+    if (!seg || seg === '.') continue
+    if (seg === '..') {
+      if (resolved.length > 0 && resolved[resolved.length - 1] !== '..') {
+        resolved.pop()
+      }
+    } else {
+      resolved.push(seg)
+    }
+  }
+
+  let result = resolved.join(sep)
+  // Preserve drive letter prefix (e.g. C:)
+  if (/^[a-zA-Z]:/.test(base)) {
+    const drive = base.substring(0, 2)
+    if (!result.startsWith(drive)) {
+      result = drive + sep + result
+    }
+  } else if (base.startsWith('/') || base.startsWith('\\')) {
+    result = sep + result
+  }
+
+  return result
+}
+
 /**
  * Preload-скрипт: создаёт безопасный мост между Main и Renderer процессами.
  * Все вызовы Node.js API проходят через ipcRenderer.invoke / ipcRenderer.send.
@@ -8,6 +86,13 @@ import { ipcRenderer, contextBridge, webFrame } from 'electron'
 contextBridge.exposeInMainWorld('api', {
   /** Платформа операционной системы (win32, darwin, linux) */
   platform: process.platform,
+
+  // ==========================================
+  // Path
+  // ==========================================
+  dirname: (p: string) => dirname(p),
+  joinPath: (...paths: string[]) => joinPath(...paths),
+  resolvePath: (...paths: string[]) => resolvePath(...paths),
 
   // ==========================================
   // Файловая система
@@ -56,6 +141,11 @@ contextBridge.exposeInMainWorld('api', {
   /** Скопировать файл в системный буфер обмена (как файл) */
   copyFileToClipboard: (filePath: string): Promise<boolean> => {
     return ipcRenderer.invoke('clipboard:copyFile', filePath)
+  },
+
+  /** Сохранить локальное изображение из base64 */
+  saveLocalImage: (filePath: string, filename: string, base64: string): Promise<string | null> => {
+    return ipcRenderer.invoke('fs:saveLocalImage', filePath, filename, base64)
   },
 
   // ==========================================

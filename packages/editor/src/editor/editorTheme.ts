@@ -595,9 +595,58 @@ html[data-lang="ru"] figure[data-sug-delete]::after {
   overflow-x: auto;
   min-height: 80px;
 }
-.mermaid-render-wrapper svg {
+.mermaid-render-wrapper svg,
+.type-club-lightbox-overlay svg {
   max-width: 100%;
   height: auto;
+}
+.mermaid-render-wrapper svg .nodeLabel,
+.mermaid-render-wrapper svg .edgeLabel,
+.mermaid-render-wrapper svg .label,
+.type-club-lightbox-overlay svg .nodeLabel,
+.type-club-lightbox-overlay svg .edgeLabel,
+.type-club-lightbox-overlay svg .label,
+.type-club-lightbox-overlay .nodeLabel,
+.type-club-lightbox-overlay .edgeLabel,
+.type-club-lightbox-overlay .label {
+  white-space: normal !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+}
+/* Стили для слайдера масштабирования в лайтбоксе */
+.type-club-lightbox-overlay input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 28px;
+  background: transparent;
+  cursor: pointer;
+  margin: 0;
+  padding: 0;
+}
+.type-club-lightbox-overlay input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+.type-club-lightbox-overlay input[type="range"]:hover::-webkit-slider-runnable-track {
+  background: rgba(255, 255, 255, 0.5);
+}
+.type-club-lightbox-overlay input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  margin-top: -5px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transition: transform 0.1s, background 0.2s;
+}
+.type-club-lightbox-overlay input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  background: var(--accent, #6c8cff);
 }
 .mermaid-empty {
   font-size: 12px;
@@ -1083,5 +1132,88 @@ html[data-lang="ru"] figure[data-sug-delete]::after {
   pointer-events: none;
   opacity: 0.3;
 }
+
+/* ==========================================
+   Image & Diagram Lightbox Slider
+   ========================================== */
+.type-club-lightbox-slider {
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+  width: 120px !important;
+  height: 20px !important;
+  background: transparent !important;
+  cursor: pointer !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  outline: none !important;
+  vertical-align: middle !important;
+}
+.type-club-lightbox-slider:focus {
+  outline: none !important;
+}
+.type-club-lightbox-slider::-webkit-slider-runnable-track {
+  width: 100% !important;
+  height: 6px !important;
+  background: rgba(255, 255, 255, 0.35) !important;
+  border-radius: 3px !important;
+  border: none !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease !important;
+}
+.type-club-lightbox-slider:hover::-webkit-slider-runnable-track {
+  background: rgba(255, 255, 255, 0.55) !important;
+}
+.type-club-lightbox-slider::-webkit-slider-thumb {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  width: 16px !important;
+  height: 16px !important;
+  border-radius: 50% !important;
+  background: #ffffff !important;
+  cursor: pointer !important;
+  margin-top: -5px !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5) !important;
+  border: none !important;
+  transition: transform 0.1s ease, background 0.15s ease !important;
+}
+.type-club-lightbox-slider:hover::-webkit-slider-thumb {
+  transform: scale(1.15) !important;
+}
+.type-club-lightbox-slider:active::-webkit-slider-thumb {
+  transform: scale(1.25) !important;
+  background: #38bdf8 !important;
+}
+.type-club-lightbox-slider::-moz-range-track {
+  width: 100% !important;
+  height: 6px !important;
+  background: rgba(255, 255, 255, 0.35) !important;
+  border-radius: 3px !important;
+  border: none !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease !important;
+}
+.type-club-lightbox-slider:hover::-moz-range-track {
+  background: rgba(255, 255, 255, 0.55) !important;
+}
+.type-club-lightbox-slider::-moz-range-thumb {
+  width: 16px !important;
+  height: 16px !important;
+  border-radius: 50% !important;
+  background: #ffffff !important;
+  cursor: pointer !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5) !important;
+  border: none !important;
+  transition: transform 0.1s ease, background 0.15s ease !important;
+}
+.type-club-lightbox-slider:hover::-moz-range-thumb {
+  transform: scale(1.15) !important;
+}
+.type-club-lightbox-slider:active::-moz-range-thumb {
+  transform: scale(1.25) !important;
+  background: #38bdf8 !important;
+}
 `
 }
+

@@ -3,6 +3,14 @@ import { EditorView, NodeView } from 'prosemirror-view'
 import { TextSelection } from 'prosemirror-state'
 import { suggestionPluginKey } from './suggestionPlugin'
 
+import { ImageLightbox } from './ImageLightbox'
+import { getTranslation, Locale } from '../i18n'
+
+function getLocale(): Locale {
+  const lang = typeof document !== 'undefined' ? document.documentElement.getAttribute('lang') : 'en';
+  return (lang === 'ru' ? 'ru' : 'en') as Locale;
+}
+
 let mermaidModulePromise: Promise<any> | null = null
 
 function getMermaid() {
@@ -199,6 +207,11 @@ export class CodeBlockView implements NodeView {
             this.view.dispatch(tr)
             this.view.focus()
           }
+        } else {
+          const svgEl = this.mermaidContainer?.querySelector('svg')
+          if (svgEl) {
+            ImageLightbox.open({ svgContent: svgEl.outerHTML, alt: 'Mermaid Diagram' })
+          }
         }
       })
 
@@ -218,7 +231,7 @@ export class CodeBlockView implements NodeView {
       const diagramTab = document.createElement('button')
       diagramTab.type = 'button'
       diagramTab.className = `code-block-tab-btn ${this.activeTab === 'diagram' ? 'active' : ''}`
-      diagramTab.textContent = 'Диаграмма'
+      diagramTab.textContent = getTranslation(getLocale(), 'editor.mermaid.diagram')
       diagramTab.addEventListener('click', (e) => {
         e.preventDefault()
         this.switchTab('diagram')
@@ -227,7 +240,7 @@ export class CodeBlockView implements NodeView {
       const codeTab = document.createElement('button')
       codeTab.type = 'button'
       codeTab.className = `code-block-tab-btn ${this.activeTab === 'code' ? 'active' : ''}`
-      codeTab.textContent = 'Код'
+      codeTab.textContent = getTranslation(getLocale(), 'editor.mermaid.code')
       codeTab.addEventListener('click', (e) => {
         e.preventDefault()
         this.switchTab('code')
@@ -242,7 +255,9 @@ export class CodeBlockView implements NodeView {
       this.activeTab = 'diagram'
       this.preElement.style.display = 'none'
       this.mermaidContainer.style.display = 'flex'
+      this.mermaidContainer.style.cursor = 'zoom-in'
     } else {
+      if (this.mermaidContainer) this.mermaidContainer.style.cursor = 'pointer'
       this.updateViewMode()
     }
 
@@ -297,7 +312,7 @@ export class CodeBlockView implements NodeView {
     if (!this.mermaidContainer) return
     const text = this.node.textContent.trim()
     if (!text) {
-      this.mermaidContainer.innerHTML = '<span class="mermaid-empty">Диаграмма пуста</span>'
+      this.mermaidContainer.innerHTML = `<span class="mermaid-empty">${getTranslation(getLocale(), 'editor.mermaid.empty')}</span>`
       if (this.mermaidError) this.mermaidError.style.display = 'none'
       return
     }
@@ -315,6 +330,7 @@ export class CodeBlockView implements NodeView {
         startOnLoad: false,
         theme: isDark ? 'dark' : 'default',
         securityLevel: 'loose',
+        flowchart: { useMaxWidth: true, htmlLabels: true },
       })
 
       const uniqueId = `mermaid-${Math.random().toString(36).substring(2, 9)}`
@@ -326,7 +342,7 @@ export class CodeBlockView implements NodeView {
       }
     } catch (err: any) {
       if (currentRender === this.renderCounter && this.mermaidError) {
-        this.mermaidError.textContent = err?.message || 'Ошибка синтаксиса Mermaid'
+        this.mermaidError.textContent = err?.message || getTranslation(getLocale(), 'editor.mermaid.syntaxError')
         this.mermaidError.style.display = 'block'
       }
     }

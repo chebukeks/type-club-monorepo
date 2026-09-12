@@ -50,6 +50,28 @@ class Article(Base):
     views: Mapped[list["ArticleView"]] = relationship(back_populates="article", lazy="selectin", cascade="all, delete-orphan")
     likes: Mapped[list["ArticleLike"]] = relationship(back_populates="article", lazy="selectin", cascade="all, delete-orphan")
     comments: Mapped[list["Comment"]] = relationship(back_populates="article", lazy="selectin", cascade="all, delete-orphan")
+    images: Mapped[list["ArticleImage"]] = relationship(back_populates="article", lazy="selectin", cascade="all, delete-orphan")
+
+
+class ArticleImage(Base):
+    __tablename__ = "article_images"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    article_id: Mapped[int] = mapped_column(
+        ForeignKey("typeclub_articles.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("typeclub_users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    filename: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    original_name: Mapped[str] = mapped_column(String(500), nullable=False)
+    file_path: Mapped[str] = mapped_column(String(500), unique=True, nullable=False)
+    file_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    mime_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    url: Mapped[str] = mapped_column(String(500), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    article: Mapped["Article"] = relationship(back_populates="images")
 
 
 class CollaborationMember(Base):

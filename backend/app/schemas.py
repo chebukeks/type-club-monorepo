@@ -177,6 +177,18 @@ class UserSuggestion(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ── Images ──
+
+class ArticleImageResponse(BaseModel):
+    id: int
+    url: str
+    filename: str
+    file_size: int
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 # ── Moderation ──
 
 class ModerateRequest(BaseModel):

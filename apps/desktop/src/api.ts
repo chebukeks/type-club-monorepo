@@ -122,6 +122,20 @@ export const articlesApi = {
     api.patch<Article>(`/articles/${id}`, data),
   delete: (id: number) => api.delete<void>(`/articles/${id}`),
   myRole: (articleId: number) => api.get<{ role: string }>(`/articles/${articleId}/my-role`),
+  uploadImage: async (articleId: number, file: File | Blob) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const headers: Record<string, string> = {};
+    const t = getToken();
+    if (t) headers["Authorization"] = `Bearer ${t}`;
+    const res = await fetch(`${config.apiUrl}/articles/${articleId}/images`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+    if (!res.ok) throw new Error("Upload failed");
+    return res.json() as Promise<{ url: string }>;
+  },
 };
 
 // ── Collaboration ──

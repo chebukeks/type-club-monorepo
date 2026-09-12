@@ -618,6 +618,31 @@ export const ru: Record<TranslationKey, string> = {
   'editor.mermaid.code': 'Код',
   'editor.mermaid.diagram': 'Диаграмма',
   'editor.mermaid.error': 'Ошибка синтаксиса Mermaid',
+  'editor.mermaid.empty': 'Диаграмма пуста',
+  'editor.mermaid.syntaxError': 'Ошибка синтаксиса Mermaid',
+
+  // Lightbox
+  'lightbox.close': 'Закрыть',
+  'lightbox.zoomIn': 'Увеличить',
+  'lightbox.zoomOut': 'Уменьшить',
+  'lightbox.resetZoom': 'Реальный размер',
+  'lightbox.fitToScreen': 'По размеру экрана',
+
+  // Image Context Menu
+  'image.contextMenu.copy': 'Копировать изображение',
+  'image.contextMenu.copyLink': 'Копировать ссылку',
+  'image.contextMenu.embed': 'Копировать код вставки',
+  'image.contextMenu.uploadToTypeClub': 'Загрузить в Type Club',
+  'image.contextMenu.saveLocally': 'Сохранить локально',
+  'image.contextMenu.uploading': 'Загрузка...',
+  'image.contextMenu.uploaded': 'Загружено',
+  'image.contextMenu.uploadFailed': 'Ошибка загрузки',
+  'image.contextMenu.saved': 'Сохранено',
+  'image.contextMenu.saveFailed': 'Ошибка сохранения',
+  'image.contextMenu.copied': 'Скопировано',
+  'image.contextMenu.notLoggedIn': 'Войдите, чтобы загрузить',
+  'image.contextMenu.onlineArticleOnly': 'Доступно только для онлайн-статей',
+  'image.contextMenu.saveFileFirst': 'Сначала сохраните файл',
 
   // Code verification & registration
   'auth.verifyEmailTitle': 'Подтверждение аккаунта',

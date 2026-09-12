@@ -616,6 +616,31 @@ export const en = {
   'editor.mermaid.code': 'Code',
   'editor.mermaid.diagram': 'Diagram',
   'editor.mermaid.error': 'Mermaid syntax error',
+  'editor.mermaid.empty': 'Diagram is empty',
+  'editor.mermaid.syntaxError': 'Mermaid syntax error',
+
+  // Lightbox
+  'lightbox.close': 'Close',
+  'lightbox.zoomIn': 'Zoom in',
+  'lightbox.zoomOut': 'Zoom out',
+  'lightbox.resetZoom': 'Reset zoom',
+  'lightbox.fitToScreen': 'Fit to screen',
+
+  // Image Context Menu
+  'image.contextMenu.copy': 'Copy image',
+  'image.contextMenu.copyLink': 'Copy image link',
+  'image.contextMenu.embed': 'Copy embed code',
+  'image.contextMenu.uploadToTypeClub': 'Upload to Type Club',
+  'image.contextMenu.saveLocally': 'Save locally',
+  'image.contextMenu.uploading': 'Uploading...',
+  'image.contextMenu.uploaded': 'Uploaded',
+  'image.contextMenu.uploadFailed': 'Upload failed',
+  'image.contextMenu.saved': 'Saved',
+  'image.contextMenu.saveFailed': 'Save failed',
+  'image.contextMenu.copied': 'Copied',
+  'image.contextMenu.notLoggedIn': 'Please log in to upload',
+  'image.contextMenu.onlineArticleOnly': 'Available only for online articles',
+  'image.contextMenu.saveFileFirst': 'Please save the file first',
 
   // Code verification & registration
   'auth.verifyEmailTitle': 'Account Verification',

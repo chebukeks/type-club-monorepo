@@ -48,6 +48,20 @@ export const interactivePlugin = new Plugin({
           const rawHref = link.getAttribute('href')
           if (rawHref && (isPreview || event.ctrlKey || event.metaKey)) {
             event.preventDefault()
+            const isRelative = !/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(rawHref) && !rawHref.startsWith('//') && !rawHref.startsWith('#')
+            
+            if (isRelative) {
+              if ((window as any).api) { // desktop check
+                view.dom.dispatchEvent(
+                  new CustomEvent('editor-open-relative-link', {
+                    bubbles: true,
+                    detail: { href: rawHref },
+                  })
+                )
+              }
+              return true
+            }
+
             let finalUrl = rawHref
             if (!/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(finalUrl)) {
               finalUrl = `https://${finalUrl}`

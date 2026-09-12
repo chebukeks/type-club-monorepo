@@ -31,6 +31,7 @@ interface MarkdownEditorProps {
   userNickname?: string;
   suggestionModeActive?: boolean;
   onTocUpdate?: (toc: TocItem[], suggestions?: SuggestionItem[]) => void;
+  articleId?: number | null;
 }
 
 export function MarkdownEditor({
@@ -46,6 +47,7 @@ export function MarkdownEditor({
   userNickname,
   suggestionModeActive,
   onTocUpdate,
+  articleId,
 }: MarkdownEditorProps) {
   const { t } = useLanguage();
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
@@ -61,6 +63,17 @@ export function MarkdownEditor({
     currentLang: string;
     rect: { top: number; left: number; bottom: number; right: number };
   } | null>(null);
+  
+  const [imageContextMenu, setImageContextMenu] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    src: string;
+    alt: string;
+    title: string;
+    pos: number;
+  } | null>(null);
+
   const viewRef = useRef<EditorView | null>(null);
 
   const isSuggestionActive = userRole === "editor" || (suggestionModeActive ?? false);
@@ -72,7 +85,37 @@ export function MarkdownEditor({
       setCodeLangPicker({ pos, currentLang, rect });
     };
     window.addEventListener("editor-change-code-block-lang", handleCodeBlockLang);
-    return () => window.removeEventListener("editor-change-code-block-lang", handleCodeBlockLang);
+
+    const handleImageContextMenu = (e: Event) => {
+      if (readOnly || editorMode !== "seamless") return;
+      const event = e as CustomEvent<{
+        pos: number;
+        src: string;
+        alt: string;
+        title: string;
+        clientX: number;
+        clientY: number;
+      }>;
+      setImageContextMenu({
+        visible: true,
+        x: event.detail.clientX,
+        y: event.detail.clientY,
+        src: event.detail.src,
+        alt: event.detail.alt,
+        title: event.detail.title,
+        pos: event.detail.pos,
+      });
+    };
+    window.addEventListener("editor-image-context-menu", handleImageContextMenu);
+
+    const closeImageMenu = () => setImageContextMenu(null);
+    window.addEventListener("click", closeImageMenu);
+
+    return () => {
+      window.removeEventListener("editor-change-code-block-lang", handleCodeBlockLang);
+      window.removeEventListener("editor-image-context-menu", handleImageContextMenu);
+      window.removeEventListener("click", closeImageMenu);
+    };
   }, [readOnly, editorMode, isSuggestionActive]);
 
   const handleSelectCodeLang = (newLang: string) => {
@@ -184,6 +227,93 @@ export function MarkdownEditor({
     setCtxTable(null);
   };
 
+  const handleCopyImage = async (src: string) => {
+    try {
+      let blob: Blob
+      if (src.startsWith('data:')) {
+        const comma = src.indexOf(',')
+        const header = src.slice(0, comma)
+        const base64 = src.slice(comma + 1)
+        const mime = header.match(/data:([^;]+)/)?.[1] || 'image/png'
+        const binary = atob(base64)
+        const bytes = new Uint8Array(binary.length)
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+        blob = new Blob([bytes], { type: mime })
+      } else {
+        const res = await fetch(src)
+        blob = await res.blob()
+      }
+      await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })])
+    } catch (e) {
+      console.error('Failed to copy image', e)
+    }
+  }
+
+  const handleEmbedImage = async (src: string, pos: number) => {
+    try {
+      const res = await fetch(src)
+      const blob = await res.blob()
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        const dataUri = reader.result as string
+        const view = viewRef.current
+        if (view) {
+          const node = view.state.doc.nodeAt(pos)
+          if (node) {
+            const tr = view.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: dataUri })
+            view.dispatch(tr)
+          }
+        }
+      }
+      reader.readAsDataURL(blob)
+    } catch (e) {
+      console.error('Failed to embed image', e)
+    }
+  }
+
+  const handleUploadImage = async (src: string, pos: number) => {
+    if (!articleId) {
+      alert(t('image.contextMenu.onlineArticleOnly') || 'Not an online article')
+      return
+    }
+    if (!userId) {
+      alert(t('image.contextMenu.notLoggedIn') || 'Not logged in')
+      return
+    }
+    try {
+      let file: File
+      if (src.startsWith('data:')) {
+        const comma = src.indexOf(',')
+        const header = src.slice(0, comma)
+        const base64 = src.slice(comma + 1)
+        const mime = header.match(/data:([^;]+)/)?.[1] || 'image/png'
+        const ext = mime.split('/')[1] || 'png'
+        const binary = atob(base64)
+        const bytes = new Uint8Array(binary.length)
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+        file = new File([bytes], `image-${Date.now()}.${ext}`, { type: mime })
+      } else {
+        const res = await fetch(src)
+        const blob = await res.blob()
+        const ext = blob.type.split('/')[1] || 'png'
+        file = new File([blob], `image-${Date.now()}.${ext}`, { type: blob.type })
+      }
+      const { articlesApi } = await import('../api')
+      const response = await articlesApi.uploadImage(articleId, file)
+      const view = viewRef.current
+      if (view && response?.url) {
+        const node = view.state.doc.nodeAt(pos)
+        if (node) {
+          const tr = view.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: response.url })
+          view.dispatch(tr)
+        }
+      }
+    } catch (e) {
+      console.error('Failed to upload image', e)
+      alert(t('image.contextMenu.uploadFailed') || 'Failed to upload image')
+    }
+  }
+
   const ctxMenuStyle = useMemo((): React.CSSProperties | null => {
     if (!ctxMenu) return null;
     const menuHeight = ctxSubmenu === "table" ? 300 : ctxSubmenu === "code" ? 260 : ctxTable !== null ? 180 : 400;
@@ -200,6 +330,10 @@ export function MarkdownEditor({
   const handleContextMenu = (e: React.MouseEvent) => {
     const view = viewRef.current;
     if (editorMode !== "seamless") return;
+    const target = e.target as HTMLElement;
+    if (target && target.closest('.image-block, .media-container, img')) {
+      return;
+    }
     e.preventDefault();
     setCtxTable(null);
     setCtxSubmenu(null);
@@ -353,20 +487,20 @@ export function MarkdownEditor({
     { label: t('editor.format.spoiler'), hotkey: "Ctrl+Shift+S", command: "spoiler" },
   ];
 
-  const btnClass = "flex items-center justify-between w-full px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 text-left";
-  const sepClass = "border-t border-gray-200 dark:border-gray-700 my-1";
+  const btnClass = "flex items-center justify-between w-full hover:bg-gray-100 dark:hover:bg-gray-800 text-left text-xs text-gray-800 dark:text-gray-200 transition-colors";
+  const sepClass = "border-t border-gray-200 dark:border-gray-700 my-1 mx-1.5 opacity-80";
 
   const numInput = (label: string, value: number, setValue: (v: number) => void, min = 1, max = 10) => (
-    <div className="flex items-center gap-2 px-2 py-1">
+    <div className="flex items-center gap-2" style={{ padding: '6px 12px' }}>
       <span className="text-xs text-gray-500 dark:text-gray-400 w-16">{label}</span>
       <button
-        className="w-6 h-6 flex items-center justify-center rounded text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 text-sm"
+        className="w-5 h-5 flex items-center justify-center rounded text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 text-xs"
         disabled={value <= min}
         onClick={() => setValue(value - 1)}
       >−</button>
-      <span className="w-8 text-center text-sm text-gray-700 dark:text-gray-300">{value}</span>
+      <span className="w-8 text-center text-xs text-gray-700 dark:text-gray-300">{value}</span>
       <button
-        className="w-6 h-6 flex items-center justify-center rounded text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 text-sm"
+        className="w-5 h-5 flex items-center justify-center rounded text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 text-xs"
         disabled={value >= max}
         onClick={() => setValue(value + 1)}
       >+</button>
@@ -421,23 +555,23 @@ export function MarkdownEditor({
 
       {ctxMenu && ctxTable !== null && (
         <div
-          className="fixed bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 py-1 flex flex-col text-sm"
+          className="fixed bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 py-1 flex flex-col text-xs"
           style={ctxMenuStyle!}
           onContextMenu={(e) => e.preventDefault()}
           onClick={(e) => e.stopPropagation()}
         >
-          <button className={btnClass} onClick={handleTableCopy}>
+          <button className={btnClass} style={{ padding: '6px 12px' }} onClick={handleTableCopy}>
             <span>{t('editor.table.copy')}</span>
           </button>
           {!isSuggestionActive && (
             <>
-              <button className={btnClass} onClick={handleTableCut}>
+              <button className={btnClass} style={{ padding: '6px 12px' }} onClick={handleTableCut}>
                 <span>{t('editor.table.cut')}</span>
               </button>
-              <button className={btnClass} onClick={handleTableEdit}>
+              <button className={btnClass} style={{ padding: '6px 12px' }} onClick={handleTableEdit}>
                 <span>{t('editor.table.edit')}</span>
               </button>
-              <button className={btnClass} onClick={handleTableDelete}>
+              <button className={btnClass} style={{ padding: '6px 12px' }} onClick={handleTableDelete}>
                 <span>{t('editor.table.delete')}</span>
               </button>
             </>
@@ -447,22 +581,22 @@ export function MarkdownEditor({
 
       {ctxMenu && !ctxSubmenu && ctxTable === null && (
         <div
-          className="fixed bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 py-1 flex flex-col text-sm"
+          className="fixed bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 py-1 flex flex-col text-xs"
           style={ctxMenuStyle!}
           onContextMenu={(e) => e.preventDefault()}
           onClick={(e) => e.stopPropagation()}
         >
-          <button className={btnClass} onClick={() => handleClipboard("copy")}>
+          <button className={btnClass} style={{ padding: '6px 12px' }} onClick={() => handleClipboard("copy")}>
             <span>{t('editor.menu.copy')}</span>
-            <span className="text-xs text-gray-400">Ctrl+C</span>
+            <span className="text-[10px] text-gray-400">Ctrl+C</span>
           </button>
-          <button className={btnClass} onClick={() => handleClipboard("cut")}>
+          <button className={btnClass} style={{ padding: '6px 12px' }} onClick={() => handleClipboard("cut")}>
             <span>{t('editor.menu.cut')}</span>
-            <span className="text-xs text-gray-400">Ctrl+X</span>
+            <span className="text-[10px] text-gray-400">Ctrl+X</span>
           </button>
-          <button className={btnClass} onClick={() => handleClipboard("paste")}>
+          <button className={btnClass} style={{ padding: '6px 12px' }} onClick={() => handleClipboard("paste")}>
             <span>{t('editor.menu.paste')}</span>
-            <span className="text-xs text-gray-400">Ctrl+V</span>
+            <span className="text-[10px] text-gray-400">Ctrl+V</span>
           </button>
           {!isSuggestionActive && (
             <>
@@ -471,22 +605,23 @@ export function MarkdownEditor({
                 <button
                   key={item.command}
                   className={btnClass}
+                  style={{ padding: '6px 12px' }}
                   onClick={() => applyFormat(item.command)}
                 >
                   <span>{item.label}</span>
-                  <span className="text-xs text-gray-400">{item.hotkey}</span>
+                  <span className="text-[10px] text-gray-400">{item.hotkey}</span>
                 </button>
               ))}
               <div className={sepClass} />
-              <button className={btnClass} onClick={() => setCtxSubmenu("table")}>
+              <button className={btnClass} style={{ padding: '6px 12px' }} onClick={() => setCtxSubmenu("table")}>
                 <span>{t('editor.menu.createTable')}</span>
-                <span className="text-xs text-gray-400">▸</span>
+                <span className="text-[10px] text-gray-400">▸</span>
               </button>
-              <button className={btnClass} onClick={() => setCtxSubmenu("code")}>
+              <button className={btnClass} style={{ padding: '6px 12px' }} onClick={() => setCtxSubmenu("code")}>
                 <span>{t('editor.menu.createCodeBlock')}</span>
-                <span className="text-xs text-gray-400">▸</span>
+                <span className="text-[10px] text-gray-400">▸</span>
               </button>
-              <button className={btnClass} onClick={insertMathBlock}>
+              <button className={btnClass} style={{ padding: '6px 12px' }} onClick={insertMathBlock}>
                 <span>{t('editor.menu.createMathBlock')}</span>
               </button>
             </>
@@ -496,6 +631,7 @@ export function MarkdownEditor({
               <div className={sepClass} />
               <button
                 className={btnClass}
+                style={{ padding: '6px 12px' }}
                 onClick={() => {
                   closeCtxMenu();
                   setShowAddNoteModal(true);
@@ -505,7 +641,7 @@ export function MarkdownEditor({
                   <MessageCircleMore size={14} className="text-amber-500 shrink-0" />
                   <span>{t('editor.menu.createNote')}</span>
                 </div>
-                <span className="text-xs text-gray-400">Ctrl+Q</span>
+                <span className="text-[10px] text-gray-400">Ctrl+Q</span>
               </button>
             </>
           )}
@@ -514,27 +650,28 @@ export function MarkdownEditor({
 
       {ctxMenu && ctxSubmenu === "table" && (
         <div
-          className="fixed bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 py-1 flex flex-col text-sm"
+          className="fixed bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 py-1 flex flex-col text-xs"
           style={ctxMenuStyle!}
           onContextMenu={(e) => e.preventDefault()}
           onClick={(e) => e.stopPropagation()}
         >
-          <button className={btnClass} onClick={() => setCtxSubmenu(null)}>
+          <button className={btnClass} style={{ padding: '6px 12px' }} onClick={() => setCtxSubmenu(null)}>
             <span>{t('common.back')}</span>
           </button>
           <div className={sepClass} />
           {numInput(t('editor.table.columns'), tableCols, setTableCols)}
           {numInput(t('editor.table.rows'), tableRows, setTableRows)}
           <div className={sepClass} />
-          <div className="px-2 py-1 overflow-x-auto">
+          <div className="overflow-x-auto" style={{ padding: '6px 12px' }}>
             <table className="w-full border-collapse">
               <tbody>{tablePreview}</tbody>
             </table>
           </div>
           <div className={sepClass} />
-          <div className="px-3 py-1.5">
+          <div style={{ padding: '6px 12px' }}>
             <button
-              className="w-full py-1.5 rounded bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
+              className="w-full rounded bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-colors"
+              style={{ padding: '6px 12px' }}
               onClick={insertTable}
             >{t('common.create')}</button>
           </div>
@@ -543,20 +680,20 @@ export function MarkdownEditor({
 
       {ctxMenu && ctxSubmenu === "code" && (
         <div
-          className="fixed bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 py-1 flex flex-col text-sm"
+          className="fixed bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 py-1 flex flex-col text-xs"
           style={ctxMenuStyle!}
           onContextMenu={(e) => e.preventDefault()}
           onClick={(e) => e.stopPropagation()}
         >
-          <button className={btnClass} onClick={() => setCtxSubmenu(null)}>
+          <button className={btnClass} style={{ padding: '6px 12px' }} onClick={() => setCtxSubmenu(null)}>
             <span>{t('common.back')}</span>
           </button>
           <div className={sepClass} />
-          <div className="px-5 py-2">
+          <div style={{ padding: '6px 12px' }}>
             <span className="text-xs text-gray-500 dark:text-gray-400">{t('editor.code.language')}</span>
             <div className="relative mt-1.5">
               <input
-                className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-sm text-gray-700 dark:text-gray-300 outline-none focus:border-gray-400"
+                className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-xs text-gray-700 dark:text-gray-300 outline-none focus:border-gray-400"
                 placeholder={t('editor.noLanguage')}
                 value={codeLang}
                 onChange={(e) => setCodeLang(e.target.value)}
@@ -568,7 +705,8 @@ export function MarkdownEditor({
                   {languagesList.filter(l => !codeLang || l.label.toLowerCase().includes(codeLang.toLowerCase()) || l.value.includes(codeLang)).map((l) => (
                     <div
                       key={l.value}
-                      className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 ${l.value === codeLang ? "text-gray-900 dark:text-gray-100" : "text-gray-600 dark:text-gray-400"}`}
+                      className={`text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 ${l.value === codeLang ? "text-gray-900 dark:text-gray-100 font-medium" : "text-gray-600 dark:text-gray-400"}`}
+                      style={{ padding: '6px 12px' }}
                       onMouseDown={() => { setCodeLang(l.value); setShowLangDropdown(false); }}
                     >{l.label}</div>
                   ))}
@@ -577,14 +715,16 @@ export function MarkdownEditor({
             </div>
           </div>
           <div className={sepClass} />
-          <div className="px-3 py-1.5 flex gap-2">
+          <div className="flex gap-2" style={{ padding: '6px 12px' }}>
             <button
-              className="flex-1 py-1.5 rounded bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
+              className="flex-1 rounded bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-colors"
+              style={{ padding: '6px 12px' }}
               onClick={() => insertCodeBlock()}
             >{t('common.create')}</button>
             {codeLang && (
               <button
-                className="flex-1 py-1.5 rounded bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm hover:bg-gray-200 dark:hover:bg-gray-700"
+                className="flex-1 rounded bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-xs hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                style={{ padding: '6px 12px' }}
                 onClick={() => insertCodeBlock("")}
               >{t('editor.noLanguage')}</button>
             )}
@@ -600,6 +740,69 @@ export function MarkdownEditor({
           onClose={() => setCodeLangPicker(null)}
           t={t}
         />
+      )}
+
+      {imageContextMenu && imageContextMenu.visible && (
+        <div
+          className="fixed z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl flex flex-col backdrop-blur-xl"
+          style={{
+            top: imageContextMenu.y,
+            left: imageContextMenu.x,
+            minWidth: '200px',
+            padding: '4px 0',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="text-left text-xs hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200 transition-colors"
+            style={{ padding: '6px 12px' }}
+            onClick={() => {
+              handleCopyImage(imageContextMenu.src)
+              setImageContextMenu(null)
+            }}
+          >
+            {t('image.contextMenu.copy') || 'Copy Image'}
+          </button>
+          
+          {!imageContextMenu.src.startsWith('data:') && (
+            <button
+              className="text-left text-xs hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200 transition-colors"
+              style={{ padding: '6px 12px' }}
+              onClick={() => {
+                navigator.clipboard.writeText(imageContextMenu.src)
+                setImageContextMenu(null)
+              }}
+            >
+              {t('image.contextMenu.copyLink') || 'Copy Image Link'}
+            </button>
+          )}
+
+          {!imageContextMenu.src.startsWith('data:') && (
+            <button
+              className="text-left text-xs hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200 transition-colors"
+              style={{ padding: '6px 12px' }}
+              onClick={() => {
+                handleEmbedImage(imageContextMenu.src, imageContextMenu.pos)
+                setImageContextMenu(null)
+              }}
+            >
+              {t('image.contextMenu.embed') || 'Embed Image'}
+            </button>
+          )}
+
+          {articleId && (
+            <button
+              className="text-left text-xs hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200 transition-colors"
+              style={{ padding: '6px 12px' }}
+              onClick={() => {
+                handleUploadImage(imageContextMenu.src, imageContextMenu.pos)
+                setImageContextMenu(null)
+              }}
+            >
+              {t('image.contextMenu.uploadToTypeClub') || 'Upload to type-club.ru'}
+            </button>
+          )}
+        </div>
       )}
 
       <AddNoteModal
@@ -688,9 +891,10 @@ function WebCodeBlockLangPopover({
       <div className="max-h-40 overflow-y-auto flex flex-col gap-0.5">
         <button
           type="button"
-          className={`text-left px-2 py-1 text-xs rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
+          className={`text-left text-xs rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
             !search ? "font-semibold text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-gray-300"
           }`}
+          style={{ padding: '6px 12px' }}
           onClick={() => onSelect("")}
         >
           {t("editor.noLanguage")}
@@ -699,11 +903,12 @@ function WebCodeBlockLangPopover({
           <button
             key={lang}
             type="button"
-            className={`text-left px-2 py-1 text-xs rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
+            className={`text-left text-xs rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
               lang === currentLang
                 ? "font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40"
                 : "text-gray-700 dark:text-gray-300"
             }`}
+            style={{ padding: '6px 12px' }}
             onClick={() => onSelect(lang)}
           >
             {lang}

@@ -10,7 +10,7 @@ from sqlalchemy import text
 from app.config import settings
 from app.models import Base
 from app.database import engine
-from app.routers import auth, articles, users, comments, stats, og, og_image, sitemap, notifications
+from app.routers import auth, articles, users, comments, stats, og, og_image, sitemap, notifications, images
 
 logging.basicConfig(level=settings.log_level.upper())
 logger = logging.getLogger(__name__)
@@ -35,11 +35,27 @@ app.include_router(og.router)
 app.include_router(og_image.router)
 app.include_router(sitemap.router)
 app.include_router(notifications.router)
+app.include_router(images.router)
 
 uploads_dir = settings.uploads_dir
 os.makedirs(uploads_dir, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
+
+from app.tasks.cleanup_images import cleanup_orphaned_images
+from app.database import async_session
+import asyncio
+
+async def run_periodic_cleanup():
+    while True:
+        try:
+            # Run cleanup
+            async with async_session() as session:
+                await cleanup_orphaned_images(session)
+        except Exception as e:
+            logger.error(f"Error during image cleanup: {e}")
+        # Sleep for 1 hour
+        await asyncio.sleep(3600)
 
 @app.on_event("startup")
 async def startup():
@@ -51,7 +67,7 @@ async def startup():
         await conn.execute(text("ALTER TABLE typeclub_articles ADD COLUMN IF NOT EXISTS share_token VARCHAR(64);"))
         await conn.execute(text("ALTER TABLE typeclub_articles ADD COLUMN IF NOT EXISTS share_role VARCHAR(20);"))
     logger.info("Database tables and schema migrations completed")
-
+    asyncio.create_task(run_periodic_cleanup())
 
 @app.get("/api/health")
 async def health():

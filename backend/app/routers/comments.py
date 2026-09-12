@@ -30,7 +30,7 @@ def _comment_to_response(comment: Comment, author: User) -> CommentResponse:
 async def list_comments(
     response: Response,
     article_id: int,
-    sort: str = Query("newest", regex="^(newest|oldest)$"),
+    sort: str = Query("newest", pattern="^(newest|oldest)$"),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     current_user: User | None = Depends(get_optional_user),

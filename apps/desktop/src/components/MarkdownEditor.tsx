@@ -191,6 +191,16 @@ export function MarkdownEditor() {
     rect: { top: number; left: number; bottom: number; right: number }
   } | null>(null)
 
+  const [imageContextMenu, setImageContextMenu] = useState<{
+    visible: boolean
+    x: number
+    y: number
+    src: string
+    alt: string
+    title: string
+    pos: number
+  } | null>(null)
+
   const isReadOnly = state.editorMode === 'preview' || (articleId != null && userRole == null)
 
   useEffect(() => {
@@ -200,7 +210,36 @@ export function MarkdownEditor() {
       setCodeLangPicker({ pos, currentLang, rect })
     }
     window.addEventListener('editor-change-code-block-lang', handleCodeBlockLang)
-    return () => window.removeEventListener('editor-change-code-block-lang', handleCodeBlockLang)
+
+    const handleImageContextMenu = (e: Event) => {
+      const event = e as CustomEvent<{
+        pos: number
+        src: string
+        alt: string
+        title: string
+        clientX: number
+        clientY: number
+      }>
+      setImageContextMenu({
+        visible: true,
+        x: event.detail.clientX,
+        y: event.detail.clientY,
+        src: event.detail.src,
+        alt: event.detail.alt,
+        title: event.detail.title,
+        pos: event.detail.pos,
+      })
+    }
+    window.addEventListener('editor-image-context-menu', handleImageContextMenu)
+    
+    const closeImageMenu = () => setImageContextMenu(null)
+    window.addEventListener('click', closeImageMenu)
+
+    return () => {
+      window.removeEventListener('editor-change-code-block-lang', handleCodeBlockLang)
+      window.removeEventListener('editor-image-context-menu', handleImageContextMenu)
+      window.removeEventListener('click', closeImageMenu)
+    }
   }, [state.editorMode, isReadOnly])
 
   const handleSelectCodeLang = useCallback((newLang: string) => {
@@ -218,6 +257,132 @@ export function MarkdownEditor() {
     }
     setCodeLangPicker(null)
   }, [editorView, codeLangPicker])
+
+  const isOnlineArticle = Boolean(articleId != null || (activeTab?.filePath && activeTab.filePath.startsWith('__online__')))
+  const isLocalFile = Boolean(window.api && activeTab?.filePath && !activeTab.filePath.startsWith('__online__'))
+
+  const handleCopyImage = async (src: string) => {
+    try {
+      let blob: Blob
+      if (src.startsWith('data:')) {
+        const comma = src.indexOf(',')
+        const header = src.slice(0, comma)
+        const base64 = src.slice(comma + 1)
+        const mime = header.match(/data:([^;]+)/)?.[1] || 'image/png'
+        const binary = atob(base64)
+        const bytes = new Uint8Array(binary.length)
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+        blob = new Blob([bytes], { type: mime })
+      } else {
+        const res = await fetch(src)
+        blob = await res.blob()
+      }
+      await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })])
+    } catch (e) {
+      console.error('Failed to copy image', e)
+    }
+  }
+
+  const handleEmbedImage = async (src: string, pos: number) => {
+    try {
+      const res = await fetch(src)
+      const blob = await res.blob()
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        const dataUri = reader.result as string
+        if (editorView) {
+          const node = editorView.state.doc.nodeAt(pos)
+          if (node) {
+            const tr = editorView.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: dataUri })
+            editorView.dispatch(tr)
+          }
+        }
+      }
+      reader.readAsDataURL(blob)
+    } catch (e) {
+      console.error('Failed to embed image', e)
+    }
+  }
+
+  const handleUploadImage = async (src: string, pos: number) => {
+    const aid = articleId || activeTab?.articleId
+    if (!aid) {
+      alert(t('image.contextMenu.onlineArticleOnly') || 'Not an online article')
+      return
+    }
+    if (!user) {
+      alert(t('image.contextMenu.notLoggedIn') || 'Not logged in')
+      return
+    }
+    try {
+      let file: File
+      if (src.startsWith('data:')) {
+        const comma = src.indexOf(',')
+        const header = src.slice(0, comma)
+        const base64 = src.slice(comma + 1)
+        const mime = header.match(/data:([^;]+)/)?.[1] || 'image/png'
+        const ext = mime.split('/')[1] || 'png'
+        const binary = atob(base64)
+        const bytes = new Uint8Array(binary.length)
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+        file = new File([bytes], `image-${Date.now()}.${ext}`, { type: mime })
+      } else {
+        const res = await fetch(src)
+        const blob = await res.blob()
+        const ext = blob.type.split('/')[1] || 'png'
+        file = new File([blob], `image-${Date.now()}.${ext}`, { type: blob.type })
+      }
+      const response = await articlesApi.uploadImage(aid, file)
+      if (editorView && response?.url) {
+        const node = editorView.state.doc.nodeAt(pos)
+        if (node) {
+          const tr = editorView.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: response.url })
+          editorView.dispatch(tr)
+        }
+      }
+    } catch (e) {
+      console.error('Failed to upload image', e)
+      alert(t('image.contextMenu.uploadFailed') || 'Failed to upload image')
+    }
+  }
+
+  const handleSaveLocally = async (src: string, pos: number) => {
+    if (!window.api) return
+    const filePath = activeTab?.filePath
+    if (!filePath || filePath.startsWith('__online__')) {
+      alert(t('image.contextMenu.saveFileFirst') || 'Save file first')
+      return
+    }
+    try {
+      let base64 = ''
+      let mime = 'image/png'
+      if (src.startsWith('data:')) {
+        const comma = src.indexOf(',')
+        const header = src.slice(0, comma)
+        base64 = src.slice(comma + 1)
+        mime = header.match(/data:([^;]+)/)?.[1] || 'image/png'
+      } else {
+        const res = await fetch(src)
+        const blob = await res.blob()
+        mime = blob.type
+        const buf = await blob.arrayBuffer()
+        base64 = btoa(String.fromCharCode(...new Uint8Array(buf)))
+      }
+      const ext = mime.split('/')[1] || 'png'
+      const filename = `image-${Date.now()}.${ext}`
+      const savedPath = await window.api.saveLocalImage(filePath, filename, base64)
+      if (savedPath && editorView) {
+        const node = editorView.state.doc.nodeAt(pos)
+        if (node) {
+          const tr = editorView.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: savedPath })
+          editorView.dispatch(tr)
+        }
+      }
+    } catch (e) {
+      console.error('Failed to save locally', e)
+      alert(t('image.contextMenu.saveFailed') || 'Failed to save locally')
+    }
+  }
 
   const replaceDataUris = useCallback((md: string): string => {
     const map = new Map<string, string>()
@@ -458,6 +623,47 @@ export function MarkdownEditor() {
     return () => window.removeEventListener('editor-open-search', handler)
   }, [])
 
+  // ── Relative link open event ──
+  useEffect(() => {
+    const handler = async (e: Event) => {
+      const { href } = (e as CustomEvent<{ href: string }>).detail
+      const currentFilePath = activeTab?.filePath
+      if (!currentFilePath) return
+
+      const dir = window.api?.dirname(currentFilePath)
+      if (!dir) return
+
+      const resolved = window.api?.resolvePath(dir, href)
+      if (!resolved) return
+
+      if (resolved.toLowerCase().endsWith('.md')) {
+        const existingTab = state.tabs.find(t => t.filePath === resolved)
+        if (existingTab) {
+          dispatch({ type: 'SET_ACTIVE_TAB', payload: { tabId: existingTab.id } })
+        } else {
+          try {
+            const fileContent = await window.api.readFile(resolved)
+            const fileName = resolved.split(/[/\\]/).pop() || 'Untitled.md'
+            dispatch({
+              type: 'OPEN_FILE',
+              payload: {
+                filePath: resolved,
+                fileName: fileName,
+                content: fileContent,
+              }
+            })
+          } catch (err) {
+            console.error('Failed to open relative md file', err)
+          }
+        }
+      } else {
+        window.api?.openExternal(resolved)
+      }
+    }
+    window.addEventListener('editor-open-relative-link', handler)
+    return () => window.removeEventListener('editor-open-relative-link', handler)
+  }, [activeTab?.filePath, state.tabs, dispatch])
+
   // ── TOC scroll-to event ──
   useEffect(() => {
     const handler = (e: Event) => {
@@ -602,6 +808,10 @@ export function MarkdownEditor() {
 
   const handleContextMenu = async (e: React.MouseEvent) => {
     if (state.editorMode !== 'seamless') return
+    const target = e.target as HTMLElement
+    if (target && target.closest('.image-block, .media-container, img')) {
+      return
+    }
     e.preventDefault()
     setCtxTable(null)
     setCtxSubmenu(null)
@@ -887,6 +1097,7 @@ export function MarkdownEditor() {
   const ctxMenuItem = (label: string, hotkey?: React.ReactNode, onClick?: () => void, extraClass?: string) => (
     <div
       className={`menu-item enabled ${extraClass || ''}`}
+      style={{ padding: '6px 12px' }}
       onClick={onClick}
     >
       <span>{label}</span>
@@ -899,7 +1110,7 @@ export function MarkdownEditor() {
   )
 
   const numInput = (label: string, value: number, setValue: (v: number) => void, min = 1, max = 10) => (
-    <div style={{ padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+    <div style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
       <span className="text-xs text-[var(--text-dim)] w-16">{label}</span>
       <button
         className="w-5 h-5 flex items-center justify-center rounded text-[var(--text-secondary)] hover:bg-[var(--menu-hover-bg)] disabled:opacity-30 text-xs"
@@ -1082,6 +1293,7 @@ export function MarkdownEditor() {
                     <div
                       key={suggestion}
                       className="menu-item enabled font-medium text-[var(--text-primary)] hover:text-[var(--accent)]"
+                      style={{ padding: '6px 12px' }}
                       onClick={() => handleApplySuggestion(suggestion)}
                     >
                       <span>{suggestion}</span>
@@ -1105,6 +1317,7 @@ export function MarkdownEditor() {
                 <div
                   key={item.command}
                   className="menu-item enabled"
+                  style={{ padding: '6px 12px' }}
                   onClick={() => applyFormat(item.command)}
                 >
                   <span>{item.label}</span>
@@ -1132,7 +1345,7 @@ export function MarkdownEditor() {
       {ctxMenuMounted && ctxSubmenu === 'table' && (
         <div
           ref={ctxMenuRef}
-          className={`fixed bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-lg shadow-xl z-50 py-0.5 flex flex-col text-[12px] text-[var(--text-secondary)] ${
+          className={`fixed bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-lg shadow-xl z-50 py-1 flex flex-col text-[12px] text-[var(--text-secondary)] ${
             ctxMenu ? 'animate-in fade-in zoom-in-95 duration-100 ease-out' : 'animate-out fade-out zoom-out-95 duration-100 ease-in fill-mode-forwards'
           }`}
           style={ctxMenuStyle!}
@@ -1145,15 +1358,15 @@ export function MarkdownEditor() {
           {numInput(t('editor.table.columns'), tableCols, setTableCols)}
           {numInput(t('editor.table.rows'), tableRows, setTableRows)}
           {sep}
-          <div className="overflow-x-auto" style={{ padding: '6px 14px' }}>
+          <div className="overflow-x-auto" style={{ padding: '6px 12px' }}>
             <table className="w-full border-collapse border border-[var(--border-strong)]">
               <tbody>{tablePreview}</tbody>
             </table>
           </div>
           {sep}
-          <div style={{ padding: '4px 10px' }}>
+          <div style={{ padding: '4px 12px' }}>
             <button
-              className="w-full py-1 rounded text-white text-xs font-medium hover:opacity-90"
+              className="w-full py-1.5 rounded text-white text-xs font-medium hover:opacity-90"
               style={{ backgroundColor: 'var(--accent)' }}
               onClick={insertTable}
             >{t('common.create')}</button>
@@ -1164,7 +1377,7 @@ export function MarkdownEditor() {
       {ctxMenuMounted && ctxSubmenu === 'code' && (
         <div
           ref={ctxMenuRef}
-          className={`fixed bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-lg shadow-xl z-50 py-0.5 flex flex-col text-[12px] text-[var(--text-secondary)] ${
+          className={`fixed bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-lg shadow-xl z-50 py-1 flex flex-col text-[12px] text-[var(--text-secondary)] ${
             ctxMenu ? 'animate-in fade-in zoom-in-95 duration-100 ease-out' : 'animate-out fade-out zoom-out-95 duration-100 ease-in fill-mode-forwards'
           }`}
           style={ctxMenuStyle!}
@@ -1174,7 +1387,7 @@ export function MarkdownEditor() {
         >
           {ctxMenuItem(t('common.back'), undefined, () => setCtxSubmenu(null))}
           {sep}
-          <div style={{ padding: '6px 14px' }}>
+          <div style={{ padding: '6px 12px' }}>
             <span className="text-[11px] text-[var(--text-dim)]">{t('editor.code.language')}</span>
             <div className="relative mt-1" ref={langDropdownRef}>
               <input
@@ -1191,6 +1404,7 @@ export function MarkdownEditor() {
                     <div
                       key={l.value}
                       className="menu-item enabled text-xs"
+                      style={{ padding: '6px 12px' }}
                       onMouseDown={() => { setCodeLang(l.value); setShowLangDropdown(false) }}
                     >{l.label}</div>
                   ))}
@@ -1199,15 +1413,15 @@ export function MarkdownEditor() {
             </div>
           </div>
           {sep}
-          <div style={{ padding: '4px 10px' }} className="flex gap-2">
+          <div style={{ padding: '4px 12px' }} className="flex gap-2">
             <button
-              className="flex-1 py-1 rounded text-white text-xs font-medium hover:opacity-90"
+              className="flex-1 py-1.5 rounded text-white text-xs font-medium hover:opacity-90"
               style={{ backgroundColor: 'var(--accent)' }}
               onClick={() => insertCodeBlock()}
             >{t('common.create')}</button>
             {codeLang && (
               <button
-                className="flex-1 py-1 rounded bg-[var(--bg-base)] border border-[var(--border-strong)] text-[var(--text-secondary)] text-xs hover:bg-[var(--menu-hover-bg)]"
+                className="flex-1 py-1.5 rounded bg-[var(--bg-base)] border border-[var(--border-strong)] text-[var(--text-secondary)] text-xs hover:bg-[var(--menu-hover-bg)]"
                 onClick={() => insertCodeBlock('')}
               >{t('editor.noLanguage')}</button>
             )}
@@ -1271,6 +1485,82 @@ export function MarkdownEditor() {
           onClose={() => setCodeLangPicker(null)}
           t={t}
         />
+      )}
+
+      {imageContextMenu && imageContextMenu.visible && (
+        <div
+          className="fixed z-50 bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-lg shadow-xl flex flex-col backdrop-blur-xl"
+          style={{
+            top: imageContextMenu.y,
+            left: imageContextMenu.x,
+            minWidth: '200px',
+            padding: '4px 0',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="menu-item enabled text-left w-full"
+            style={{ padding: '6px 12px', border: 'none', background: 'transparent' }}
+            onClick={() => {
+              handleCopyImage(imageContextMenu.src)
+              setImageContextMenu(null)
+            }}
+          >
+            <span>{t('image.contextMenu.copy') || 'Copy Image'}</span>
+          </button>
+          
+          {!imageContextMenu.src.startsWith('data:') && (
+            <button
+              className="menu-item enabled text-left w-full"
+              style={{ padding: '6px 12px', border: 'none', background: 'transparent' }}
+              onClick={() => {
+                navigator.clipboard.writeText(imageContextMenu.src)
+                setImageContextMenu(null)
+              }}
+            >
+              <span>{t('image.contextMenu.copyLink') || 'Copy Image Link'}</span>
+            </button>
+          )}
+
+          {!imageContextMenu.src.startsWith('data:') && (
+            <button
+              className="menu-item enabled text-left w-full"
+              style={{ padding: '6px 12px', border: 'none', background: 'transparent' }}
+              onClick={() => {
+                handleEmbedImage(imageContextMenu.src, imageContextMenu.pos)
+                setImageContextMenu(null)
+              }}
+            >
+              <span>{t('image.contextMenu.embed') || 'Embed Image'}</span>
+            </button>
+          )}
+
+          {isOnlineArticle && (
+            <button
+              className="menu-item enabled text-left w-full"
+              style={{ padding: '6px 12px', border: 'none', background: 'transparent' }}
+              onClick={() => {
+                handleUploadImage(imageContextMenu.src, imageContextMenu.pos)
+                setImageContextMenu(null)
+              }}
+            >
+              <span>{t('image.contextMenu.uploadToTypeClub') || 'Upload to type-club.ru'}</span>
+            </button>
+          )}
+
+          {isLocalFile && (
+            <button
+              className="menu-item enabled text-left w-full"
+              style={{ padding: '6px 12px', border: 'none', background: 'transparent' }}
+              onClick={() => {
+                handleSaveLocally(imageContextMenu.src, imageContextMenu.pos)
+                setImageContextMenu(null)
+              }}
+            >
+              <span>{t('image.contextMenu.saveLocally') || 'Save Locally'}</span>
+            </button>
+          )}
+        </div>
       )}
     </div>
   )
@@ -1381,7 +1671,7 @@ function CodeBlockLangPopover({
           className={`text-left text-xs rounded hover:bg-[var(--bg-hover)] transition-colors ${
             !search ? 'font-semibold text-[var(--accent)]' : 'text-[var(--text-secondary)]'
           }`}
-          style={{ padding: '6px 10px', border: 'none', background: 'transparent', cursor: 'pointer' }}
+          style={{ padding: '6px 12px', border: 'none', background: 'transparent', cursor: 'pointer' }}
           onClick={() => onSelect('')}
         >
           {t('editor.noLanguage')}
@@ -1393,7 +1683,7 @@ function CodeBlockLangPopover({
               lang === currentLang ? 'font-semibold text-[var(--accent)] bg-[var(--bg-active)]' : 'text-[var(--text-secondary)]'
             }`}
             style={{
-              padding: '6px 10px',
+              padding: '6px 12px',
               border: 'none',
               background: lang === currentLang ? 'var(--bg-active)' : 'transparent',
               cursor: 'pointer',

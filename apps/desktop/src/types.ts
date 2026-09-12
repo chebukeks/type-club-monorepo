@@ -266,6 +266,9 @@ export type AppAction =
 /** API, доступный из Renderer-процесса через contextBridge */
 export interface IElectronAPI {
   platform: string;
+  dirname: (p: string) => string;
+  joinPath: (...paths: string[]) => string;
+  resolvePath: (...paths: string[]) => string;
   readFile: (filePath: string) => Promise<string>;
   writeFile: (filePath: string, content: string) => Promise<void>;
   readDir: (dirPath: string) => Promise<FileEntry[]>;
@@ -275,6 +278,7 @@ export interface IElectronAPI {
   deleteItem: (filePath: string) => Promise<void>;
   showItemInFolder: (filePath: string) => void;
   copyFileToClipboard: (filePath: string) => Promise<boolean>;
+  saveLocalImage: (filePath: string, filename: string, base64: string) => Promise<string | null>;
   confirmDelete: (itemName: string) => Promise<boolean>;
   openFolder: () => Promise<string | null>;
   openFile: () => Promise<{ filePath: string; content: string } | null>;
