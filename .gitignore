@@ -37,6 +37,7 @@ __pycache__/
 .agent/
 .gemini/
 .qwen/
+.opencode/
 CLAUDE.md
 GEMINI.md
 QWEN.md
