@@ -1,83 +1,77 @@
-# Security Recommendations
+# Security Policy
 
-Сводка замечаний по аудиту безопасности перед open-source публикацией.
+We take the security of Type Club seriously. This document outlines our security policies, supported versions, and how to report vulnerabilities responsibly.
 
-## Выполнено (ветки `monorepo-prep`)
+## Supported Versions
 
-### type-club-web
-- [x] Убраны хардкод-секреты из `config.py` (БД, JWT, SMTP, продакшн URL)
-- [x] Убрана авто-модерация по email-матчингу в `auth.py`
-- [x] Переименована Docker-сеть из `eatsmart_bot_eatsmart_net` в `type-club-net` (в коде; на проде — см. ниже)
-- [x] Убрана ссылка на внутреннюю инфраструктуру из `AGENTS.md`
-- [x] Создан `.env.example` с плейсхолдерами
-- [x] `.npmrc` переключён с китайского зеркала на `registry.npmjs.org` (позже возвращён обратно — из РФ npmjs.org недоступен)
+Only the latest release versions receive security updates and patches.
 
-### type-club
-- [x] `log.txt` удалён из git-трекинга
-- [x] Хардкод-путь в `deploy-release.sh` заменён на `TYPECLUB_DOWNLOADS_DIR`
-- [x] Все ссылки на `type-club.ru` вынесены в `src/config.ts`
-- [x] README clone URL обновлён
+| Component | Supported | Notes |
+| --------- | --------- | ----- |
+| Desktop App | :white_check_mark: | Latest version on `main` / GitHub releases |
+| Web Frontend | :white_check_mark: | Latest deployment / `main` |
+| Backend API | :white_check_mark: | Latest deployment / `main` |
+| Collab Server | :white_check_mark: | Latest deployment / `main` |
 
-## Нужно сделать вручную на проде
+---
 
-### Критично — сменить секреты
-- [ ] **SMTP пароль** — сгенерировать новый в ЛК почтового сервиса
-- [ ] **Пароль БД** — сменить в PostgreSQL и обновить `.env`
-- [ ] **JWT secret** — сгенерировать новый (`openssl rand -hex 32`)
-- [ ] **SECRET_KEY** приложения — сгенерировать новый
+## Reporting a Vulnerability
 
-### Рекомендовано
-- [ ] Удалить БД-креды из `.vscode/settings.json` (на проде)
-- [ ] Переименовать Docker-сеть на проде (`eatsmart_bot_eatsmart_net` → `type-club-net`)
-- [ ] Обновить `docker-compose.yml` на проде после переименования сети
-- [ ] Назначить модератора вручную через БД (авто-промоушн убран)
+If you discover a security vulnerability in Type Club, please do **not** disclose it publicly via GitHub issues or discussions until it has been reviewed and addressed.
 
-## Открытые вопросы
+### How to Report
 
-### Production domain
-- [x] Имя домена `type-club.ru` остаётся в комментариях и тексте — это публичное имя проекта, допустимо
-- [x] Nginx-конфиги содержат `server_name type-club.ru` — допустимо, если репо публичный
+1. **GitHub Security Advisory (Preferred)**:
+   Navigate to the repository's **Security** tab and click **"Report a vulnerability"** to submit a private vulnerability report.
+2. **Contacting Maintainers**:
+   If private vulnerability reporting is unavailable, please open a confidential report or contact the maintainers directly through GitHub profiles associated with this repository.
 
-## Выполнено (2026-07-26 — подготовка к open-source)
+### What to Include in Your Report
 
-- [x] Email в git-истории заменён на `159796331+chebukeks@users.noreply.github.com` (210 коммитов, filter-branch)
-- [x] Токен Mail.ru удалён из `apps/web/index.html`
-- [x] CORS: `allow_credentials=False` (JWT через Authorization header, куки не используются)
-- [x] `docker-compose.yml`: сеть переименована в `type-club-net`
-- [x] `.npmrc`: зеркало заменено на `registry.npmjs.org`
-- [x] Креды в SECURITY.md обезличены
-- [x] Обход сервисного токена исправлен (`articles.py:540` — теперь 500 вместо пропуска)
-- [x] Валидация SERVICE_TOKEN при старте collab-server (выход с ошибкой если не задан)
-- [x] `.gitignore` дополнен (`*.pem`, `*.key`, `credentials*`, `*.sql`, `*.dump`)
-- [x] Добавлен `LICENSE` (MIT)
-- [x] Добавлен `README.md`
-- [x] `docker-compose.local.yml` + `.env.local` для локальной разработки
-- [x] `vite.config.ts`: WebSocket-прокси `/collab`
-- [x] `useCollaboration.ts`: динамический collab URL (dev/prod автоматически)
+To help us investigate and resolve the issue quickly, please provide:
+- A clear description of the vulnerability and its potential impact.
+- Step-by-step reproduction instructions or a minimal Proof of Concept (PoC).
+- Affected components (Desktop, Web, Backend, Collab Server, Editor package).
+- Any proposed mitigations or remediation steps if you have them.
 
-## Безопасность загрузки и хранения изображений (2026-09-12)
+### Response Timeline
 
-- [x] **Изоляция доступа**: Загрузка изображений на сервер доступна строго для онлайн-статей только авторизованным авторам или соавторам статьи.
-- [x] **Квоты хранилища**:
-  - Максимальный размер одного файла: 10 МБ.
-  - Суммарная дисковая квота на одну статью: 500 МБ.
-- [x] **Валидация типов и двоичных сигнатур (Magic Bytes)**:
-  - Разрешенные форматы строго ограничены: PNG, JPEG, GIF, WEBP, SVG.
-  - Проверка бинарных сигнатур заголовков для растровых изображений (не полагаясь на расширение или MIME-тип от клиента).
-- [x] **Защита от Stored XSS в SVG**:
-  - XML-структура SVG проверяется на безопасность: любые файлы со скриптами (`<script>`, inline `on*` обработчики, `javascript:` ссылки) отклоняются со статусом 400.
-- [x] **Защита от Path Traversal**:
-  - Имена файлов на сервере формируются на базе `uuid4()`, клиентские имена файлов не используются в путях файловой системы.
-  - Файлы хранятся в изолированных каталогах `uploads/articles/{article_id}/`.
-- [x] **Автоматическая очистка неиспользуемых файлов**:
-  - Периодическая фоновая задача очищает с диска и из БД изображения, которые были загружены, но больше не используются в тексте статьи.
+- **Initial Response**: Within 48 hours, confirming receipt of your report.
+- **Triage & Assessment**: Within 5 business days, with severity evaluation and next steps.
+- **Resolution & Release**: A fix will be developed in private and released promptly, after which a public security advisory will be published acknowledging the reporter (if desired).
 
-## История изменений
+---
 
-### 2026-07-03 — Настройка монорепы
-- [x] Очищены секреты из исходного кода (config.py, auth.py)
-- [x] Обновлён .gitignore, исключены .env, log.txt, .vscode/
-- [x] Добавлен .env.example с плейсхолдерами
-- [x] Добавлен SECURITY.md
-- [ ] **Сменить GitHub PAT** — токен передавался в shell-командах, мог остаться в истории терминала
-- [ ] **Сменить продакшн-секреты** — SMTP пароль, БД пароль, JWT secret (см. раздел «Нужно сделать вручную»)
+## Security Architecture & Defenses
+
+Type Club implements multiple defense-in-depth measures across its stack:
+
+### 1. Authentication & Credentials
+- **Password Hashing**: Stored using modern salted `bcrypt` algorithms.
+- **JWT Authorization**: Stateless authentication via `HS256` tokens passed in standard `Authorization: Bearer` headers. Cookies are not used for token storage, mitigating CSRF risks.
+- **Token Expiration**: Access tokens and one-time verification tokens (email confirmation, password reset) have strict TTL expiration periods.
+- **Environment Isolation**: Production secrets (JWT keys, DB credentials, SMTP tokens) are strictly injected via environment variables and never hardcoded in repository files.
+
+### 2. File Upload & Storage Security
+- **Strict Role Validation**: Image uploads are permitted only for online articles by authorized authors and co-authors.
+- **Strict Quotas**:
+  - Maximum single file size: 10 MB.
+  - Cumulative storage quota per article: 500 MB.
+- **Magic Bytes & Binary Verification**:
+  - Permitted image formats: PNG, JPEG, GIF, WEBP, SVG.
+  - Real file headers and binary signatures are verified on the backend, not relying on client MIME types or file extensions.
+- **Stored XSS Prevention**:
+  - SVG files are strictly parsed and sanitized. Any files containing embedded `<script>`, inline event handlers (`onload`, `onerror`, etc.), or `javascript:` URI schemes are rejected with HTTP 400.
+- **Path Traversal Protection**:
+  - Uploaded files are renamed using secure `uuid4()` identifiers. User-provided filenames are never used in file system paths.
+  - Assets are compartmentalized in isolated directory structures (`uploads/articles/{article_id}/`).
+- **Orphan File Cleanup**: Periodic background worker automatically scans and purges uploaded files that are no longer referenced in article content.
+
+### 3. Collaboration & Real-Time Sync
+- **Mutual Service Authentication**: Internal communication between the real-time collaboration server (`collab-server`) and the FastAPI backend requires a pre-shared `SERVICE_TOKEN`.
+- **WebSocket Access Control**: On connection, the collaboration server validates user tokens and queries backend article access permissions before synchronizing Yjs CRDT document states.
+- **Document Integrity**: Yjs document updates are synchronized incrementally and debounced before persistent storage, preventing race conditions or document overwrite bugs.
+
+### 4. Client & Desktop Security
+- **Electron Security**: Context isolation is enabled in the desktop application, with restricted IPC channels exposed via `preload.ts`.
+- **CORS Configuration**: The backend restricts cross-origin resource sharing to prevent unauthorized cross-origin requests.

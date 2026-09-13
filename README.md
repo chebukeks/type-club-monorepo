@@ -49,7 +49,7 @@ The `.npmrc` files use `registry.npmmirror.com` (a mirror that works reliably fr
 ## Documentation
 
 - [Development Guide](DEVELOPMENT_GUIDE.md) — architecture, conventions, editor internals
-- [Security](SECURITY.md) — security audit and recommendations
+- [Security Policy](SECURITY.md) — vulnerability reporting and security measures
 
 ## License
 

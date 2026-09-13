@@ -14,7 +14,7 @@ type-club-monorepo/
 ├── backend/             FastAPI (бывший type-club-web/backend)
 ├── nginx/               Конфиги веб-сервера
 ├── DEPLOY.md            Инструкции по деплою
-├── SECURITY.md          Замечания по безопасности
+├── SECURITY.md          Политика безопасности
 └── package.json         npm workspaces
 ```
 
