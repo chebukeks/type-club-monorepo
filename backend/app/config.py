@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:5173"
 
     # Allowed CORS origins (comma-separated)
-    cors_origins: str = "https://type-club.ru"
+    cors_origins: str = "https://type-club.ru,https://www.type-club.ru"
 
     # Verification token TTL
     verify_email_token_minutes: int = 1440  # 24 hours
