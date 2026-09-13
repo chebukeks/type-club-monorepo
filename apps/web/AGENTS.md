@@ -1,5 +1,12 @@
 # AGENTS.md
 
+## 🔒 Privacy & Identity Rules (Strict)
+
+- For all git commits, PRs, and author metadata, ALWAYS use: `chebukeks <159796331+chebukeks@users.noreply.github.com>`
+- NEVER use, infer, or output any personal email addresses from local environment, system paths, or tool outputs.
+- Use only generic placeholders in examples/tests: `user@example.com`, `noreply@type-club.ru`, `user@localhost`.
+- Never commit absolute local system paths containing user directories.
+
 ## Architecture
 
 - **Two-package repo** (no monorepo tooling — run commands from each package dir).
