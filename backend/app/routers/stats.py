@@ -1,9 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import datetime, timezone, timedelta
+import hashlib
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
 from app.models import Article, ArticleLike, ArticleView, User
+from app.rate_limit import limiter
 from app.routers.auth import get_current_user, get_optional_user, get_verified_user
 from app.schemas import LikeResponse, ViewResponse
 
@@ -11,7 +15,9 @@ router = APIRouter(tags=["stats"])
 
 
 @router.post("/api/articles/{article_id}/view", response_model=ViewResponse)
+@limiter.limit("30/minute")
 async def record_view(
+    request: Request,
     article_id: int,
     session: AsyncSession = Depends(get_session),
 ):
@@ -19,9 +25,24 @@ async def record_view(
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
 
-    view = ArticleView(article_id=article_id)
-    session.add(view)
-    await session.commit()
+    client_ip = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "")
+    raw = f"{client_ip}:{user_agent}:{article_id}"
+    viewer_hash = hashlib.sha256(raw.encode()).hexdigest()[:32]
+
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    existing = (await session.execute(
+        select(ArticleView).where(
+            ArticleView.article_id == article_id,
+            ArticleView.viewer_hash == viewer_hash,
+            ArticleView.viewed_at > cutoff,
+        )
+    )).scalar_one_or_none()
+
+    if not existing:
+        view = ArticleView(article_id=article_id, viewer_hash=viewer_hash)
+        session.add(view)
+        await session.commit()
 
     count = (
         await session.execute(

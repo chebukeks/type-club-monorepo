@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_session
 from app.models import Article, ArticleLike, ArticleView, User
 from app.config import settings
+from app.utils import escape_like
 from app.routers.auth import get_current_user, get_optional_user, get_verified_user
 from app.schemas import (
     ArticleListItem,
@@ -51,7 +52,7 @@ async def search_users(
         return []
     result = await session.execute(
         select(User)
-        .where(User.nickname.ilike(f"%{q}%"))
+        .where(User.nickname.ilike(f"%{escape_like(q)}%", escape="\\"))
         .order_by(User.nickname)
         .limit(limit)
     )
@@ -168,6 +169,20 @@ async def upload_avatar(
     content = await file.read()
     if len(content) > MAX_AVATAR_SIZE:
         raise HTTPException(status_code=400, detail="File too large (max 2 MB)")
+
+    # SECURITY: Verify magic bytes match declared extension
+    MAGIC_BYTES = {
+        ".jpg": [b'\xff\xd8\xff'],
+        ".jpeg": [b'\xff\xd8\xff'],
+        ".png": [b'\x89PNG\r\n\x1a\n'],
+        ".webp": [b'RIFF'],
+    }
+    expected = MAGIC_BYTES.get(ext)
+    if expected:
+        if not any(content.startswith(sig) for sig in expected):
+            raise HTTPException(status_code=400, detail="File content does not match declared type")
+        if ext == ".webp" and (len(content) < 12 or content[8:12] != b'WEBP'):
+            raise HTTPException(status_code=400, detail="File content does not match declared type")
 
     uploads_dir = Path(settings.uploads_dir)
     uploads_dir.mkdir(parents=True, exist_ok=True)

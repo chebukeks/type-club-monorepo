@@ -137,9 +137,11 @@ async def _load_avatar(avatar_url: str | None, nickname: str, size: int = AVATAR
     """Download and crop avatar to circle, or fall back to initial avatar."""
     if avatar_url:
         try:
-            url = avatar_url
-            if url.startswith("/"):
-                url = f"http://localhost:{settings.api_port}{url}"
+            # SECURITY: Only allow local /uploads/ paths — never arbitrary URLs
+            if not avatar_url.startswith("/uploads/"):
+                return _draw_initial_avatar(nickname, size)
+
+            url = f"http://localhost:{settings.api_port}{avatar_url}"
 
             async with httpx.AsyncClient(timeout=5.0) as client:
                 resp = await client.get(url)

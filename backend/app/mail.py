@@ -22,6 +22,10 @@ def _render(template_name: str, **kwargs) -> str:
 
 
 async def send_email(to: str, subject: str, html: str) -> None:
+    if not settings.smtp_host:
+        logger.warning("SMTP host is not configured, skipping email to %s", to)
+        return
+
     message = MIMEMultipart("alternative")
     message["From"] = formataddr(("Type Club", settings.smtp_from))
     message["To"] = to

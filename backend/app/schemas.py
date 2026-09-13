@@ -7,6 +7,21 @@ from pydantic import BaseModel, EmailStr, field_validator
 import re
 
 
+def check_password_strength(v: str) -> str:
+    if len(v) < 8:
+        raise ValueError("Password must be at least 8 characters")
+    if len(v) > 128:
+        raise ValueError("Password must be at most 128 characters")
+    has_letter = any(c.isalpha() for c in v)
+    has_digit = any(c.isdigit() for c in v)
+    if not (has_letter and has_digit):
+        raise ValueError("Password must contain at least one letter and one digit")
+    weak = {"password", "12345678", "qwerty123", "password1", "abc12345", "123456789"}
+    if v.lower() in weak:
+        raise ValueError("This password is too common")
+    return v
+
+
 # ── Auth ──
 
 class RegisterRequest(BaseModel):
@@ -30,9 +45,7 @@ class RegisterRequest(BaseModel):
     @field_validator("password")
     @classmethod
     def validate_password(cls, v: str) -> str:
-        if len(v) < 6:
-            raise ValueError("Password must be at least 6 characters")
-        return v
+        return check_password_strength(v)
 
     @field_validator("confirm_password")
     @classmethod
@@ -49,7 +62,13 @@ class LoginRequest(BaseModel):
 
 class TokenResponse(BaseModel):
     access_token: str
+    refresh_token: Optional[str] = None
     token_type: str = "bearer"
+    expires_in: Optional[int] = None
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
 
 
 class UserResponse(BaseModel):
@@ -72,6 +91,33 @@ class UpdateProfileRequest(BaseModel):
     old_password: Optional[str] = None
     password: Optional[str] = None
     confirm_password: Optional[str] = None
+
+    @field_validator("avatar_url")
+    @classmethod
+    def validate_avatar_url(cls, v: str | None) -> str | None:
+        if v is not None and v != "" and not v.startswith("/uploads/"):
+            raise ValueError("Avatar URL must start with /uploads/")
+        return v
+
+    @field_validator("nickname")
+    @classmethod
+    def validate_nickname_update(cls, v: str | None) -> str | None:
+        if v is not None:
+            v = v.strip()
+            if not v or len(v) < 2:
+                raise ValueError("Nickname must be at least 2 characters")
+            if len(v) > 30:
+                raise ValueError("Nickname must be at most 30 characters")
+            if not re.match(r"^[a-zA-Z0-9_-]+$", v):
+                raise ValueError("Nickname can only contain Latin letters, numbers, underscores and hyphens")
+        return v
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_update(cls, v: str | None) -> str | None:
+        if v is not None:
+            return check_password_strength(v)
+        return v
 
     @field_validator("confirm_password")
     @classmethod
@@ -105,6 +151,11 @@ class ResetPasswordRequest(BaseModel):
     token: str
     password: str
     confirm_password: str
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        return check_password_strength(v)
 
     @field_validator("confirm_password")
     @classmethod

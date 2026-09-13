@@ -27,7 +27,10 @@ RUN node_modules/.bin/esbuild services/collab-server/src/index.ts \
 
 FROM node:22-alpine
 WORKDIR /app
-COPY --from=build /app/services/collab-server/dist ./dist
+COPY --from=build --chown=node:node /app/services/collab-server/dist ./dist
+
+# SECURITY: Run as non-root user
+USER node
 
 EXPOSE 8001
 

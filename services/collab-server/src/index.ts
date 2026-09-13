@@ -284,8 +284,22 @@ function heartbeat(ws: WebSocket) {
 
 // ── Server ──
 
+const MAX_PAYLOAD_BYTES = 1 * 1024 * 1024 // 1 MB
+const MAX_CONNECTIONS_PER_IP = 25
+
+const connectionsByIP = new Map<string, number>()
+
+function getClientIP(req: any): string {
+  return (
+    req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+    req.socket.remoteAddress ||
+    "unknown"
+  )
+}
+
 const wss = new WebSocketServer({
   port: PORT,
+  maxPayload: MAX_PAYLOAD_BYTES,
   perMessageDeflate: {
     zlibDeflateOptions: {
       chunkSize: 1024,
@@ -302,6 +316,20 @@ const wss = new WebSocketServer({
 })
 
 wss.on("connection", async (ws, req) => {
+  const clientIP = getClientIP(req)
+  const currentConns = connectionsByIP.get(clientIP) || 0
+  if (currentConns >= MAX_CONNECTIONS_PER_IP) {
+    ws.close(4029, "Too many connections from this IP")
+    return
+  }
+  connectionsByIP.set(clientIP, currentConns + 1)
+
+  ws.on("close", () => {
+    const count = connectionsByIP.get(clientIP) || 1
+    if (count <= 1) connectionsByIP.delete(clientIP)
+    else connectionsByIP.set(clientIP, count - 1)
+  })
+
   const params = getQueryParams(req.url)
   const articleId = parseInt(params.articleId, 10)
   const token = params.token || ""

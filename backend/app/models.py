@@ -111,6 +111,7 @@ class ArticleView(Base):
     article_id: Mapped[int] = mapped_column(
         ForeignKey("typeclub_articles.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    viewer_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
     viewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     article: Mapped["Article"] = relationship(back_populates="views")

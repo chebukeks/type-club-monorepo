@@ -33,14 +33,31 @@ async def verify_image_content(content: bytes, mime_type: str) -> bool:
         return content.startswith(b'RIFF') and content[8:12] == b'WEBP'
     elif mime_type == "image/svg+xml":
         try:
-            # Check for malicious content in SVG
             text_content = content.decode('utf-8')
-            lower_content = text_content.lower()
-            if "<script" in lower_content or "javascript:" in lower_content or "onload=" in lower_content or "onerror=" in lower_content:
-                return False
-            # Try parsing as XML
-            ET.fromstring(text_content)
-            return True
+            tree = ET.fromstring(text_content)
+
+            DANGEROUS_ELEMENTS = {
+                'script', 'foreignobject', 'iframe', 'object', 'embed', 'applet',
+                'audio', 'video', 'style', 'meta', 'link'
+            }
+
+            def check_element(el) -> bool:
+                tag = el.tag.split('}')[-1].lower() if '}' in str(el.tag) else str(el.tag).lower()
+                if tag in DANGEROUS_ELEMENTS:
+                    return False
+                for attr_name, attr_val in el.attrib.items():
+                    local_name = attr_name.split('}')[-1].lower() if '}' in attr_name else attr_name.lower()
+                    if local_name.startswith('on'):
+                        return False
+                    val_lower = str(attr_val).strip().lower()
+                    if 'javascript:' in val_lower or 'data:text/html' in val_lower or 'vbscript:' in val_lower:
+                        return False
+                for child in el:
+                    if not check_element(child):
+                        return False
+                return True
+
+            return check_element(tree)
         except Exception:
             return False
     return False

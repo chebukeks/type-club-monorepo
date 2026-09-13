@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # Frontend URL for email links
     frontend_url: str = "http://localhost:5173"
 
+    # Allowed CORS origins (comma-separated)
+    cors_origins: str = "https://type-club.ru"
+
     # Verification token TTL
     verify_email_token_minutes: int = 1440  # 24 hours
     reset_password_token_minutes: int = 60   # 1 hour

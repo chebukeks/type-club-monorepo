@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_session
 from app.models import Article, ArticleLike, CollaborationMember, Notification, User
 from app.config import settings
+from app.utils import escape_like
 from app.routers.auth import get_current_user, get_moderator_user, get_optional_user, get_verified_user
 from app.schemas import (
     ArticleCreateRequest,
@@ -87,7 +88,7 @@ async def list_articles(
     if not (current_user and current_user.role == "moderator"):
         conditions.append(Article.access_state == "public")
     if q and q.strip():
-        conditions.append(Article.title.ilike(f"%{q.strip()}%"))
+        conditions.append(Article.title.ilike(f"%{escape_like(q.strip())}%", escape="\\"))
 
     query = select(Article)
     count_query = select(func.count(Article.id))
@@ -156,7 +157,7 @@ async def list_my_articles(
 
     filters = [or_(*conditions)]
     if q and q.strip():
-        filters.append(Article.title.ilike(f"%{q.strip()}%"))
+        filters.append(Article.title.ilike(f"%{escape_like(q.strip())}%", escape="\\"))
 
     total = (
         await session.execute(select(func.count(Article.id)).where(*filters))

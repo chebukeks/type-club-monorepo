@@ -266,6 +266,72 @@ const store = new Store({
   },
 })
 
+// ============================================================
+// Безопасность: валидация путей для IPC файловых операций (Path Traversal Guard)
+// ============================================================
+const allowedRoots = new Set<string>()
+
+function addAllowedRoot(targetPath?: string): void {
+  if (!targetPath) return
+  try {
+    const resolved = path.resolve(targetPath).toLowerCase()
+    try {
+      const stat = fs.statSync(resolved)
+      allowedRoots.add(stat.isDirectory() ? resolved : path.dirname(resolved))
+    } catch {
+      allowedRoots.add(path.dirname(resolved))
+    }
+  } catch { /* ignore */ }
+}
+
+function isPathAllowed(filePath: string): boolean {
+  if (!filePath) return false
+  try {
+    const resolved = path.resolve(filePath).toLowerCase()
+    // Разрешаем стандартные системные папки пользователя
+    try {
+      const docsDir = path.resolve(app.getPath('documents')).toLowerCase()
+      if (resolved.startsWith(docsDir)) return true
+    } catch { /* ignore */ }
+    try {
+      const desktopDir = path.resolve(app.getPath('desktop')).toLowerCase()
+      if (resolved.startsWith(desktopDir)) return true
+    } catch { /* ignore */ }
+    try {
+      const downloadsDir = path.resolve(app.getPath('downloads')).toLowerCase()
+      if (resolved.startsWith(downloadsDir)) return true
+    } catch { /* ignore */ }
+    try {
+      const userDataDir = path.resolve(app.getPath('userData')).toLowerCase()
+      if (resolved.startsWith(userDataDir)) return true
+    } catch { /* ignore */ }
+
+    // Проверяем открытые пользователем папки/файлы
+    for (const root of allowedRoots) {
+      if (resolved.startsWith(root)) return true
+    }
+    return false
+  } catch {
+    return false
+  }
+}
+
+function assertPathAllowed(filePath: string): void {
+  if (!isPathAllowed(filePath)) {
+    throw new Error(`[SECURITY] Access denied: path outside allowed directories (${filePath})`)
+  }
+}
+
+// Загрузка сохранённых путей в доверенный список
+try {
+  const lastFolder = store.get('lastFolderPath') as string | undefined
+  if (lastFolder) addAllowedRoot(lastFolder)
+  const recentFolders = (store.get('recentFolders') as string[] | undefined) || []
+  recentFolders.forEach(addAllowedRoot)
+  const recentFiles = (store.get('recentFiles') as string[] | undefined) || []
+  recentFiles.forEach(addAllowedRoot)
+} catch { /* ignore */ }
+
 /** Пути к файлам, переданные через командную строку при старте */
 const initialFiles: string[] = []
 
@@ -287,6 +353,7 @@ function getFilesFromArgs(argv: string[]): string[] {
 
 // Первичный сбор файлов при запуске
 initialFiles.push(...getFilesFromArgs(process.argv))
+initialFiles.forEach(addAllowedRoot)
 console.log('[MAIN] initialFiles from argv:', initialFiles)
 
 // ============================================================
@@ -320,6 +387,7 @@ if (!gotTheLock) {
 
   app.on('second-instance', (_event, commandLine) => {
     const additionalFiles = getFilesFromArgs(commandLine)
+    additionalFiles.forEach(addAllowedRoot)
     console.log('[MAIN] second-instance, win:', !!win, 'files:', additionalFiles)
 
     if (win) {
@@ -504,7 +572,16 @@ function createWindow() {
 
   // Запрещаем создавать новые окна через target="_blank" или window.open
   win.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
+    try {
+      const parsed = new URL(url)
+      if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+        shell.openExternal(url)
+      } else {
+        console.warn(`[SECURITY] Blocked windowOpen for non-http(s) URL: ${url}`)
+      }
+    } catch {
+      console.warn(`[SECURITY] Blocked windowOpen for invalid URL: ${url}`)
+    }
     return { action: 'deny' }
   })
 
@@ -604,19 +681,23 @@ function readDirRecursive(dirPath: string): FileEntry[] {
 
 // --- Чтение файла ---
 ipcMain.handle('fs:readFile', async (_event, filePath: string): Promise<string> => {
+  assertPathAllowed(filePath)
   return fs.readFileSync(filePath, 'utf-8')
 })
 
 // --- Запись файла ---
 ipcMain.handle('fs:writeFile', async (_event, filePath: string, content: string): Promise<void> => {
+  assertPathAllowed(filePath)
   fs.writeFileSync(filePath, content, 'utf-8')
 })
 
 // --- Сохранение локального изображения ---
 ipcMain.handle('fs:saveLocalImage', async (_event, docPath: string, filename: string, base64Data: string): Promise<string | null> => {
   try {
+    assertPathAllowed(docPath)
     const dir = path.dirname(docPath)
     const imgPath = path.join(dir, filename)
+    assertPathAllowed(imgPath)
     const buffer = Buffer.from(base64Data, 'base64')
     fs.writeFileSync(imgPath, buffer)
     return `./${filename}`
@@ -628,17 +709,20 @@ ipcMain.handle('fs:saveLocalImage', async (_event, docPath: string, filename: st
 
 // --- Чтение директории (рекурсивно) ---
 ipcMain.handle('fs:readDir', async (_event, dirPath: string): Promise<FileEntry[]> => {
+  assertPathAllowed(dirPath)
   return readDirRecursive(dirPath)
 })
 
 // --- Создание директории ---
 ipcMain.handle('fs:createDir', async (_event, dirPath: string): Promise<void> => {
+  assertPathAllowed(dirPath)
   fs.mkdirSync(dirPath, { recursive: true })
 })
 
 // --- Проверка существования ---
 ipcMain.handle('fs:exists', async (_event, filePath: string): Promise<boolean> => {
   try {
+    assertPathAllowed(filePath)
     return fs.existsSync(filePath)
   } catch {
     return false
@@ -647,22 +731,29 @@ ipcMain.handle('fs:exists', async (_event, filePath: string): Promise<boolean> =
 
 // --- Переименование ---
 ipcMain.handle('fs:rename', async (_event, oldPath: string, newPath: string): Promise<void> => {
+  assertPathAllowed(oldPath)
+  assertPathAllowed(newPath)
   fs.renameSync(oldPath, newPath)
 })
 
 // --- Удаление (в корзину) ---
 ipcMain.handle('fs:delete', async (_event, filePath: string): Promise<void> => {
+  assertPathAllowed(filePath)
   await shell.trashItem(filePath)
 })
 
 // --- Показать в проводнике ---
 ipcMain.on('shell:showItemInFolder', (_event, filePath: string) => {
-  shell.showItemInFolder(filePath)
+  try {
+    assertPathAllowed(filePath)
+    shell.showItemInFolder(filePath)
+  } catch { /* ignore */ }
 })
 
 // --- Копирование файла в системный буфер обмена как файла ---
 ipcMain.handle('clipboard:copyFile', async (_event, filePath: string): Promise<boolean> => {
   try {
+    assertPathAllowed(filePath)
     const normalizedPath = path.resolve(filePath)
     if (!fs.existsSync(normalizedPath)) {
       return false
@@ -713,6 +804,7 @@ ipcMain.handle('dialog:openFolder', async (): Promise<string | null> => {
     title: 'Выберите рабочую папку',
   })
   if (result.canceled || result.filePaths.length === 0) return null
+  addAllowedRoot(result.filePaths[0])
   return result.filePaths[0]
 })
 
@@ -725,6 +817,7 @@ ipcMain.handle('dialog:openFile', async (): Promise<{ filePath: string; content:
   })
   if (result.canceled || result.filePaths.length === 0) return null
   const filePath = result.filePaths[0]
+  addAllowedRoot(filePath)
   const content = fs.readFileSync(filePath, 'utf-8')
   return { filePath, content }
 })
@@ -739,6 +832,7 @@ ipcMain.handle('dialog:saveFileAs', async (_event, content: string, defaultName:
   if (result.canceled || !result.filePath) return null
 
   try {
+    addAllowedRoot(result.filePath)
     fs.writeFileSync(result.filePath, content, 'utf-8')
     return { filePath: result.filePath }
   } catch (err) {
@@ -840,6 +934,13 @@ ipcMain.handle('store:get', async (_event, key: string) => {
 })
 
 ipcMain.handle('store:set', async (_event, key: string, value: unknown) => {
+  if (key === 'lastFolderPath' && typeof value === 'string') {
+    addAllowedRoot(value)
+  } else if ((key === 'recentFolders' || key === 'recentFiles') && Array.isArray(value)) {
+    value.forEach((item) => {
+      if (typeof item === 'string') addAllowedRoot(item)
+    })
+  }
   store.set(key as string, value)
 })
 
@@ -1055,7 +1156,18 @@ ipcMain.on('window:maximize', () => {
   }
 })
 ipcMain.on('window:close', () => win?.close())
-ipcMain.on('window:openExternal', (_event, url: string) => shell.openExternal(url))
+ipcMain.on('window:openExternal', (_event, url: string) => {
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+      shell.openExternal(url)
+    } else {
+      console.warn(`[SECURITY] Blocked openExternal for non-http(s) URL: ${url}`)
+    }
+  } catch {
+    console.warn(`[SECURITY] Blocked openExternal for invalid URL: ${url}`)
+  }
+})
 
 // Подтверждение закрытия окна от renderer
 ipcMain.on('window:confirm-close', () => {

@@ -2,9 +2,11 @@ import datetime
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, status
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.rate_limit import limiter
 
 from app.auth import (
     create_jwt,
@@ -96,11 +98,16 @@ async def _create_and_send_verification(user: User, session: AsyncSession) -> No
     )
     session.add(token)
     await session.commit()
-    await send_verification_email(user.email, user.nickname, code_str)
+    try:
+        await send_verification_email(user.email, user.nickname, code_str)
+    except Exception:
+        logger.exception("Failed to send verification email to %s", user.email)
 
 
 @router.post("/register", response_model=TokenResponse, status_code=201)
+@limiter.limit("5/minute")
 async def register(
+    request: Request,
     data: RegisterRequest,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
@@ -128,7 +135,12 @@ async def register(
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(data: LoginRequest, session: AsyncSession = Depends(get_session)):
+@limiter.limit("10/minute")
+async def login(
+    request: Request,
+    data: LoginRequest,
+    session: AsyncSession = Depends(get_session),
+):
     user = (await session.execute(select(User).where(User.email == data.email))).scalar_one_or_none()
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -162,6 +174,8 @@ async def update_me(
         current_user.nickname = data.nickname
 
     if data.avatar_url is not None:
+        if data.avatar_url and not data.avatar_url.startswith("/uploads/"):
+            raise HTTPException(status_code=400, detail="Invalid avatar URL. Use the upload endpoint.")
         current_user.avatar_url = data.avatar_url
 
     if data.bio is not None:
@@ -170,6 +184,10 @@ async def update_me(
         current_user.bio = data.bio
 
     if data.password is not None:
+        if len(data.password) < 8:
+            raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+        if not (any(c.isalpha() for c in data.password) and any(c.isdigit() for c in data.password)):
+            raise HTTPException(status_code=400, detail="Password must contain at least one letter and one digit")
         if not data.old_password or not verify_password(data.old_password, current_user.password_hash):
             raise HTTPException(status_code=403, detail="Current password is incorrect")
         current_user.password_hash = hash_password(data.password)
@@ -180,7 +198,9 @@ async def update_me(
 
 
 @router.post("/verify-email", response_model=ResendVerificationResponse)
+@limiter.limit("5/minute")
 async def verify_email(
+    request: Request,
     data: VerifyEmailRequest,
     current_user: User | None = Depends(get_optional_user),
     session: AsyncSession = Depends(get_session),
@@ -195,13 +215,15 @@ async def verify_email(
         if u:
             target_user_id = u.id
 
+    if not target_user_id:
+        raise HTTPException(status_code=400, detail="User identification required (login or provide email)")
+
     query = select(VerificationToken).where(
         VerificationToken.token == code_to_check,
         VerificationToken.purpose == "email_verify",
         VerificationToken.used == False,
+        VerificationToken.user_id == target_user_id,
     )
-    if target_user_id:
-        query = query.where(VerificationToken.user_id == target_user_id)
 
     token = (await session.execute(query.order_by(VerificationToken.created_at.desc()))).scalars().first()
 
@@ -224,7 +246,9 @@ async def verify_email(
 
 
 @router.post("/resend-verification", response_model=ResendVerificationResponse)
+@limiter.limit("3/10minutes")
 async def resend_verification(
+    request: Request,
     data: Optional[VerifyEmailRequest] = None,
     current_user: User | None = Depends(get_optional_user),
     session: AsyncSession = Depends(get_session),
@@ -272,7 +296,9 @@ async def resend_verification(
 
 
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
+@limiter.limit("3/10minutes")
 async def forgot_password(
+    request: Request,
     data: ForgotPasswordRequest,
     session: AsyncSession = Depends(get_session),
 ):
@@ -305,7 +331,12 @@ async def forgot_password(
 
 
 @router.post("/reset-password", response_model=ResendVerificationResponse)
-async def reset_password(data: ResetPasswordRequest, session: AsyncSession = Depends(get_session)):
+@limiter.limit("5/minute")
+async def reset_password(
+    request: Request,
+    data: ResetPasswordRequest,
+    session: AsyncSession = Depends(get_session),
+):
     token = (
         await session.execute(
             select(VerificationToken).where(
