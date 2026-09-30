@@ -22,6 +22,21 @@ export default function TableOfContents({
   const [open, setOpen] = useState(false);
   const [activePos, setActivePos] = useState<number | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isEditor) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const handleResize = () => {
+      const isKb = window.innerHeight - vv.height > 120;
+      setKeyboardOpen(isKb);
+    };
+
+    vv.addEventListener("resize", handleResize);
+    return () => vv.removeEventListener("resize", handleResize);
+  }, [isEditor]);
 
   const hasToc = toc && toc.length > 0;
   const showSuggestions = isEditor && suggestions && suggestions.length > 0;
@@ -169,7 +184,11 @@ export default function TableOfContents({
   return (
     <>
       {/* Floating Action Button */}
-      <div className={`fixed bottom-6 right-6 z-40 ${className}`}>
+      <div
+        className={`fixed z-40 transition-all duration-200 ${
+          isEditor ? "bottom-20 sm:bottom-6 right-4 sm:right-6" : "bottom-6 right-6"
+        } ${keyboardOpen ? "opacity-0 pointer-events-none translate-y-2" : "opacity-100"} ${className}`}
+      >
         <button
           onClick={() => setOpen(!open)}
           className="relative p-3.5 rounded-full bg-blue-600 hover:bg-blue-700 active:scale-95 text-white shadow-xl shadow-blue-500/25 transition-all duration-200 flex items-center justify-center group"
@@ -186,7 +205,7 @@ export default function TableOfContents({
         {/* Popover / Sheet Drawer */}
         {mounted && (
           <div
-            className={`absolute bottom-16 right-0 w-80 max-h-[70vh] flex flex-col bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border border-gray-200/80 dark:border-gray-800/80 rounded-2xl shadow-2xl z-50 p-4 ${
+            className={`absolute bottom-16 right-0 w-[calc(100vw-2rem)] sm:w-80 max-h-[70vh] flex flex-col bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border border-gray-200/80 dark:border-gray-800/80 rounded-2xl shadow-2xl z-50 p-4 ${
               open
                 ? "animate-in fade-in zoom-in-95 slide-in-from-bottom-3 duration-150 ease-out"
                 : "animate-out fade-out zoom-out-95 slide-out-to-bottom-3 duration-150 ease-in fill-mode-forwards"

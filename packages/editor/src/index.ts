@@ -4,7 +4,26 @@ export { schema } from "./editor/schema";
 export { parseMarkdown, serializeMarkdown, generateExportHtml } from "./editor/markdownConfig";
 export { htmlToMarkdown, isMeaningfulHtml } from "./editor/htmlToMarkdown";
 export { getEditorStyles } from "./editor/editorTheme";
-export { getKeymapPlugins } from "./editor/keymap";
+export {
+  getKeymapPlugins,
+  universalExitCommand,
+  undoCommand,
+  redoCommand,
+  indentListCommand,
+  outdentListCommand,
+  setHeadingLevel,
+  isInList,
+  isInTable,
+  isInCodeBlock,
+  isInExitableBlock,
+  getActiveHeadingLevel,
+  getListType,
+  isInBlockquote,
+  isMarkActive,
+  hasActiveInlineMarks,
+  canExit,
+  isInMath,
+} from "./editor/keymap";
 export { getInputRulesPlugin } from "./editor/inputRules";
 export { seamlessPlugin } from "./editor/seamlessPlugin";
 export { linkTooltipPlugin } from "./editor/linkTooltipPlugin";

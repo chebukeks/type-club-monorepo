@@ -8,35 +8,140 @@ import { undo as pmUndo, redo as pmRedo } from 'prosemirror-history'
 import { undo as yUndo, redo as yRedo } from 'y-prosemirror'
 import { splitListItem, sinkListItem, liftListItem } from 'prosemirror-schema-list'
 import { addRowAfter, deleteRow, CellSelection } from 'prosemirror-tables'
-import { Command, TextSelection } from 'prosemirror-state'
+import { Command, TextSelection, NodeSelection, EditorState } from 'prosemirror-state'
 import { schema } from './schema'
 import type { Plugin } from 'prosemirror-state'
 
-// Команда: выход из блоков кода и таблиц по Esc
-const exitBlockByEsc: Command = (state, dispatch) => {
-  const { $head } = state.selection
-  
-  let blockDepth = -1
+/**
+ * Универсальная команда выхода:
+ * - Для инлайн-элементов (math_inline, активные инлайн-марки) — выход дальше на ту же строку (снимает стили или переводит каретку за инлайн-ноду).
+ * - Для блочных элементов (code_block, table, math_block, blockquote, list_item) — выход на новую строку ниже (создаёт новый параграф).
+ */
+export const universalExitCommand: Command = (state, dispatch) => {
+  const { $head, empty } = state.selection
 
+  // 1. Инлайн-математика: выход за пределы math_inline на ту же строку
+  if ($head.parent.type.name === 'math_inline') {
+    if (dispatch) {
+      const text = $head.parent.textContent
+      const trimmed = text.trim()
+      const nodeStart = $head.before()
+      const nodeEnd = $head.after()
+      if (trimmed.length === 0) {
+        let tr = state.tr.replaceWith(nodeStart, nodeEnd, schema.text('$'))
+        tr.setSelection(TextSelection.near(tr.doc.resolve(nodeStart + 1)))
+        dispatch(tr)
+      } else if (trimmed !== text) {
+        const newNode = $head.parent.type.create(null, schema.text(trimmed))
+        let tr = state.tr.replaceWith(nodeStart, nodeEnd, newNode)
+        const newNodeEnd = nodeStart + trimmed.length + 2
+        tr.setSelection(TextSelection.near(tr.doc.resolve(newNodeEnd)))
+        dispatch(tr)
+      } else {
+        let tr = state.tr
+        tr.setSelection(TextSelection.near(tr.doc.resolve(nodeEnd)))
+        dispatch(tr)
+      }
+    }
+    return true
+  }
+
+  // 2. Инлайн-стили: если активны марки у каретки (storedMarks или marks) — перемещаем каретку за пределы стиля в том же параграфе
+  const activeMarks = state.storedMarks || (empty ? $head.marks() : [])
+  if (activeMarks && activeMarks.length > 0) {
+    if (dispatch) {
+      let tr = state.tr
+      const parent = $head.parent
+      const parentStart = $head.start()
+      const offset = $head.parentOffset
+
+      // Находим правую границу текущего стиля в пределах текстового блока
+      let exitOffset = offset
+      let curOffset = 0
+      for (let i = 0; i < parent.childCount; i++) {
+        const child = parent.child(i)
+        const childStart = curOffset
+        const childEnd = curOffset + child.nodeSize
+
+        if (childStart <= offset && offset <= childEnd) {
+          let end = childEnd
+          for (let j = i + 1; j < parent.childCount; j++) {
+            const nextChild = parent.child(j)
+            const hasAnyMark = nextChild.marks.some(m => activeMarks.some(a => a.type === m.type))
+            if (hasAnyMark) {
+              end += nextChild.nodeSize
+            } else {
+              break
+            }
+          }
+          exitOffset = end
+          break
+        }
+        curOffset = childEnd
+      }
+
+      const targetPos = parentStart + exitOffset
+      tr.setSelection(TextSelection.near(tr.doc.resolve(targetPos)))
+      tr.setStoredMarks([])
+      dispatch(tr.scrollIntoView())
+    }
+    return true
+  }
+
+  // 3. Блочные элементы: table, code_block, math_block, blockquote, list_item
   for (let d = $head.depth; d > 0; d--) {
-    const name = $head.node(d).type.name
-    if (name === 'table' || name === 'code_block' || name === 'math_block') {
-      blockDepth = d
-      break
+    const node = $head.node(d)
+    const name = node.type.name
+
+    if (name === 'table' || name === 'code_block' || name === 'math_block' || name === 'blockquote') {
+      if (dispatch) {
+        const endPos = $head.after(d)
+        const tr = state.tr
+        const p = schema.nodes.paragraph.createAndFill()!
+        tr.insert(endPos, p)
+        tr.setSelection(TextSelection.near(tr.doc.resolve(endPos + 1)))
+        dispatch(tr.scrollIntoView())
+      }
+      return true
+    }
+
+    if (name === 'list_item') {
+      // Ищем родительский список верхнего уровня
+      let listDepth = d
+      for (let ld = d - 1; ld > 0; ld--) {
+        const parentName = $head.node(ld).type.name
+        if (parentName === 'bullet_list' || parentName === 'ordered_list') {
+          listDepth = ld
+        } else if (parentName !== 'list_item') {
+          break
+        }
+      }
+      if (dispatch) {
+        const endPos = $head.after(listDepth)
+        const tr = state.tr
+        const p = schema.nodes.paragraph.createAndFill()!
+        tr.insert(endPos, p)
+        tr.setSelection(TextSelection.near(tr.doc.resolve(endPos + 1)))
+        dispatch(tr.scrollIntoView())
+      }
+      return true
     }
   }
-  if (blockDepth === -1) return false
-  
+
+  // 4. Обычный параграф / заголовок без активных марок: создаём новый параграф ниже
   if (dispatch) {
-    // Для блочных элементов вставляем новый пустой параграф ниже
-    const endPos = $head.after(blockDepth)
+    const depth = $head.depth > 0 ? 1 : 0
+    const endPos = $head.after(depth)
     const tr = state.tr
-    tr.insert(endPos, schema.nodes.paragraph.createAndFill()!)
+    const p = schema.nodes.paragraph.createAndFill()!
+    tr.insert(endPos, p)
     tr.setSelection(TextSelection.near(tr.doc.resolve(endPos + 1)))
-    dispatch(tr)
+    dispatch(tr.scrollIntoView())
   }
   return true
 }
+
+const exitBlockByEsc: Command = universalExitCommand
 
 // Команда: автосоздание таблицы при вводе |col1|col2| и нажатии Enter
 const createTableOnEnter: Command = (state, dispatch) => {
@@ -439,8 +544,8 @@ function setHeadingLevel(level: number): Command {
 
     if (dispatch) {
       const pos = $head.before()
-      if (parentType === 'heading' && $head.parent.attrs.level === level) {
-        // Если уже такой уровень — превращаем обратно в параграф
+      if (level === 0 || (parentType === 'heading' && $head.parent.attrs.level === level)) {
+        // Если 0 или уже такой уровень — превращаем обратно в параграф
         const content = $head.parent.content
         const tr = state.tr.replaceWith(pos, $head.after(), schema.nodes.paragraph.create(null, content))
         tr.setSelection(TextSelection.near(tr.doc.resolve(pos + 1)))
@@ -475,6 +580,44 @@ const selectAllInCodeBlock: Command = (state, dispatch) => {
   return false
 }
 
+// Команда: выход из блока кода по двойному Enter (пустая строка в конце блока)
+const codeBlockDoubleEnterExit: Command = (state, dispatch) => {
+  const { $head, empty } = state.selection
+  if (!empty) return false
+  if ($head.parent.type.name !== 'code_block') return false
+
+  const text = $head.parent.textContent
+  const offset = $head.parentOffset
+  if (offset > 0 && text[offset - 1] === '\n' && (offset === text.length || text[offset] === '\n')) {
+    if (dispatch) {
+      let codeDepth = -1
+      for (let d = $head.depth; d > 0; d--) {
+        if ($head.node(d).type.name === 'code_block') {
+          codeDepth = d
+          break
+        }
+      }
+      if (codeDepth === -1) return false
+
+      const start = $head.before(codeDepth)
+      const end = $head.after(codeDepth)
+      const newText = text.slice(0, offset - 1) + text.slice(offset)
+      const newCodeNode = schema.nodes.code_block.create(
+        $head.parent.attrs,
+        newText ? schema.text(newText) : undefined
+      )
+      const tr = state.tr.replaceWith(start, end, newCodeNode)
+      const insertPos = start + newCodeNode.nodeSize
+      const p = schema.nodes.paragraph.createAndFill()!
+      tr.insert(insertPos, p)
+      tr.setSelection(TextSelection.near(tr.doc.resolve(insertPos + 1)))
+      dispatch(tr.scrollIntoView())
+    }
+    return true
+  }
+  return false
+}
+
 /** Кастомные горячие клавиши */
 const customKeymap = keymap({
   // Выделение всего текста внутри блока кода
@@ -496,12 +639,14 @@ const customKeymap = keymap({
   'Mod-5': setHeadingLevel(5),
   'Mod-6': setHeadingLevel(6),
 
+
   // Умный Enter: цепочка команд (первая вернувшая true перехватывает событие)
   'Enter': chainCommands(
     tableEnterNav,
     createMathBlockOnEnter,
     createCodeBlockOnEnter,
     mathEnterCommand,
+    codeBlockDoubleEnterExit,
     createTableOnEnter,
     splitListItem(schema.nodes.list_item)
   ),
@@ -569,4 +714,123 @@ const baseKeys = keymap(baseKeymap)
 /** Все клавиатурные плагины в правильном порядке */
 export function getKeymapPlugins(): Plugin[] {
   return [customKeymap, bracketKeymap, baseKeys]
+}
+
+export const undoCommand: Command = chainCommands(pmUndo, yUndo)
+export const redoCommand: Command = chainCommands(pmRedo, yRedo)
+export const indentListCommand: Command = sinkListItem(schema.nodes.list_item)
+export const outdentListCommand: Command = liftListItem(schema.nodes.list_item)
+export { setHeadingLevel }
+
+export function isInList(state: EditorState): boolean {
+  const { $head } = state.selection
+  for (let d = $head.depth; d > 0; d--) {
+    const name = $head.node(d).type.name
+    if (name === 'list_item' || name === 'bullet_list' || name === 'ordered_list') return true
+  }
+  return false
+}
+
+export function isInTable(state: EditorState): boolean {
+  const { $head } = state.selection
+  for (let d = $head.depth; d > 0; d--) {
+    const name = $head.node(d).type.name
+    if (name === 'table' || name === 'table_row' || name === 'table_cell' || name === 'table_header') return true
+  }
+  return false
+}
+
+export function isInCodeBlock(state: EditorState): boolean {
+  const { $head } = state.selection
+  for (let d = $head.depth; d > 0; d--) {
+    const name = $head.node(d).type.name
+    if (name === 'code_block') return true
+  }
+  return false
+}
+
+export function isInExitableBlock(state: EditorState): boolean {
+  const { $head } = state.selection
+  for (let d = $head.depth; d > 0; d--) {
+    const name = $head.node(d).type.name
+    if (
+      name === 'table' ||
+      name === 'table_row' ||
+      name === 'table_cell' ||
+      name === 'table_header' ||
+      name === 'code_block' ||
+      name === 'math_block' ||
+      name === 'math_inline' ||
+      name === 'blockquote' ||
+      name === 'list_item'
+    ) {
+      return true
+    }
+  }
+  return false
+}
+
+export function getActiveHeadingLevel(state: EditorState): number | null {
+  const { $head } = state.selection
+  if ($head.parent.type.name === 'heading') {
+    return $head.parent.attrs.level
+  }
+  return null
+}
+
+export function getListType(state: EditorState): 'task' | 'bullet' | 'ordered' | null {
+  const { $head } = state.selection
+  for (let d = $head.depth; d > 0; d--) {
+    const node = $head.node(d)
+    if (node.type.name === 'list_item') {
+      if (node.attrs.checked !== null && node.attrs.checked !== undefined) {
+        return 'task'
+      }
+    }
+    if (node.type.name === 'bullet_list') return 'bullet'
+    if (node.type.name === 'ordered_list') return 'ordered'
+  }
+  return null
+}
+
+export function isInBlockquote(state: EditorState): boolean {
+  const { $head } = state.selection
+  for (let d = $head.depth; d > 0; d--) {
+    if ($head.node(d).type.name === 'blockquote') return true
+  }
+  return false
+}
+
+export function isMarkActive(state: EditorState, markType: any): boolean {
+  if (!markType) return false
+  const { from, $from, to, empty } = state.selection
+  if (empty) {
+    return !!(state.storedMarks ? markType.isInSet(state.storedMarks) : markType.isInSet($from.marks()))
+  }
+  return state.doc.rangeHasMark(from, to, markType)
+}
+
+export function hasActiveInlineMarks(state: EditorState): boolean {
+  if (state.storedMarks && state.storedMarks.length > 0) return true
+  const { $head, empty } = state.selection
+  if (empty && $head.marks().length > 0) return true
+  return false
+}
+
+export function canExit(state: EditorState): boolean {
+  return isInExitableBlock(state) || hasActiveInlineMarks(state)
+}
+
+export function isInMath(state: EditorState): boolean {
+  if (state.selection instanceof NodeSelection) {
+    const name = state.selection.node.type.name
+    if (name === 'math_inline' || name === 'math_block') return true
+  }
+  const { $head } = state.selection
+  if ($head.parent.type.name === 'math_inline' || $head.parent.type.name === 'math_block') return true
+  for (let d = $head.depth; d > 0; d--) {
+    const name = $head.node(d).type.name
+    if (name === 'math_block' || name === 'math_inline') return true
+  }
+  return false
 }

@@ -1,14 +1,23 @@
 import { useState, useRef, useMemo, useEffect } from "react";
-import { MessageCircleMore } from "lucide-react";
+import { MessageCircleMore, Copy, Link2, HardDriveDownload, CloudUpload, Trash2, X } from "lucide-react";
 import { toggleMark } from "prosemirror-commands";
 import { TextSelection, NodeSelection, Selection } from "prosemirror-state";
-import { deleteTable } from "prosemirror-tables";
+import {
+  deleteTable,
+  addRowBefore,
+  addRowAfter,
+  addColumnBefore,
+  addColumnAfter,
+  deleteRow,
+  deleteColumn,
+} from "prosemirror-tables";
 import type { EditorView } from "prosemirror-view";
 
-import { EditorCore, schema, tableEditPluginKey } from "@type-club/editor";
+import { EditorCore, schema, tableEditPluginKey, universalExitCommand } from "@type-club/editor";
 import type { EditorMode, CollaborationConfig, TocItem, SuggestionItem } from "@type-club/editor";
 import { useLanguage } from "../context/LanguageContext";
 import AddNoteModal from "./AddNoteModal";
+import MobileToolbar from "./MobileToolbar";
 
 export type { EditorMode } from "@type-club/editor";
 
@@ -64,6 +73,9 @@ export function MarkdownEditor({
     rect: { top: number; left: number; bottom: number; right: number };
   } | null>(null);
   
+  const [showTableSheet, setShowTableSheet] = useState(false);
+  const [editorView, setEditorView] = useState<EditorView | null>(null);
+
   const [imageContextMenu, setImageContextMenu] = useState<{
     visible: boolean;
     x: number;
@@ -88,6 +100,9 @@ export function MarkdownEditor({
 
     const handleImageContextMenu = (e: Event) => {
       if (readOnly || editorMode !== "seamless") return;
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
       const event = e as CustomEvent<{
         pos: number;
         src: string;
@@ -314,6 +329,153 @@ export function MarkdownEditor({
     }
   }
 
+  const handleDeleteImage = (pos: number) => {
+    const view = viewRef.current;
+    if (!view) return;
+    const node = view.state.doc.nodeAt(pos);
+    if (node) {
+      view.dispatch(view.state.tr.delete(pos, pos + node.nodeSize));
+      view.focus();
+    }
+    setImageContextMenu(null);
+  };
+
+  const handleInsertImageFile = async (fileOrUrl: File | string) => {
+    const view = viewRef.current;
+    if (!view) return;
+
+    if (typeof fileOrUrl === "string") {
+      const src = fileOrUrl;
+      const { state, dispatch } = view;
+      const imageType = state.schema.nodes.image;
+      if (!imageType) return;
+
+      const { $head } = state.selection;
+      let blockDepth = -1;
+      for (let d = $head.depth; d >= 1; d--) {
+        const name = $head.node(d).type.name;
+        if (name === "paragraph" || name === "heading" || name === "code_block" || name === "math_block") {
+          blockDepth = d;
+          break;
+        }
+      }
+
+      const imageNode = imageType.create({ src, alt: "image" });
+      let targetPos = state.selection.from;
+      const tr = state.tr;
+
+      if (blockDepth !== -1) {
+        const isEmpty = $head.node(blockDepth).textContent.trim() === "";
+        const blockStart = $head.before(blockDepth);
+        const blockEnd = $head.after(blockDepth);
+        if (isEmpty) {
+          tr.replaceWith(blockStart, blockEnd, imageNode);
+          targetPos = blockStart;
+        } else {
+          tr.insert(blockEnd, imageNode);
+          targetPos = blockEnd;
+        }
+        const newPos = targetPos + imageNode.nodeSize;
+        const p = state.schema.nodes.paragraph.createAndFill()!;
+        tr.insert(newPos, p);
+        tr.setSelection(TextSelection.near(tr.doc.resolve(newPos + 1)));
+      } else {
+        tr.insert(targetPos, imageNode);
+        const newPos = targetPos + imageNode.nodeSize;
+        const p = state.schema.nodes.paragraph.createAndFill()!;
+        tr.insert(newPos, p);
+        tr.setSelection(TextSelection.near(tr.doc.resolve(newPos + 1)));
+      }
+
+      dispatch(tr.scrollIntoView());
+      view.focus();
+      return;
+    }
+
+    const file = fileOrUrl;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUri = reader.result as string;
+      const { state, dispatch } = view;
+      const imageType = state.schema.nodes.image;
+      if (!imageType) return;
+
+      const { $head } = state.selection;
+      let blockDepth = -1;
+      for (let d = $head.depth; d >= 1; d--) {
+        const name = $head.node(d).type.name;
+        if (name === "paragraph" || name === "heading" || name === "code_block" || name === "math_block") {
+          blockDepth = d;
+          break;
+        }
+      }
+
+      const tempAlt = file.name || `photo-${Date.now()}`;
+      const imageNode = imageType.create({ src: dataUri, alt: tempAlt });
+
+      let targetPos = state.selection.from;
+      const tr = state.tr;
+
+      if (blockDepth !== -1) {
+        const isEmpty = $head.node(blockDepth).textContent.trim() === "";
+        const blockStart = $head.before(blockDepth);
+        const blockEnd = $head.after(blockDepth);
+        if (isEmpty) {
+          tr.replaceWith(blockStart, blockEnd, imageNode);
+          targetPos = blockStart;
+        } else {
+          tr.insert(blockEnd, imageNode);
+          targetPos = blockEnd;
+        }
+        const newPos = targetPos + imageNode.nodeSize;
+        const p = state.schema.nodes.paragraph.createAndFill()!;
+        tr.insert(newPos, p);
+        tr.setSelection(TextSelection.near(tr.doc.resolve(newPos + 1)));
+      } else {
+        tr.insert(targetPos, imageNode);
+        const newPos = targetPos + imageNode.nodeSize;
+        const p = state.schema.nodes.paragraph.createAndFill()!;
+        tr.insert(newPos, p);
+        tr.setSelection(TextSelection.near(tr.doc.resolve(newPos + 1)));
+      }
+
+      dispatch(tr.scrollIntoView());
+      view.focus();
+
+      // If online article, upload in background to save space and replace base64 with server URL
+      if (articleId && userId) {
+        try {
+          const { articlesApi } = await import("../api");
+          const response = await articlesApi.uploadImage(articleId, file);
+          if (response?.url && viewRef.current) {
+            const currentView = viewRef.current;
+            let foundPos: number | null = null;
+            currentView.state.doc.descendants((node, pos) => {
+              if (node.type.name === "image" && (node.attrs.src === dataUri || node.attrs.alt === tempAlt)) {
+                foundPos = pos;
+                return false;
+              }
+            });
+            if (foundPos !== null) {
+              const node = currentView.state.doc.nodeAt(foundPos);
+              if (node) {
+                currentView.dispatch(
+                  currentView.state.tr.setNodeMarkup(foundPos, undefined, {
+                    ...node.attrs,
+                    src: response.url,
+                  })
+                );
+              }
+            }
+          }
+        } catch (err) {
+          console.warn("Background image upload failed, keeping base64 dataUri", err);
+        }
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const ctxMenuStyle = useMemo((): React.CSSProperties | null => {
     if (!ctxMenu) return null;
     const menuHeight = ctxSubmenu === "table" ? 300 : ctxSubmenu === "code" ? 260 : ctxTable !== null ? 180 : 400;
@@ -328,6 +490,15 @@ export function MarkdownEditor({
   }, [ctxMenu, ctxSubmenu, ctxTable]);
 
   const handleContextMenu = (e: React.MouseEvent) => {
+    // If touch pointer or touch device, DO NOT suppress native selection!
+    const isTouch =
+      (e.nativeEvent as any).pointerType === 'touch' ||
+      ('ontouchstart' in window && !window.matchMedia('(pointer: fine)').matches);
+
+    if (isTouch) {
+      return;
+    }
+
     const view = viewRef.current;
     if (editorMode !== "seamless") return;
     const target = e.target as HTMLElement;
@@ -550,8 +721,134 @@ export function MarkdownEditor({
         userNickname={userNickname}
         suggestionModeActive={suggestionModeActive}
         onTocUpdate={onTocUpdate}
-        onEditorView={(v) => { viewRef.current = v; }}
+        onEditorView={(v) => {
+          viewRef.current = v;
+          setEditorView(v);
+        }}
       />
+
+      {!readOnly && editorMode === "seamless" && (
+        <MobileToolbar
+          view={editorView || viewRef.current}
+          onOpenTableSheet={() => setShowTableSheet(true)}
+          onInsertTable={() => {
+            setTableRows(3);
+            setTableCols(3);
+            insertTable();
+          }}
+          onInsertCodeBlock={() => insertCodeBlock()}
+          onInsertMathBlock={insertMathBlock}
+          onInsertImageFile={handleInsertImageFile}
+        />
+      )}
+
+      {showTableSheet && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col justify-end bg-black/40 backdrop-blur-xs animate-in fade-in duration-150"
+          onClick={() => setShowTableSheet(false)}
+        >
+          <div
+            className="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 rounded-t-2xl p-4 shadow-2xl flex flex-col gap-3 max-h-[80vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-2">
+              <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                {t('toolbar.tableActions')}
+              </span>
+              <button
+                onClick={() => setShowTableSheet(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-xs font-medium">
+              <button
+                className="p-2.5 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 flex items-center gap-2 transition-colors text-left"
+                onClick={() => {
+                  if (viewRef.current) addRowBefore(viewRef.current.state, viewRef.current.dispatch);
+                  setShowTableSheet(false);
+                }}
+              >
+                <span>➕ {t('toolbar.addRowBefore')}</span>
+              </button>
+
+              <button
+                className="p-2.5 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 flex items-center gap-2 transition-colors text-left"
+                onClick={() => {
+                  if (viewRef.current) addRowAfter(viewRef.current.state, viewRef.current.dispatch);
+                  setShowTableSheet(false);
+                }}
+              >
+                <span>➕ {t('toolbar.addRowAfter')}</span>
+              </button>
+
+              <button
+                className="p-2.5 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 flex items-center gap-2 transition-colors text-left"
+                onClick={() => {
+                  if (viewRef.current) addColumnBefore(viewRef.current.state, viewRef.current.dispatch);
+                  setShowTableSheet(false);
+                }}
+              >
+                <span>➕ {t('toolbar.addColumnBefore')}</span>
+              </button>
+
+              <button
+                className="p-2.5 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 flex items-center gap-2 transition-colors text-left"
+                onClick={() => {
+                  if (viewRef.current) addColumnAfter(viewRef.current.state, viewRef.current.dispatch);
+                  setShowTableSheet(false);
+                }}
+              >
+                <span>➕ {t('toolbar.addColumnAfter')}</span>
+              </button>
+
+              <button
+                className="p-2.5 rounded-lg bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/60 flex items-center gap-2 transition-colors text-left"
+                onClick={() => {
+                  if (viewRef.current) deleteRow(viewRef.current.state, viewRef.current.dispatch);
+                  setShowTableSheet(false);
+                }}
+              >
+                <span>🗑️ {t('toolbar.deleteRow')}</span>
+              </button>
+
+              <button
+                className="p-2.5 rounded-lg bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/60 flex items-center gap-2 transition-colors text-left"
+                onClick={() => {
+                  if (viewRef.current) deleteColumn(viewRef.current.state, viewRef.current.dispatch);
+                  setShowTableSheet(false);
+                }}
+              >
+                <span>🗑️ {t('toolbar.deleteColumn')}</span>
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+              <button
+                className="w-full p-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors"
+                onClick={() => {
+                  if (viewRef.current) universalExitCommand(viewRef.current.state, viewRef.current.dispatch);
+                  setShowTableSheet(false);
+                }}
+              >
+                <span>↵ {t('toolbar.exitTooltip')}</span>
+              </button>
+
+              <button
+                className="w-full p-2.5 rounded-lg bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 hover:bg-red-200 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors"
+                onClick={() => {
+                  if (viewRef.current) deleteTable(viewRef.current.state, viewRef.current.dispatch);
+                  setShowTableSheet(false);
+                }}
+              >
+                <span>🗑️ {t('toolbar.deleteTable')}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {ctxMenu && ctxTable !== null && (
         <div
@@ -743,66 +1040,170 @@ export function MarkdownEditor({
       )}
 
       {imageContextMenu && imageContextMenu.visible && (
-        <div
-          className="fixed z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl flex flex-col backdrop-blur-xl"
-          style={{
-            top: imageContextMenu.y,
-            left: imageContextMenu.x,
-            minWidth: '200px',
-            padding: '4px 0',
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            className="text-left text-xs hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200 transition-colors"
-            style={{ padding: '6px 12px' }}
-            onClick={() => {
-              handleCopyImage(imageContextMenu.src)
-              setImageContextMenu(null)
-            }}
+        <>
+          {/* Mobile Bottom Sheet for Image Actions */}
+          <div
+            className="sm:hidden fixed inset-0 z-50 flex flex-col justify-end bg-black/40 backdrop-blur-xs animate-in fade-in duration-150"
+            onClick={() => setImageContextMenu(null)}
           >
-            {t('image.contextMenu.copy') || 'Copy Image'}
-          </button>
-          
-          {!imageContextMenu.src.startsWith('data:') && (
-            <button
-              className="text-left text-xs hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200 transition-colors"
-              style={{ padding: '6px 12px' }}
-              onClick={() => {
-                navigator.clipboard.writeText(imageContextMenu.src)
-                setImageContextMenu(null)
-              }}
+            <div
+              className="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 rounded-t-2xl p-4 shadow-2xl flex flex-col gap-2 max-h-[80vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
             >
-              {t('image.contextMenu.copyLink') || 'Copy Image Link'}
-            </button>
-          )}
+              <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-2.5">
+                <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                  {t('toolbar.imageActions')}
+                </span>
+                <button
+                  onClick={() => setImageContextMenu(null)}
+                  className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
 
-          {!imageContextMenu.src.startsWith('data:') && (
-            <button
-              className="text-left text-xs hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200 transition-colors"
-              style={{ padding: '6px 12px' }}
-              onClick={() => {
-                handleEmbedImage(imageContextMenu.src, imageContextMenu.pos)
-                setImageContextMenu(null)
-              }}
-            >
-              {t('image.contextMenu.embed') || 'Embed Image'}
-            </button>
-          )}
+              <div className="flex flex-col gap-1.5 text-xs font-medium pt-1">
+                <button
+                  className="w-full px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200 flex items-center gap-3 transition-colors text-left"
+                  onClick={() => {
+                    handleCopyImage(imageContextMenu.src);
+                    setImageContextMenu(null);
+                  }}
+                >
+                  <Copy className="w-4 h-4 text-gray-500 dark:text-gray-400 shrink-0" />
+                  <span>{t('image.contextMenu.copy') || 'Copy Image'}</span>
+                </button>
 
-          {articleId && (
+                {!imageContextMenu.src.startsWith('data:') && (
+                  <button
+                    className="w-full px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200 flex items-center gap-3 transition-colors text-left"
+                    onClick={() => {
+                      navigator.clipboard.writeText(imageContextMenu.src);
+                      setImageContextMenu(null);
+                    }}
+                  >
+                    <Link2 className="w-4 h-4 text-gray-500 dark:text-gray-400 shrink-0" />
+                    <span>{t('image.contextMenu.copyLink') || 'Copy Image Link'}</span>
+                  </button>
+                )}
+
+                {!imageContextMenu.src.startsWith('data:') && (
+                  <button
+                    className="w-full px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200 flex items-center gap-3 transition-colors text-left"
+                    onClick={() => {
+                      handleEmbedImage(imageContextMenu.src, imageContextMenu.pos);
+                      setImageContextMenu(null);
+                    }}
+                  >
+                    <HardDriveDownload className="w-4 h-4 text-gray-500 dark:text-gray-400 shrink-0" />
+                    <span>{t('image.contextMenu.embed') || 'Embed Image'}</span>
+                  </button>
+                )}
+
+                {articleId && (
+                  <button
+                    className="w-full px-3 py-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 flex items-center gap-3 transition-colors text-left"
+                    onClick={() => {
+                      handleUploadImage(imageContextMenu.src, imageContextMenu.pos);
+                      setImageContextMenu(null);
+                    }}
+                  >
+                    <CloudUpload className="w-4 h-4 text-blue-500 shrink-0" />
+                    <span>{t('image.contextMenu.uploadToTypeClub') || 'Upload to type-club.ru'}</span>
+                  </button>
+                )}
+
+                <button
+                  className="w-full px-3 py-2.5 rounded-xl bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 flex items-center gap-3 transition-colors text-left"
+                  onClick={() => {
+                    handleDeleteImage(imageContextMenu.pos);
+                  }}
+                >
+                  <Trash2 className="w-4 h-4 text-red-500 shrink-0" />
+                  <span>{t('toolbar.deleteImage')}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Desktop Popover Menu */}
+          <div
+            className="hidden sm:flex fixed z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl flex-col backdrop-blur-xl py-1"
+            style={{
+              top: imageContextMenu.y,
+              left: Math.min(imageContextMenu.x, window.innerWidth - 220),
+              minWidth: '200px',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
-              className="text-left text-xs hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200 transition-colors"
-              style={{ padding: '6px 12px' }}
+              className="text-left text-xs hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200 transition-colors flex items-center gap-2.5"
+              style={{ padding: '7px 12px' }}
               onClick={() => {
-                handleUploadImage(imageContextMenu.src, imageContextMenu.pos)
-                setImageContextMenu(null)
+                handleCopyImage(imageContextMenu.src);
+                setImageContextMenu(null);
               }}
             >
-              {t('image.contextMenu.uploadToTypeClub') || 'Upload to type-club.ru'}
+              <Copy className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400 shrink-0" />
+              <span>{t('image.contextMenu.copy') || 'Copy Image'}</span>
             </button>
-          )}
-        </div>
+            
+            {!imageContextMenu.src.startsWith('data:') && (
+              <button
+                className="text-left text-xs hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200 transition-colors flex items-center gap-2.5"
+                style={{ padding: '7px 12px' }}
+                onClick={() => {
+                  navigator.clipboard.writeText(imageContextMenu.src);
+                  setImageContextMenu(null);
+                }}
+              >
+                <Link2 className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400 shrink-0" />
+                <span>{t('image.contextMenu.copyLink') || 'Copy Image Link'}</span>
+              </button>
+            )}
+
+            {!imageContextMenu.src.startsWith('data:') && (
+              <button
+                className="text-left text-xs hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200 transition-colors flex items-center gap-2.5"
+                style={{ padding: '7px 12px' }}
+                onClick={() => {
+                  handleEmbedImage(imageContextMenu.src, imageContextMenu.pos);
+                  setImageContextMenu(null);
+                }}
+              >
+                <HardDriveDownload className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400 shrink-0" />
+                <span>{t('image.contextMenu.embed') || 'Embed Image'}</span>
+              </button>
+            )}
+
+            {articleId && (
+              <button
+                className="text-left text-xs hover:bg-blue-50 dark:hover:bg-blue-950/40 text-blue-600 dark:text-blue-400 transition-colors flex items-center gap-2.5"
+                style={{ padding: '7px 12px' }}
+                onClick={() => {
+                  handleUploadImage(imageContextMenu.src, imageContextMenu.pos);
+                  setImageContextMenu(null);
+                }}
+              >
+                <CloudUpload className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                <span>{t('image.contextMenu.uploadToTypeClub') || 'Upload to type-club.ru'}</span>
+              </button>
+            )}
+
+            <div className={sepClass} />
+
+            <button
+              className="text-left text-xs hover:bg-red-50 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 transition-colors flex items-center gap-2.5"
+              style={{ padding: '7px 12px' }}
+              onClick={() => {
+                handleDeleteImage(imageContextMenu.pos);
+              }}
+            >
+              <Trash2 className="w-3.5 h-3.5 text-red-500 shrink-0" />
+              <span>{t('toolbar.deleteImage')}</span>
+            </button>
+          </div>
+        </>
       )}
 
       <AddNoteModal

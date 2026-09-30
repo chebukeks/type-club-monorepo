@@ -386,6 +386,39 @@ html[data-lang="ru"] figure[data-sug-delete]::after {
   font-family: inherit;
 }
 
+.image-action-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-surface, #ffffff);
+  color: var(--text-secondary, #4b5563);
+  border: 1px solid var(--border-default, #e5e7eb);
+  border-radius: 10px;
+  cursor: pointer;
+  z-index: 15;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: all 0.15s ease;
+  padding: 0;
+  touch-action: manipulation;
+  user-select: none;
+}
+.image-action-btn:hover {
+  background: var(--bg-hover, #f3f4f6);
+  color: var(--text-primary, #111827);
+  border-color: var(--border-strong, #d1d5db);
+  transform: scale(1.05);
+}
+.image-action-btn:active {
+  transform: scale(0.95);
+}
+
 /* Заголовки */
 .ProseMirror h1 { font-size: 2em; font-weight: 700; color: var(--editor-heading); line-height: 1.3; margin: 1em 0 0.4em 0; }
 .ProseMirror h2 { font-size: 1.5em; font-weight: 650; color: var(--editor-heading); line-height: 1.35; margin: 0.8em 0 0.3em 0; }
@@ -1213,6 +1246,24 @@ html[data-lang="ru"] figure[data-sug-delete]::after {
 .type-club-lightbox-slider:active::-moz-range-thumb {
   transform: scale(1.25) !important;
   background: #38bdf8 !important;
+}
+
+/* ==========================================
+   Мобильная адаптивность редактора
+   ========================================== */
+@media (max-width: 640px) {
+  .ProseMirror {
+    padding: 16px 14px;
+    padding-bottom: 35vh;
+    box-shadow: none;
+  }
+  .image-action-btn {
+    opacity: 1 !important;
+    width: 32px;
+    height: 32px;
+    top: 8px;
+    right: 8px;
+  }
 }
 `
 }

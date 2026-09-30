@@ -140,9 +140,7 @@ export class ImageView implements NodeView {
           ImageLightbox.open({ src: img.src, alt: img.alt })
         }
       } else {
-        const handleContextMenu = (e: MouseEvent) => {
-          e.preventDefault()
-          e.stopPropagation()
+        const triggerMenu = (clientX: number, clientY: number) => {
           const pos = this.getPos()
           if (pos === undefined) return
           const detail = {
@@ -150,8 +148,8 @@ export class ImageView implements NodeView {
             src: this.currentSrc,
             alt: this.node.attrs.alt,
             title: this.node.attrs.title,
-            clientX: e.clientX,
-            clientY: e.clientY,
+            clientX,
+            clientY,
           }
           const event = new CustomEvent('editor-image-context-menu', {
             bubbles: true,
@@ -161,8 +159,47 @@ export class ImageView implements NodeView {
           this.view.dom.dispatchEvent(event)
           window.dispatchEvent(new CustomEvent('editor-image-context-menu', { detail }))
         }
+
+        const handleContextMenu = (e: MouseEvent) => {
+          // On touch devices, do not block native touch behavior with contextmenu; the user has the '···' button
+          if ((e as any).pointerType === 'touch' || ('ontouchstart' in window && !window.matchMedia('(pointer: fine)').matches)) {
+            return
+          }
+          e.preventDefault()
+          e.stopPropagation()
+          triggerMenu(e.clientX, e.clientY)
+        }
         img.addEventListener('contextmenu', handleContextMenu)
         this.mediaContainer.addEventListener('contextmenu', handleContextMenu)
+
+        // Кнопка `···` для действий с картинкой (стиль сайта, защита от выделения)
+        const actionBtn = document.createElement('button')
+        actionBtn.className = 'image-action-btn'
+        actionBtn.type = 'button'
+        actionBtn.setAttribute('aria-label', 'Image actions')
+        actionBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>'
+
+        const onActionTrigger = (e: Event) => {
+          e.preventDefault()
+          e.stopPropagation()
+          if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur()
+          }
+          const rect = actionBtn.getBoundingClientRect()
+          triggerMenu(rect.left, rect.bottom + 4)
+        }
+
+        actionBtn.addEventListener('click', onActionTrigger)
+        actionBtn.addEventListener('touchstart', onActionTrigger, { passive: false })
+        actionBtn.addEventListener('pointerdown', (e) => {
+          e.preventDefault()
+          e.stopPropagation()
+        })
+        actionBtn.addEventListener('mousedown', (e) => {
+          e.preventDefault()
+          e.stopPropagation()
+        })
+        this.mediaContainer.appendChild(actionBtn)
       }
       
       this.mediaContainer.appendChild(img)

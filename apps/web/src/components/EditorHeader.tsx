@@ -140,7 +140,7 @@ export default function EditorHeader({
   return (
     <header className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 shrink-0">
       {/* Main row */}
-      <div className="flex items-center px-3 sm:px-4 gap-2 sm:gap-3 h-14">
+      <div className="flex items-center px-3 sm:px-4 gap-2 sm:gap-3 h-12 sm:h-14">
         <div className="flex items-center gap-1.5 shrink-0">
           <button
             onClick={() => {
@@ -156,7 +156,7 @@ export default function EditorHeader({
             <ChevronLeft size={20} />
           </button>
           <Link to="/" className="shrink-0 hover:opacity-80 flex items-center" title="Type Club">
-            <img src="/icons/icon_48x48.png" alt="Type Club" className="h-8 w-8" />
+            <img src="/icons/icon_48x48.png" alt="Type Club" className="h-7 w-7 sm:h-8 sm:w-8" />
           </Link>
         </div>
 
@@ -165,7 +165,7 @@ export default function EditorHeader({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder={t('common.untitled')}
-          className="flex-1 bg-transparent text-base sm:text-lg font-semibold outline-none placeholder-gray-300 dark:placeholder-gray-600 min-w-0"
+          className="flex-1 bg-transparent text-sm sm:text-lg font-semibold outline-none placeholder-gray-300 dark:placeholder-gray-600 min-w-0"
         />
 
         {/* Desktop: buttons inline */}
@@ -177,8 +177,9 @@ export default function EditorHeader({
 
         {/* Mobile: menu toggle */}
         <button
-          className="sm:hidden p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 shrink-0"
+          className="sm:hidden p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors shrink-0"
           onClick={() => setMenuOpen(!menuOpen)}
+          aria-label="Menu"
         >
           {menuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
@@ -186,12 +187,91 @@ export default function EditorHeader({
 
       {/* Mobile: expandable menu */}
       {menuOpen && (
-        <div className="sm:hidden border-t border-gray-200 dark:border-gray-800 px-3 py-2 space-y-2 bg-white dark:bg-gray-950">
-          <div className="flex items-center gap-2">
-            <SuggestionBadge />
-            <ModeSwitcher />
+        <div className="sm:hidden border-t border-gray-200 dark:border-gray-800 px-3 py-2 space-y-1.5 bg-white dark:bg-gray-950 shadow-md animate-in slide-in-from-top-1 fade-in duration-150 ease-out">
+          {/* Mode Switcher - full width segmented control */}
+          {!isSuggestionActive && (
+            <div>
+              <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 w-full">
+                {modes.map((m) => (
+                  <button
+                    key={m.mode}
+                    onClick={() => {
+                      handleModeChange(m.mode);
+                      setMenuOpen(false);
+                    }}
+                    className={`flex-1 py-1 text-[11px] font-medium rounded transition-all text-center ${
+                      editorMode === m.mode
+                        ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs"
+                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Row 2: Advisor, Synced, Publish all in ONE compact row */}
+          <div className="flex items-center gap-1.5 w-full">
+            {/* Advisor Toggle / Badge */}
+            {editorMode === "seamless" && (
+              userRole === "editor" ? (
+                <div
+                  className="flex-1 min-w-0 h-7.5 px-2 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 text-[11px] font-medium border border-amber-200 dark:border-amber-800 flex items-center justify-center gap-1.5 shrink-0 cursor-default"
+                  title={t('titlebar.advisorBadgeTitle')}
+                >
+                  <Lightbulb size={13} className="shrink-0 text-amber-500" />
+                  <span className="truncate">{t('titlebar.advisorBadge')}</span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onToggleSuggestionMode?.(!suggestionModeActive)}
+                  className={`flex-1 min-w-0 h-7.5 px-2 rounded-lg text-[11px] font-medium transition-all flex items-center justify-center gap-1.5 ${
+                    suggestionModeActive
+                      ? "bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 shadow-xs"
+                      : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 border border-transparent"
+                  }`}
+                  title={suggestionModeActive ? t('titlebar.turnOffSuggestion') : t('titlebar.turnOnSuggestion')}
+                >
+                  <Lightbulb size={13} className={`shrink-0 ${suggestionModeActive ? "text-amber-500" : "text-gray-400"}`} />
+                  <span className="truncate">{t('titlebar.advisorBadge')}</span>
+                </button>
+              )
+            )}
+
+            {/* Synced Status */}
+            {collabActive && (
+              <div
+                className={`flex-1 min-w-0 h-7.5 px-2 rounded-lg flex items-center justify-center gap-1.5 text-[11px] font-medium border ${
+                  collabSynced
+                    ? "bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900/50"
+                    : "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900/50"
+                }`}
+                title={collabSynced ? t('editor.syncedDesc') : t('editor.connecting')}
+              >
+                {collabSynced ? <Cloud size={13} className="shrink-0" /> : <RefreshCw size={13} className="animate-spin shrink-0" />}
+                <span className="truncate">{collabSynced ? t('editor.synced') : t('editor.syncing')}</span>
+              </div>
+            )}
+
+            {/* Publish Button */}
+            {isAuthor && (
+              <button
+                type="button"
+                onClick={() => {
+                  onPublish();
+                  setMenuOpen(false);
+                }}
+                className="flex-1 min-w-0 h-7.5 px-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-[11px] flex items-center justify-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                title={t('editor.publish')}
+              >
+                <Globe size={13} className="shrink-0" />
+                <span className="truncate">{t('editor.publish')}</span>
+              </button>
+            )}
           </div>
-          <ActionButtons />
         </div>
       )}
 

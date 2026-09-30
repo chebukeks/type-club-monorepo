@@ -264,7 +264,7 @@ export default function SiteHeader({ onLogoClick }: SiteHeaderProps) {
       </div>
 
       {menuOpen && (
-        <div className="md:hidden border-t border-gray-200 dark:border-gray-800 p-4 bg-white dark:bg-gray-950">
+        <div className="md:hidden border-t border-gray-200 dark:border-gray-800 p-4 bg-white dark:bg-gray-950 animate-in slide-in-from-top-2 fade-in duration-200 ease-out">
           {navLinks.map((l) => (
             <Link key={l.to} to={l.to} onClick={() => setMenuOpen(false)}
               className="block px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800">

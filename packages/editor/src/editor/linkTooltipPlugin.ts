@@ -9,7 +9,8 @@ class TooltipView {
   view: EditorView
   activeUrl: string = ''
   activeRange: { from: number; to: number } | null = null
-  isImage: boolean = false
+
+  private onImageMenu: () => void
 
   constructor(view: EditorView) {
     this.view = view
@@ -41,6 +42,14 @@ class TooltipView {
     } else {
       document.body.appendChild(this.tooltip)
     }
+
+    this.onImageMenu = () => {
+      this.hide()
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('editor-image-context-menu', this.onImageMenu)
+    }
+
     this.hide()
   }
 
@@ -48,28 +57,17 @@ class TooltipView {
     if (!this.activeRange) return
     const newUrl = this.input.value
 
-    // Если значение не менялось (или это сокращённый data: URI), не обновляем
-    if (newUrl === this.activeUrl || (this.activeUrl.startsWith('data:') && newUrl.includes('(встроенное изображение)'))) {
+    if (newUrl === this.activeUrl) {
       this.hide()
       this.view.focus()
       return
     }
 
     const tr = this.view.state.tr
-
-    if (this.isImage) {
-      // Обновляем атрибут src у картинки
-      tr.setNodeMarkup(this.activeRange.from, null, {
-        ...this.view.state.doc.nodeAt(this.activeRange.from)!.attrs,
-        src: newUrl
-      })
-    } else {
-      // Обновляем mark у ссылки
-      const { schema } = this.view.state
-      tr.removeMark(this.activeRange.from, this.activeRange.to, schema.marks.link)
-      if (newUrl) {
-        tr.addMark(this.activeRange.from, this.activeRange.to, schema.marks.link.create({ href: newUrl }))
-      }
+    const { schema } = this.view.state
+    tr.removeMark(this.activeRange.from, this.activeRange.to, schema.marks.link)
+    if (newUrl) {
+      tr.addMark(this.activeRange.from, this.activeRange.to, schema.marks.link.create({ href: newUrl }))
     }
 
     this.view.dispatch(tr)
@@ -81,87 +79,49 @@ class TooltipView {
     const state = view.state
     const { selection } = state
 
-    // Прячем тултип, если выделение изменилось и мы не находимся в тултипе
+    // Прячем тултип, если фокус в инпуте тултипа
     if (document.activeElement === this.input) return
 
-    if (!selection.empty && !this.isImageNodeSelection(view)) {
+    if (!selection.empty) {
       this.hide()
       return
     }
 
-    // Ищем марку link
+    // Ищем марку link у курсора
     const $pos = selection.$from
     const linkMark = $pos.marks().find(m => m.type.name === 'link')
-    
-    // Ищем ноду image (например, если она выделена как NodeSelection)
-    const nodeAfter = $pos.nodeAfter
-    const isImage = nodeAfter && nodeAfter.type.name === 'image' && selection.from === $pos.pos && selection.to === $pos.pos + nodeAfter.nodeSize
 
-    if (!linkMark && !isImage) {
+    if (!linkMark) {
       this.hide()
       return
     }
 
-    this.isImage = !!isImage
-    this.activeUrl = isImage ? nodeAfter!.attrs.src : linkMark!.attrs.href
+    this.activeUrl = linkMark.attrs.href || ''
 
-    // Находим полный диапазон марки (или ноды)
-    if (isImage) {
-      this.activeRange = { from: $pos.pos, to: $pos.pos + nodeAfter!.nodeSize }
-    } else {
-      const parent = $pos.parent
-      const parentStart = $pos.start()
-      
-      let startOffset = $pos.parentOffset
-      let endOffset = $pos.parentOffset
+    // Находим полный диапазон марки link
+    const parent = $pos.parent
+    const parentStart = $pos.start()
 
-      while (startOffset > 0 && parent.childBefore(startOffset).node?.marks.includes(linkMark!)) {
-        startOffset -= parent.childBefore(startOffset).node!.nodeSize
+    let from = parentStart
+    let to = parentStart
+    parent.forEach((child, offset) => {
+      if (child.marks.includes(linkMark)) {
+        if (from === parentStart) from = parentStart + offset
+        to = parentStart + offset + child.nodeSize
       }
-      while (endOffset < parent.nodeSize - 2 && parent.childAfter(endOffset).node?.marks.includes(linkMark!)) {
-        endOffset += parent.childAfter(endOffset).node!.nodeSize
-      }
+    })
+    this.activeRange = { from, to }
 
-      // Упрощенный поиск диапазона ссылки, если курсор внутри (можно использовать из seamlessPlugin, но тут он локальный)
-      let from = parentStart, to = parentStart
-      parent.forEach((child, offset) => {
-        if (child.marks.includes(linkMark!)) {
-          if (from === parentStart) from = parentStart + offset
-          to = parentStart + offset + child.nodeSize
-        }
-      })
-      this.activeRange = { from, to }
-    }
-
-    // Для data: URI показываем сокращённую версию, чтобы не вешать браузер
-    // (полный URL может быть 3+ МБ)
-    if (this.activeUrl && this.activeUrl.startsWith('data:')) {
-      const commaIdx = this.activeUrl.indexOf(',')
-      const header = commaIdx !== -1 ? this.activeUrl.substring(0, commaIdx) : 'data:image'
-      this.input.value = header + ',… (встроенное изображение)'
-    } else {
-      this.input.value = this.activeUrl
-    }
+    this.input.value = this.activeUrl
     this.show()
-    
+
     // Позиционируем
     const coords = view.coordsAtPos(this.activeRange.from)
-    const parent = this.view.dom.parentNode as HTMLElement
-    const parentRect = parent ? parent.getBoundingClientRect() : { left: 0, top: 0 }
-    
-    this.tooltip.style.left = (coords.left - parentRect.left) + 'px'
-    this.tooltip.style.top = (coords.bottom - parentRect.top) + 5 + 'px' // чуть ниже текста
-  }
+    const parentEl = this.view.dom.parentNode as HTMLElement
+    const parentRect = parentEl ? parentEl.getBoundingClientRect() : { left: 0, top: 0 }
 
-  isImageNodeSelection(view: EditorView) {
-    const { selection } = view.state
-    if (selection.from !== selection.to) {
-      const node = view.state.doc.nodeAt(selection.from)
-      if (node && node.type.name === 'image' && selection.to === selection.from + node.nodeSize) {
-        return true
-      }
-    }
-    return false
+    this.tooltip.style.left = (coords.left - parentRect.left) + 'px'
+    this.tooltip.style.top = (coords.bottom - parentRect.top) + 5 + 'px'
   }
 
   show() {
@@ -174,6 +134,9 @@ class TooltipView {
   }
 
   destroy() {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('editor-image-context-menu', this.onImageMenu)
+    }
     this.tooltip.remove()
   }
 }

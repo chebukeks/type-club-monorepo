@@ -1,4 +1,4 @@
-﻿# AGENTS.md — Guidelines for AI Coding Assistants
+# AGENTS.md — Guidelines for AI Coding Assistants
 
 This file provides rules, architectural context, and development guidelines for AI assistants working in this repository.
 
@@ -44,4 +44,6 @@ Type Club is an npm workspaces monorepo:
 - **Type Safety**: The frontend and desktop builds include `tsc` type checking. All TypeScript code must compile without errors (`npm run build`).
 - **Editor Architecture**: The editor uses a custom ProseMirror plugin pipeline in `packages/editor/src/editor/`. When editing editor behavior, inspect existing plugins before adding new ones.
 - **Localization**: UI text across web, desktop, and editor is localized (Russian and English). Keep both translation tables updated when adding user-facing strings.
+- **Mobile & Touch UX**: When adding buttons to toolbars or overlays over the ProseMirror editor, always attach `onPointerDown={(e) => e.preventDefault()}` so that tapping controls does not cause ProseMirror to blur or dismiss the mobile virtual keyboard. For viewport keyboard tracking, rely on `window.visualViewport`.
+- **Role-Based Article Permissions**: Only users with the author role (`userRole === "author" || isNew || !userRole`) can publish articles. Co-authors and editors (advisors) cannot publish.
 - **Git Hygiene**: Keep commits focused and atomic with descriptive commit messages.
