@@ -42,6 +42,11 @@ class RegisterRequest(BaseModel):
             raise ValueError("Nickname can only contain Latin letters, numbers, underscores and hyphens")
         return v
 
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return v.strip().lower() if v else v
+
     @field_validator("password")
     @classmethod
     def validate_password(cls, v: str) -> str:
@@ -58,6 +63,11 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return v.strip().lower() if v else v
 
 
 class TokenResponse(BaseModel):
@@ -134,6 +144,11 @@ class VerifyEmailRequest(BaseModel):
     token: Optional[str] = None
     email: Optional[EmailStr] = None
 
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, v: Optional[str]) -> Optional[str]:
+        return v.strip().lower() if v else v
+
 
 class ResendVerificationResponse(BaseModel):
     message: str
@@ -141,6 +156,11 @@ class ResendVerificationResponse(BaseModel):
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return v.strip().lower() if v else v
 
 
 class ForgotPasswordResponse(BaseModel):

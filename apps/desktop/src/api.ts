@@ -68,16 +68,22 @@ export interface TokenResponse {
 
 export const authApi = {
   register: (data: { nickname: string; email: string; password: string; confirm_password: string }) =>
-    api.post<TokenResponse>("/auth/register", data),
+    api.post<TokenResponse>("/auth/register", { ...data, email: data.email.trim().toLowerCase() }),
   login: (data: { email: string; password: string }) =>
-    api.post<TokenResponse>("/auth/login", data),
+    api.post<TokenResponse>("/auth/login", { ...data, email: data.email.trim().toLowerCase() }),
   me: () => api.get<User>("/auth/me"),
   updateMe: (data: { nickname?: string; password?: string; confirm_password?: string }) =>
     api.patch<User>("/auth/me", data),
   verifyEmail: (data: { code: string; email?: string }) =>
-    api.post<{ message: string }>("/auth/verify-email", data),
+    api.post<{ message: string }>("/auth/verify-email", {
+      ...data,
+      email: data.email ? data.email.trim().toLowerCase() : undefined,
+    }),
   resendVerification: (data?: { email?: string }) =>
-    api.post<{ message: string }>("/auth/resend-verification", data),
+    api.post<{ message: string }>("/auth/resend-verification", {
+      ...data,
+      email: data?.email ? data.email.trim().toLowerCase() : undefined,
+    }),
 };
 
 // ── Articles ──

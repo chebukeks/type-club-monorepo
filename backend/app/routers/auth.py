@@ -3,7 +3,7 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, status
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.rate_limit import limiter
@@ -112,7 +112,7 @@ async def register(
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
 ):
-    existing = (await session.execute(select(User).where(User.email == data.email))).scalar_one_or_none()
+    existing = (await session.execute(select(User).where(func.lower(User.email) == data.email.lower().strip()))).scalar_one_or_none()
     if existing:
         raise HTTPException(status_code=409, detail="Email already registered")
 
@@ -122,7 +122,7 @@ async def register(
 
     user = User(
         nickname=data.nickname,
-        email=data.email,
+        email=data.email.lower().strip(),
         password_hash=hash_password(data.password),
     )
     session.add(user)
@@ -141,7 +141,7 @@ async def login(
     data: LoginRequest,
     session: AsyncSession = Depends(get_session),
 ):
-    user = (await session.execute(select(User).where(User.email == data.email))).scalar_one_or_none()
+    user = (await session.execute(select(User).where(func.lower(User.email) == data.email.lower().strip()))).scalar_one_or_none()
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
@@ -211,7 +211,7 @@ async def verify_email(
 
     target_user_id = current_user.id if current_user else None
     if not target_user_id and data.email:
-        u = (await session.execute(select(User).where(User.email == data.email))).scalar_one_or_none()
+        u = (await session.execute(select(User).where(func.lower(User.email) == data.email.lower().strip()))).scalar_one_or_none()
         if u:
             target_user_id = u.id
 
@@ -255,7 +255,7 @@ async def resend_verification(
 ):
     user = current_user
     if not user and data and data.email:
-        user = (await session.execute(select(User).where(User.email == data.email))).scalar_one_or_none()
+        user = (await session.execute(select(User).where(func.lower(User.email) == data.email.lower().strip()))).scalar_one_or_none()
 
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated or email not found")
@@ -302,7 +302,7 @@ async def forgot_password(
     data: ForgotPasswordRequest,
     session: AsyncSession = Depends(get_session),
 ):
-    user = (await session.execute(select(User).where(User.email == data.email))).scalar_one_or_none()
+    user = (await session.execute(select(User).where(func.lower(User.email) == data.email.lower().strip()))).scalar_one_or_none()
     if user:
         await session.execute(
             update(VerificationToken)

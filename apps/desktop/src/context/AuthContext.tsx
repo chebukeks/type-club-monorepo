@@ -41,26 +41,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const login = async (email: string, password: string) => {
-    const res = await authApi.login({ email, password });
+    const res = await authApi.login({ email: email.trim().toLowerCase(), password });
     setToken(res.access_token);
     const u = await authApi.me();
     setUser(u);
   };
 
   const register = async (nickname: string, email: string, password: string, confirm: string) => {
-    const res = await authApi.register({ nickname, email, password, confirm_password: confirm });
+    const res = await authApi.register({
+      nickname: nickname.trim(),
+      email: email.trim().toLowerCase(),
+      password,
+      confirm_password: confirm,
+    });
     setToken(res.access_token);
     const u = await authApi.me();
     setUser(u);
   };
 
   const verifyEmail = async (code: string, email?: string) => {
-    await authApi.verifyEmail({ code, email });
+    await authApi.verifyEmail({ code, email: email ? email.trim().toLowerCase() : undefined });
     await refresh();
   };
 
   const resendVerification = async (email?: string) => {
-    await authApi.resendVerification({ email });
+    await authApi.resendVerification({ email: email ? email.trim().toLowerCase() : undefined });
   };
 
   const logout = () => {
