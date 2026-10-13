@@ -160,6 +160,14 @@ export default function Editor() {
     [articleId, title, content, navigate, t]
   );
 
+  if (articleId && !loaded) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-[var(--bg-base)]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen flex flex-col overflow-hidden">
       <EditorHeader

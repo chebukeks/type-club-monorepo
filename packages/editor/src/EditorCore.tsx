@@ -169,7 +169,21 @@ export function EditorCore({
       viewRef.current = null;
     }
 
-    const doc = parseMarkdown(content);
+    let doc: PMNode;
+    if (collaboration) {
+      if (collaboration.yXmlFragment.length > 0) {
+        try {
+          const json = yXmlFragmentToProsemirrorJSON(collaboration.yXmlFragment);
+          doc = schema.nodeFromJSON(json);
+        } catch {
+          doc = schema.topNodeType.createAndFill()!;
+        }
+      } else {
+        doc = schema.topNodeType.createAndFill()!;
+      }
+    } else {
+      doc = parseMarkdown(content);
+    }
     const isPreview = editorMode === "preview" || readOnly;
 
     const tabPlugin = keymap({
@@ -226,7 +240,9 @@ export function EditorCore({
           destroy() {
             if (syncTimer) {
               clearTimeout(syncTimer);
-              flush(lastDoc);
+              if (!collaboration || lastDoc.content.size > 0) {
+                flush(lastDoc);
+              }
             }
           },
         };

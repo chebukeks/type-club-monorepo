@@ -2,6 +2,8 @@ import { WebSocketServer, WebSocket } from "ws"
 import * as Y from "yjs"
 import * as encoding from "lib0/encoding"
 import * as decoding from "lib0/decoding"
+import * as fs from "fs"
+import * as path from "path"
 import {
   messageYjsSyncStep1,
   messageYjsSyncStep2,
@@ -23,10 +25,54 @@ if (!SERVICE_TOKEN) {
 const SAVE_DEBOUNCE_MS = parseInt(process.env.SAVE_DEBOUNCE_MS || "8000", 10)
 // Max consecutive auto-retries of a failed save (avoids hot-looping).
 const MAX_SAVE_RETRIES = 5
-// Keep the in-memory doc alive this long after the last client leaves.
-const DOC_TTL_MS = 60_000
+// Keep the in-memory doc alive this long after the last client leaves (15 mins).
+const DOC_TTL_MS = parseInt(process.env.DOC_TTL_MS || "900000", 10)
 // Yjs XmlFragment key — MUST match the client (useCollaboration.ts).
 const FRAGMENT_KEY = "content"
+
+// Directory for persisting Yjs binary CRDT snapshots on disk across doc evictions/restarts.
+const STORAGE_DIR = process.env.STORAGE_DIR || path.resolve(process.cwd(), "storage")
+try {
+  if (!fs.existsSync(STORAGE_DIR)) {
+    fs.mkdirSync(STORAGE_DIR, { recursive: true })
+  }
+} catch (err) {
+  console.warn("[storage] failed to create storage dir:", err)
+}
+
+function getDocFilePath(articleId: number): string {
+  return path.join(STORAGE_DIR, `article-${articleId}.ydoc`)
+}
+
+function loadDocFromDisk(state: DocState): boolean {
+  try {
+    const filePath = getDocFilePath(state.articleId)
+    if (fs.existsSync(filePath)) {
+      const data = fs.readFileSync(filePath)
+      if (data.length > 0) {
+        Y.applyUpdate(state.doc, new Uint8Array(data))
+        state.seeded = true
+        console.log(`[storage] article=${state.articleId} restored from disk (${data.length} bytes)`)
+        return true
+      }
+    }
+  } catch (err) {
+    console.error(`[storage] article=${state.articleId} failed to read disk state:`, err)
+  }
+  return false
+}
+
+function saveDocToDisk(state: DocState): void {
+  try {
+    const filePath = getDocFilePath(state.articleId)
+    const update = Y.encodeStateAsUpdate(state.doc)
+    if (update.length > 0) {
+      fs.writeFileSync(filePath, Buffer.from(update))
+    }
+  } catch (err) {
+    console.error(`[storage] article=${state.articleId} failed to write disk state:`, err)
+  }
+}
 
 const messageSync = 0
 const messageAwareness = 1
@@ -42,7 +88,6 @@ interface DocState {
   awareness: Awareness
   clients: Map<WebSocket, ClientInfo>
   articleId: number
-  initPromise: Promise<void>
   seeded: boolean
   dirty: boolean
   saving: boolean
@@ -64,7 +109,6 @@ function getOrCreateDoc(articleId: number): DocState {
     awareness,
     clients: new Map(),
     articleId,
-    initPromise: Promise.resolve(),
     seeded: false,
     dirty: false,
     saving: false,
@@ -100,13 +144,23 @@ function getOrCreateDoc(articleId: number): DocState {
     }
   })
 
-  newState.initPromise = seedFromBackend(newState)
+  // First, attempt to restore from local disk cache
+  const loadedFromDisk = loadDocFromDisk(newState)
+  if (loadedFromDisk) {
+    newState.seeded = true
+  }
+
   return state
 }
 
 // ── Seeding: DB markdown → Yjs XmlFragment (once, on first open) ──
 
 async function seedFromBackend(state: DocState): Promise<void> {
+  const fragment = state.doc.getXmlFragment(FRAGMENT_KEY)
+  if (fragment.length > 0) {
+    state.seeded = true
+    return
+  }
   try {
     const res = await fetch(`${BACKEND_URL}/api/articles/${state.articleId}/content`, {
       headers: { Authorization: `Bearer ${SERVICE_TOKEN}` },
@@ -116,10 +170,10 @@ async function seedFromBackend(state: DocState): Promise<void> {
       return
     }
     const data = (await res.json()) as { content?: string }
-    const fragment = state.doc.getXmlFragment(FRAGMENT_KEY)
     if (fragment.length === 0) {
       seedYFragmentFromMarkdown(data.content || "", fragment)
       console.log(`[seed] article=${state.articleId} seeded ${(data.content || "").length} chars`)
+      saveDocToDisk(state)
     }
   } catch (err) {
     console.error(`[seed] article=${state.articleId} error:`, err)
@@ -155,6 +209,7 @@ async function persist(state: DocState): Promise<void> {
       return
     }
     const content = yFragmentToMarkdown(fragment)
+    saveDocToDisk(state)
 
     const res = await fetch(`${BACKEND_URL}/api/articles/${state.articleId}/sync-state`, {
       method: "PATCH",
@@ -197,6 +252,8 @@ async function flush(state: DocState): Promise<void> {
   }
   if (state.dirty) {
     await persist(state)
+  } else {
+    saveDocToDisk(state)
   }
 }
 
@@ -436,7 +493,38 @@ wss.on("connection", async (ws, req) => {
     role: verifiedRole,
   })
 
-  await state.initPromise
+  // Smart Seeding:
+  // If the document has not yet been seeded (neither in-memory nor from disk):
+  if (!state.seeded) {
+    let clientHasState = false
+    for (const msg of pending) {
+      try {
+        const dec = decoding.createDecoder(msg)
+        const outer = decoding.readVarUint(dec)
+        if (outer === messageSync) {
+          const inner = decoding.readVarUint(dec)
+          if (inner === messageYjsSyncStep1) {
+            const sv = decoding.readVarUint8Array(dec)
+            const decodedSV = Y.decodeStateVector(sv)
+            if (decodedSV.size > 0) {
+              clientHasState = true
+              break
+            }
+          }
+        }
+      } catch (err) {
+        // ignore decoding errors
+      }
+    }
+
+    if (clientHasState) {
+      console.log(`[ws] article=${articleId} client has existing Yjs state (${clientHasState}), skipping DB seed to prevent duplication`)
+      state.seeded = true
+    } else {
+      await seedFromBackend(state)
+    }
+  }
+
   if (ws.readyState !== WebSocket.OPEN) return
 
   ws.send(encodeSyncStep1(state.doc))
