@@ -29,6 +29,9 @@ FROM node:22-alpine
 WORKDIR /app
 COPY --from=build --chown=node:node /app/services/collab-server/dist ./dist
 
+# Writable dir for persisted Yjs CRDT snapshots (server runs as non-root `node`)
+RUN mkdir -p /app/storage && chown node:node /app/storage
+
 # SECURITY: Run as non-root user
 USER node
 
