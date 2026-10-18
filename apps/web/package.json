@@ -11,7 +11,7 @@
   "dependencies": {
     "@type-club/editor": "*",
     "highlight.js": "^11.11.1",
-    "katex": "^0.18.11",
+    "katex": "^0.18.0",
     "lucide-react": "^1.6.0",
     "markdown-it": "^14.3.1",
     "markdown-it-mark": "^4.0.0",

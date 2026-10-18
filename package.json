@@ -42,7 +42,7 @@
     "minimatch@9": {
       "brace-expansion": "^2.1.7"
     },
-    "katex": "^0.18.11",
+    "katex": "^0.18.0",
     "markdown-it": "^14.3.1",
     "prosemirror-view": "^1.42.6",
     "react-router": "^7.18.4",

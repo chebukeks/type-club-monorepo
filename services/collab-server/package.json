@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@type-club/editor": "*",
-    "katex": "^0.18.11",
+    "katex": "^0.18.0",
     "lib0": "^0.2.93",
     "markdown-it": "^14.3.1",
     "markdown-it-mark": "^4",
