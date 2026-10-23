@@ -910,7 +910,7 @@ ipcMain.handle('export:pdf', async (_event, htmlContent: string, defaultName: st
     const pdfBuffer = await printWin.webContents.printToPDF({
       printBackground: true,
       pageSize: 'A4',
-      margins: { marginType: 'none' },
+      margins: { top: 0, bottom: 0, left: 0, right: 0 },
       generateDocumentOutline: true
     })
     
