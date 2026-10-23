@@ -57,5 +57,16 @@ export { createCollaborationPlugins } from "./editor/collaborationPlugin";
 export { spellcheckPlugin, spellcheckPluginKey } from "./editor/spellcheckPlugin";
 export { spellcheckService } from "./editor/spellcheckService";
 
+export { seedYFragmentFromMarkdown, yFragmentToMarkdown } from "./editor/collabSync";
+export {
+  generateSuggestionId,
+  createSuggestionTags,
+  parseSuggestionsFromMarkdown,
+  applySuggestionDecision,
+  getCleanMarkdown,
+  proposeSuggestionInMarkdown,
+} from "./editor/suggestionUtils";
+export type { ParsedSuggestion, CreateSuggestionOptions } from "./editor/suggestionUtils";
+
 export type { EditorMode, EditorProps, FocusMode, TocItem, SuggestionItem, CollaborationConfig } from "./types";
 export * from "./i18n";

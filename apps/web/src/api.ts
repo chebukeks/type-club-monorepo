@@ -380,3 +380,26 @@ export function formatNotificationItem(
 
   return { title: title || n.title, message: message || n.message, link };
 }
+
+// ── API Keys / PAT ──
+
+export interface ApiKeyItem {
+  id: number;
+  name: string;
+  prefix: string;
+  scopes: string[];
+  created_at: string;
+  expires_at: string | null;
+  last_used_at: string | null;
+}
+
+export interface ApiKeyCreatedItem extends ApiKeyItem {
+  token: string;
+}
+
+export const apiKeysApi = {
+  list: () => api.get<ApiKeyItem[]>("/api-keys"),
+  create: (data: { name: string; scopes: string[]; expires_in_days?: number }) =>
+    api.post<ApiKeyCreatedItem>("/api-keys", data),
+  delete: (id: number) => api.delete<void>(`/api-keys/${id}`),
+};

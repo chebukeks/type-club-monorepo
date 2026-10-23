@@ -430,3 +430,55 @@ class NotificationListResponse(BaseModel):
     items: list[NotificationResponse]
     unread_count: int
     total: int
+
+
+# ── API Keys / PAT ──
+
+VALID_API_KEY_SCOPES = {
+    "articles:read",
+    "articles:write",
+    "articles:manage",
+    "articles:delete",
+}
+
+
+class ApiKeyCreateRequest(BaseModel):
+    name: str
+    scopes: list[str] = ["articles:read", "articles:write", "articles:manage"]
+    expires_in_days: Optional[int] = None
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v or len(v) < 2:
+            raise ValueError("Key name must be at least 2 characters")
+        if len(v) > 100:
+            raise ValueError("Key name must be at most 100 characters")
+        return v
+
+    @field_validator("scopes")
+    @classmethod
+    def validate_scopes(cls, v: list[str]) -> list[str]:
+        if not v:
+            raise ValueError("At least one scope is required")
+        for s in v:
+            if s not in VALID_API_KEY_SCOPES:
+                raise ValueError(f"Invalid scope: {s}. Valid scopes: {sorted(list(VALID_API_KEY_SCOPES))}")
+        return sorted(list(set(v)))
+
+
+class ApiKeyResponse(BaseModel):
+    id: int
+    name: str
+    prefix: str
+    scopes: list[str]
+    created_at: datetime
+    expires_at: Optional[datetime] = None
+    last_used_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class ApiKeyCreatedResponse(ApiKeyResponse):
+    token: str

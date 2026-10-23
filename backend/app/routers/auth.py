@@ -19,7 +19,8 @@ from app.auth import (
 from app.config import settings
 from app.database import get_session
 from app.mail import send_reset_password_email, send_verification_email
-from app.models import User, VerificationToken
+import hashlib
+from app.models import ApiKey, User, VerificationToken
 from app.schemas import (
     ForgotPasswordRequest,
     ForgotPasswordResponse,
@@ -38,6 +39,32 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 logger = logging.getLogger(__name__)
 
 
+async def _resolve_token_user(
+    token: str, session: AsyncSession
+) -> tuple[User | None, ApiKey | None]:
+    if token.startswith("tc_pat_"):
+        key_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        result = await session.execute(
+            select(ApiKey).where(ApiKey.key_hash == key_hash)
+        )
+        api_key = result.scalar_one_or_none()
+        if not api_key:
+            return None, None
+        now = datetime.datetime.now(datetime.timezone.utc)
+        if api_key.expires_at and api_key.expires_at < now:
+            return None, None
+        api_key.last_used_at = now
+        await session.commit()
+        user = await session.get(User, api_key.user_id)
+        return user, api_key
+    else:
+        user_id = decode_jwt(token)
+        if user_id is None:
+            return None, None
+        user = await session.get(User, user_id)
+        return user, None
+
+
 async def get_current_user(
     session: AsyncSession = Depends(get_session),
     authorization: str | None = Header(None),
@@ -47,12 +74,11 @@ async def get_current_user(
     token = authorization.removeprefix("Bearer ").strip()
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    user_id = decode_jwt(token)
-    if user_id is None:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    user = await session.get(User, user_id)
+    user, api_key = await _resolve_token_user(token, session)
     if user is None:
-        raise HTTPException(status_code=401, detail="User not found")
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    if api_key is not None:
+        setattr(user, "_api_key", api_key)
     return user
 
 
@@ -65,10 +91,37 @@ async def get_optional_user(
     token = authorization.removeprefix("Bearer ").strip()
     if not token:
         return None
-    user_id = decode_jwt(token)
-    if user_id is None:
-        return None
-    return await session.get(User, user_id)
+    user, api_key = await _resolve_token_user(token, session)
+    if user is not None and api_key is not None:
+        setattr(user, "_api_key", api_key)
+    return user
+
+
+def check_scope(user: User | None, scope: str) -> None:
+    if not user:
+        return
+    api_key: ApiKey | None = getattr(user, "_api_key", None)
+    if api_key is not None:
+        granted = [s.strip() for s in api_key.scopes.split(",") if s.strip()]
+        if scope not in granted:
+            raise HTTPException(
+                status_code=403,
+                detail=f"API key missing required scope: {scope}",
+            )
+
+
+def require_scope(required_scope: str):
+    async def _dependency(current_user: User = Depends(get_current_user)) -> User:
+        api_key: ApiKey | None = getattr(current_user, "_api_key", None)
+        if api_key is not None:
+            granted = [s.strip() for s in api_key.scopes.split(",") if s.strip()]
+            if required_scope not in granted:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"API key missing required scope: {required_scope}",
+                )
+        return current_user
+    return _dependency
 
 
 async def get_verified_user(

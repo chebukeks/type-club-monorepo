@@ -1,8 +1,9 @@
 import { useState, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { authApi, usersApi } from "../api";
+import { ApiKeySettings } from "../components/ApiKeySettings";
 
 function nickError(n: string, t: (k: any) => string): string | null {
   const tr = n.trim();
@@ -23,6 +24,9 @@ export default function Settings() {
   const { user, refresh } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentTab = searchParams.get("tab") || "profile";
+
   const [nickname, setNickname] = useState(user?.nickname || "");
   const [bio, setBio] = useState(user?.bio || "");
   const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url || "");
@@ -108,8 +112,8 @@ export default function Settings() {
   };
 
   return (
-    <div className="max-w-md mx-auto px-4 py-12">
-      <div className="flex items-center gap-2 mb-8">
+    <div className="max-w-lg mx-auto px-4 py-12">
+      <div className="flex items-center gap-2 mb-6">
         <button
           onClick={() => navigate(`/${user.nickname}`)}
           className="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
@@ -119,7 +123,35 @@ export default function Settings() {
         <h1 className="text-2xl font-bold">{t('titlebar.settings')}</h1>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="flex border-b border-gray-200 dark:border-gray-800 mb-6">
+        <button
+          type="button"
+          onClick={() => setSearchParams({ tab: "profile" })}
+          className={`pb-2 px-4 text-sm font-semibold border-b-2 transition-colors ${
+            currentTab === "profile"
+              ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400"
+              : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+          }`}
+        >
+          {t('settings.tabProfile')}
+        </button>
+        <button
+          type="button"
+          onClick={() => setSearchParams({ tab: "mcp" })}
+          className={`pb-2 px-4 text-sm font-semibold border-b-2 transition-colors ${
+            currentTab === "mcp"
+              ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400"
+              : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+          }`}
+        >
+          {t('settings.tabMcp')}
+        </button>
+      </div>
+
+      {currentTab === "mcp" ? (
+        <ApiKeySettings />
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-4">
         {msg && <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950 text-green-600 text-sm">{msg}</div>}
         {error && <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950 text-red-600 text-sm">{error}</div>}
 
@@ -264,6 +296,7 @@ export default function Settings() {
           {loading ? t('settings.uploading') : t('settings.saveChanges')}
         </button>
       </form>
+      )}
     </div>
   );
 }

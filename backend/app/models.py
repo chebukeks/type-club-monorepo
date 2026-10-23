@@ -25,6 +25,7 @@ class User(Base):
     articles: Mapped[list["Article"]] = relationship(back_populates="author", lazy="selectin")
     likes: Mapped[list["ArticleLike"]] = relationship(back_populates="user", lazy="selectin", cascade="all, delete-orphan")
     comments: Mapped[list["Comment"]] = relationship(back_populates="user", lazy="selectin", cascade="all, delete-orphan")
+    api_keys: Mapped[list["ApiKey"]] = relationship(back_populates="user", lazy="selectin", cascade="all, delete-orphan")
 
 
 class Article(Base):
@@ -177,3 +178,21 @@ class Notification(Base):
     user: Mapped["User"] = relationship(foreign_keys=[user_id], lazy="selectin")
     sender: Mapped[Optional["User"]] = relationship(foreign_keys=[sender_id], lazy="selectin")
     article: Mapped[Optional["Article"]] = relationship(foreign_keys=[article_id], lazy="selectin")
+
+
+class ApiKey(Base):
+    __tablename__ = "typeclub_api_keys"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("typeclub_users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    prefix: Mapped[str] = mapped_column(String(20), nullable=False)
+    key_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    scopes: Mapped[str] = mapped_column(String(255), nullable=False, default="articles:read,articles:write,articles:manage")
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped["User"] = relationship(back_populates="api_keys")

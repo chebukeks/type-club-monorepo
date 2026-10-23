@@ -14,7 +14,7 @@ from app.config import settings
 from app.models import Base
 from app.database import engine
 from app.rate_limit import limiter
-from app.routers import auth, articles, users, comments, stats, og, og_image, sitemap, notifications, images
+from app.routers import auth, articles, users, comments, stats, og, og_image, sitemap, notifications, images, api_keys
 
 logging.basicConfig(level=settings.log_level.upper())
 logger = logging.getLogger(__name__)
@@ -65,6 +65,7 @@ app.include_router(og_image.router)
 app.include_router(sitemap.router)
 app.include_router(notifications.router)
 app.include_router(images.router)
+app.include_router(api_keys.router)
 
 uploads_dir = settings.uploads_dir
 os.makedirs(uploads_dir, exist_ok=True)

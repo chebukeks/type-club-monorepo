@@ -1,0 +1,29 @@
+{
+  "name": "@type-club/mcp-server",
+  "version": "0.1.0",
+  "description": "Model Context Protocol (MCP) server for Type Club platform",
+  "type": "module",
+  "bin": {
+    "type-club-mcp": "./dist/index.cjs"
+  },
+  "main": "./dist/index.cjs",
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --format=cjs --target=node20 --outfile=dist/index.cjs --external:bufferutil --external:utf-8-validate",
+    "start": "node dist/index.cjs",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.0",
+    "@type-club/editor": "*",
+    "ws": "^8.18.0",
+    "yjs": "^13.6.14",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/ws": "^8.5.10",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.4.0"
+  }
+}

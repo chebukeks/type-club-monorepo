@@ -10,7 +10,7 @@ from app.database import get_session
 from app.models import Article, ArticleLike, CollaborationMember, Notification, User
 from app.config import settings
 from app.utils import escape_like
-from app.routers.auth import get_current_user, get_moderator_user, get_optional_user, get_verified_user
+from app.routers.auth import check_scope, get_current_user, get_moderator_user, get_optional_user, get_verified_user
 from app.schemas import (
     ArticleCreateRequest,
     ArticleListItem,
@@ -83,6 +83,8 @@ async def list_articles(
     current_user: User | None = Depends(get_optional_user),
     session: AsyncSession = Depends(get_session),
 ):
+    if current_user:
+        check_scope(current_user, "articles:read")
     offset = (page - 1) * size
     conditions = []
     if not (current_user and current_user.role == "moderator"):
@@ -123,6 +125,8 @@ async def list_my_articles(
     current_user: User = Depends(get_verified_user),
     session: AsyncSession = Depends(get_session),
 ):
+    if current_user:
+        check_scope(current_user, "articles:read")
     offset = (page - 1) * size
     if roles is None:
         wanted_roles = list(VALID_MY_ROLES)
@@ -190,6 +194,7 @@ async def create_article(
     current_user: User = Depends(get_verified_user),
     session: AsyncSession = Depends(get_session),
 ):
+    check_scope(current_user, "articles:manage")
     slug = data.slug or _slugify(data.title)
     existing = (
         await session.execute(
@@ -266,6 +271,10 @@ async def update_article(
     current_user: User = Depends(get_verified_user),
     session: AsyncSession = Depends(get_session),
 ):
+    if data.content is not None:
+        check_scope(current_user, "articles:write")
+    if data.title is not None or data.access_state is not None or data.slug is not None:
+        check_scope(current_user, "articles:manage")
     article = await session.get(Article, article_id)
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
@@ -335,6 +344,7 @@ async def delete_article(
     current_user: User = Depends(get_verified_user),
     session: AsyncSession = Depends(get_session),
 ):
+    check_scope(current_user, "articles:delete")
     article = await session.get(Article, article_id)
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
@@ -355,6 +365,7 @@ async def list_collaborators(
     current_user: User = Depends(get_verified_user),
     session: AsyncSession = Depends(get_session),
 ):
+    check_scope(current_user, "articles:read")
     article = await session.get(Article, article_id)
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
@@ -387,6 +398,7 @@ async def invite_collaborator(
     current_user: User = Depends(get_verified_user),
     session: AsyncSession = Depends(get_session),
 ):
+    check_scope(current_user, "articles:manage")
     article = await session.get(Article, article_id)
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
@@ -447,6 +459,7 @@ async def remove_collaborator(
     current_user: User = Depends(get_verified_user),
     session: AsyncSession = Depends(get_session),
 ):
+    check_scope(current_user, "articles:manage")
     article = await session.get(Article, article_id)
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
