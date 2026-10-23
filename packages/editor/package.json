@@ -6,8 +6,8 @@
   "types": "./src/index.ts",
   "peerDependencies": {
     "highlight.js": "^11",
-    "katex": "^0.16",
-    "markdown-it": "^14",
+    "katex": "^0.18.0",
+    "markdown-it": "^14.3.1",
     "markdown-it-mark": "^4",
     "markdown-it-task-lists": "^2",
     "markdown-it-texmath": "^1",
@@ -32,6 +32,6 @@
     "yjs": "^13.6"
   },
   "dependencies": {
-    "mermaid": "^11.17.2"
+    "mermaid": "^12.2.0"
   }
 }
