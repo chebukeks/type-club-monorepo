@@ -23,7 +23,8 @@ describe('Suggestion Utilities', () => {
     assert.ok(tags.includes('class="suggestion-insert"'))
     assert.ok(tags.includes('correction'))
     assert.ok(tags.includes('class="suggestion-note"'))
-    assert.ok(tags.includes('data-sug-note-text="Fix typo"'))
+    assert.ok(tags.includes('data-note-id="test_sug_123"'))
+    assert.ok(tags.includes('data-note-text="Fix typo"'))
   })
 
   it('should parse suggestions from markdown string', () => {

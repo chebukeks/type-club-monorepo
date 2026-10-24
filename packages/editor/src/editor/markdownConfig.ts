@@ -176,11 +176,11 @@ function suggestionHtmlPlugin(md: MarkdownIt) {
           const rest = noteMatch[2]
           const noteTok = new state.Token('suggestion_note', 'span', 0)
           noteTok.attrs = [
-            ['noteId', extractAttr(attrStr, 'data-note-id')],
+            ['noteId', extractAttr(attrStr, 'data-note-id') || extractAttr(attrStr, 'data-od-id')],
             ['sugAuthorId', extractAttr(attrStr, 'data-sug-author-id')],
             ['sugAuthorName', extractAttr(attrStr, 'data-sug-author-name')],
             ['sugColor', extractAttr(attrStr, 'data-sug-color')],
-            ['noteText', extractAttr(attrStr, 'data-note-text')],
+            ['noteText', extractAttr(attrStr, 'data-note-text') || extractAttr(attrStr, 'data-sug-note-text')],
             ['sugCreatedAt', extractAttr(attrStr, 'data-sug-created-at')],
           ]
           newChildren.push(noteTok)

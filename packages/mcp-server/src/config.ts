@@ -31,7 +31,7 @@ export function loadConfig(): ServerConfig {
 
   const apiUrl = (process.env.TYPECLUB_API_URL || 'http://localhost:8000').replace(/\/+$/, '')
   const apiKey = (process.env.TYPECLUB_API_KEY || '').trim()
-  const wsUrl = (process.env.TYPECLUB_WS_URL || 'ws://localhost:4444').replace(/\/+$/, '')
+  const wsUrl = (process.env.TYPECLUB_WS_URL || 'ws://localhost:8001').replace(/\/+$/, '')
 
   return {
     apiUrl,

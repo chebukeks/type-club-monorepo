@@ -36,6 +36,16 @@ export interface CollaboratorItem {
   invited_at: string
 }
 
+export interface CommentItem {
+  id: number
+  article_id: number
+  user_id: number
+  author_nickname: string
+  content: string
+  created_at: string
+  updated_at: string
+}
+
 export class TypeClubApiClient {
   private apiUrl: string
   private apiKey: string
@@ -186,6 +196,32 @@ export class TypeClubApiClient {
 
   async removeCollaborator(articleId: number, userId: number): Promise<void> {
     await this.request<void>(`/api/articles/${articleId}/collaborators/${userId}`, {
+      method: 'DELETE',
+    })
+  }
+
+  async listComments(
+    articleId: number,
+    params: { page?: number; size?: number; sort?: 'newest' | 'oldest' } = {}
+  ): Promise<CommentItem[]> {
+    return this.request<CommentItem[]>(`/api/articles/${articleId}/comments`, {
+      query: {
+        page: params.page || 1,
+        size: params.size || 20,
+        sort: params.sort || 'newest',
+      },
+    })
+  }
+
+  async addComment(articleId: number, content: string): Promise<CommentItem> {
+    return this.request<CommentItem>(`/api/articles/${articleId}/comments`, {
+      method: 'POST',
+      body: { content },
+    })
+  }
+
+  async deleteComment(commentId: number): Promise<void> {
+    await this.request<void>(`/api/comments/${commentId}`, {
       method: 'DELETE',
     })
   }

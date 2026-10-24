@@ -53,7 +53,7 @@ export function createSuggestionTags(opts: CreateSuggestionOptions): string {
 
   if (opts.comment) {
     const note = escapeAttr(opts.comment)
-    result += `<span class="suggestion-note" data-od-id="${odId}" data-sug-author-id="${authorId}" data-sug-author-name="${authorName}" data-sug-note-text="${note}" data-sug-created-at="${createdAt}"></span>`
+    result += `<span class="suggestion-note" data-note-id="${odId}" data-od-id="${odId}" data-sug-author-id="${authorId}" data-sug-author-name="${authorName}" data-sug-color="${color}" data-note-text="${note}" data-sug-note-text="${note}" data-sug-created-at="${createdAt}"></span>`
   }
 
   return result
@@ -123,8 +123,8 @@ export function parseSuggestionsFromMarkdown(markdown: string): ParsedSuggestion
   const noteRegex = /<span\s+class="suggestion-note"([^>]*)><\/span>/gi
   while ((match = noteRegex.exec(markdown)) !== null) {
     const attrs = match[1]
-    const odIdMatch = attrs.match(/data-od-id="([^"]*)"/)
-    const noteTextMatch = attrs.match(/data-sug-note-text="([^"]*)"/)
+    const odIdMatch = attrs.match(/data-note-id="([^"]*)"/) || attrs.match(/data-od-id="([^"]*)"/)
+    const noteTextMatch = attrs.match(/data-note-text="([^"]*)"/) || attrs.match(/data-sug-note-text="([^"]*)"/)
 
     const odId = odIdMatch ? odIdMatch[1] : ''
     if (!odId) continue
@@ -158,7 +158,7 @@ export function applySuggestionDecision(
     'gi'
   )
   const notePattern = new RegExp(
-    `<span\\s+class="suggestion-note"[^>]*data-od-id="${escapedOdId}"[^>]*><\\/span>`,
+    `<span\\s+class="suggestion-note"[^>]*(?:data-note-id|data-od-id)="${escapedOdId}"[^>]*><\\/span>`,
     'gi'
   )
 

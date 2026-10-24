@@ -110,11 +110,11 @@ export const suggestionNoteNode: NodeSpec = {
       tag: "span.suggestion-note",
       getAttrs(dom: HTMLElement) {
         return {
-          noteId: dom.getAttribute("data-note-id") || "",
+          noteId: dom.getAttribute("data-note-id") || dom.getAttribute("data-od-id") || "",
           sugAuthorId: Number(dom.getAttribute("data-sug-author-id")) || 0,
           sugAuthorName: dom.getAttribute("data-sug-author-name") || "",
           sugColor: dom.style.getPropertyValue("--sug-color") || "#f59e0b",
-          noteText: dom.getAttribute("data-note-text") || "",
+          noteText: dom.getAttribute("data-note-text") || dom.getAttribute("data-sug-note-text") || "",
           sugCreatedAt: dom.getAttribute("data-sug-created-at") || "",
         };
       },

@@ -20,7 +20,8 @@ export function ApiKeySettings() {
   const [expiresInDays, setExpiresInDays] = useState<number | undefined>(undefined);
   const [creating, setCreating] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [configFormat, setConfigFormat] = useState<"claude" | "cursor" | "cli">("claude");
+  const [configFormat, setConfigFormat] = useState<"claude" | "cursor">("claude");
+  const [runMode, setRunMode] = useState<"local" | "npx">("local");
 
   const loadKeys = async () => {
     setLoading(true);
@@ -88,17 +89,24 @@ export function ApiKeySettings() {
 
   const currentOrigin =
     typeof window !== "undefined" ? window.location.origin : "https://type-club.ru";
+  const wsOrigin = currentOrigin.includes("localhost") || currentOrigin.includes("127.0.0.1")
+    ? "ws://localhost:8001"
+    : currentOrigin.replace(/^http/, "ws") + "/collab";
 
   const getClaudeConfig = (token: string) => {
+    const isLocal = runMode === "local";
     return JSON.stringify(
       {
         mcpServers: {
           "type-club": {
-            command: "npx",
-            args: ["-y", "@type-club/mcp-server"],
+            command: isLocal ? "node" : "npx",
+            args: isLocal
+              ? ["packages/mcp-server/dist/index.cjs"]
+              : ["-y", "@type-club/mcp-server"],
             env: {
               TYPECLUB_API_KEY: token,
               TYPECLUB_API_URL: currentOrigin,
+              TYPECLUB_WS_URL: wsOrigin,
             },
           },
         },
@@ -109,13 +117,15 @@ export function ApiKeySettings() {
   };
 
   const getCursorConfig = (token: string) => {
+    const isLocal = runMode === "local";
     return JSON.stringify(
       {
         typeClub: {
-          command: "npx -y @type-club/mcp-server",
+          command: isLocal ? "node packages/mcp-server/dist/index.cjs" : "npx -y @type-club/mcp-server",
           env: {
             TYPECLUB_API_KEY: token,
             TYPECLUB_API_URL: currentOrigin,
+            TYPECLUB_WS_URL: wsOrigin,
           },
         },
       },
@@ -346,18 +356,45 @@ export function ApiKeySettings() {
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                  {t("settings.mcp.configSnippet")}
-                </label>
+              <div className="flex flex-col gap-2 mb-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                    {t("settings.mcp.configSnippet")}
+                  </label>
+                  <div className="flex gap-1 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => setRunMode("local")}
+                      className={`px-2 py-0.5 rounded font-medium ${
+                        runMode === "local"
+                          ? "bg-emerald-600 text-white"
+                          : "bg-gray-100 dark:bg-gray-800 text-gray-500"
+                      }`}
+                    >
+                      Локально (директория)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRunMode("npx")}
+                      className={`px-2 py-0.5 rounded font-medium ${
+                        runMode === "npx"
+                          ? "bg-emerald-600 text-white"
+                          : "bg-gray-100 dark:bg-gray-800 text-gray-500"
+                      }`}
+                    >
+                      NPM (npx)
+                    </button>
+                  </div>
+                </div>
+
                 <div className="flex gap-1 text-xs">
                   <button
                     type="button"
                     onClick={() => setConfigFormat("claude")}
-                    className={`px-2 py-0.5 rounded ${
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
                       configFormat === "claude"
                         ? "bg-blue-600 text-white"
-                        : "bg-gray-100 dark:bg-gray-800 text-gray-500"
+                        : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
                     }`}
                   >
                     Claude Desktop
@@ -365,13 +402,13 @@ export function ApiKeySettings() {
                   <button
                     type="button"
                     onClick={() => setConfigFormat("cursor")}
-                    className={`px-2 py-0.5 rounded ${
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
                       configFormat === "cursor"
                         ? "bg-blue-600 text-white"
-                        : "bg-gray-100 dark:bg-gray-800 text-gray-500"
+                        : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
                     }`}
                   >
-                    Cursor / Other
+                    Cursor / Antigravity
                   </button>
                 </div>
               </div>

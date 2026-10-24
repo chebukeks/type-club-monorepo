@@ -37,14 +37,7 @@ export function registerTools(
     const hasCollaborators = (await api.listCollaborators(articleId)).length > 0
 
     if (hasCollaborators) {
-      try {
-        return await collab.modifyCollaborativeArticle(articleId, modifier)
-      } catch (err: any) {
-        // If collab server is unavailable, attempt fallback via REST
-        const updatedMarkdown = modifier(article.content || '')
-        await api.updateArticle(articleId, { content: updatedMarkdown })
-        return updatedMarkdown
-      }
+      return await collab.modifyCollaborativeArticle(articleId, modifier)
     } else {
       const updatedMarkdown = modifier(article.content || '')
       await api.updateArticle(articleId, { content: updatedMarkdown })
@@ -553,6 +546,91 @@ export function registerTools(
         return {
           isError: true,
           content: [{ type: 'text', text: `Failed to remove collaborator: ${err.message}` }],
+        }
+      }
+    }
+  )
+
+  // 13. list_comments
+  server.tool(
+    'list_comments',
+    'List comments for an article.',
+    {
+      article_id: z.number().int().describe('Article ID'),
+      page: z.number().int().min(1).default(1).describe('Page number'),
+      limit: z.number().int().min(1).max(50).default(20).describe('Comments per page'),
+      sort: z.enum(['newest', 'oldest']).default('newest').describe('Sort order'),
+    },
+    async ({ article_id, page, limit, sort }) => {
+      try {
+        const comments = await api.listComments(article_id, { page, size: limit, sort })
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(comments, null, 2),
+            },
+          ],
+        }
+      } catch (err: any) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: `Failed to list comments: ${err.message}` }],
+        }
+      }
+    }
+  )
+
+  // 14. add_comment
+  server.tool(
+    'add_comment',
+    'Add a comment to an article.',
+    {
+      article_id: z.number().int().describe('Article ID'),
+      content: z.string().min(1).max(5000).describe('Comment content'),
+    },
+    async ({ article_id, content }) => {
+      try {
+        const comment = await api.addComment(article_id, content)
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Comment added successfully:\n${JSON.stringify(comment, null, 2)}`,
+            },
+          ],
+        }
+      } catch (err: any) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: `Failed to add comment: ${err.message}` }],
+        }
+      }
+    }
+  )
+
+  // 15. delete_comment
+  server.tool(
+    'delete_comment',
+    'Delete a comment by its ID.',
+    {
+      comment_id: z.number().int().describe('Comment ID to delete'),
+    },
+    async ({ comment_id }) => {
+      try {
+        await api.deleteComment(comment_id)
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Comment ${comment_id} deleted successfully.`,
+            },
+          ],
+        }
+      } catch (err: any) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: `Failed to delete comment: ${err.message}` }],
         }
       }
     }

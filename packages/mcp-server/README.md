@@ -27,8 +27,25 @@ Allows AI assistants (Claude Desktop, Cursor, Antigravity, etc.) to securely rea
 3. Click **Generate API Key**, select the desired scopes and expiration, then copy your secret token.
 
 ### 2. Configure Claude Desktop
-Add to your `claude_desktop_config.json`:
 
+**Local Monorepo Build:**
+```json
+{
+  "mcpServers": {
+    "type-club": {
+      "command": "node",
+      "args": ["packages/mcp-server/dist/index.cjs"],
+      "env": {
+        "TYPECLUB_API_KEY": "tc_pat_your_token_here",
+        "TYPECLUB_API_URL": "http://localhost:5173",
+        "TYPECLUB_WS_URL": "ws://localhost:8001"
+      }
+    }
+  }
+}
+```
+
+**Global / NPM:**
 ```json
 {
   "mcpServers": {
@@ -45,8 +62,24 @@ Add to your `claude_desktop_config.json`:
 ```
 
 ### 3. Configure Cursor / Antigravity
-In Cursor MCP Settings or `.cursor/mcp.json`:
 
+**Local Monorepo Build:**
+```json
+{
+  "mcpServers": {
+    "typeClub": {
+      "command": "node packages/mcp-server/dist/index.cjs",
+      "env": {
+        "TYPECLUB_API_KEY": "tc_pat_your_token_here",
+        "TYPECLUB_API_URL": "http://localhost:5173",
+        "TYPECLUB_WS_URL": "ws://localhost:8001"
+      }
+    }
+  }
+}
+```
+
+**Global / NPM:**
 ```json
 {
   "mcpServers": {
@@ -73,13 +106,16 @@ In Cursor MCP Settings or `.cursor/mcp.json`:
 | `create_article` | `articles:manage` | Create a new article draft |
 | `update_article` | `articles:manage` | Update title, slug, or visibility (`confirm: true` required when publishing) |
 | `delete_article` | `articles:delete` | Permanently delete an article (`confirm: true` required) |
-| `edit_content` | `articles:write` | Direct content rewrite or targeted patch |
+| `edit_content` | `articles:write` | Direct content rewrite or targeted patch (collaborative articles sync via Yjs) |
 | `propose_suggestion` | `articles:write` | Propose an advisor suggestion with diff and note |
 | `list_suggestions` | `articles:read` | List all pending advisor suggestions on an article |
 | `review_suggestion` | `articles:write` | Accept or reject a suggestion by its `odId` |
 | `list_collaborators` | `articles:read` | List co-authors and advisors |
 | `invite_collaborator`| `articles:manage` | Invite a collaborator (`coauthor` or `editor`) |
 | `remove_collaborator`| `articles:manage` | Remove a collaborator |
+| `list_comments` | `articles:read` | List comments for an article |
+| `add_comment` | `articles:write` | Add a comment to an article |
+| `delete_comment` | `articles:delete` | Delete a comment |
 
 ---
 

@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
 from app.models import Article, Comment, Notification, User
-from app.routers.auth import get_current_user, get_optional_user, get_verified_user
+from app.routers.auth import check_scope, get_current_user, get_optional_user, get_verified_user
 from app.schemas import CommentCreateRequest, CommentResponse, CommentUpdateRequest
 
 router = APIRouter(tags=["comments"])
@@ -36,6 +36,8 @@ async def list_comments(
     current_user: User | None = Depends(get_optional_user),
     session: AsyncSession = Depends(get_session),
 ):
+    if current_user:
+        check_scope(current_user, "articles:read")
     article = await session.get(Article, article_id)
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
@@ -84,6 +86,7 @@ async def create_comment(
     current_user: User = Depends(get_verified_user),
     session: AsyncSession = Depends(get_session),
 ):
+    check_scope(current_user, "articles:write")
     article = await session.get(Article, article_id)
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
@@ -151,6 +154,7 @@ async def delete_comment(
     current_user: User = Depends(get_verified_user),
     session: AsyncSession = Depends(get_session),
 ):
+    check_scope(current_user, "articles:delete")
     comment = await session.get(Comment, comment_id)
     if not comment:
         raise HTTPException(status_code=404, detail="Comment not found")
