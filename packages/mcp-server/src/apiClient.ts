@@ -74,6 +74,7 @@ export class TypeClubApiClient {
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      'X-Agent-Source': 'TypeClub-MCP',
     }
     if (this.apiKey) {
       headers['Authorization'] = `Bearer ${this.apiKey}`

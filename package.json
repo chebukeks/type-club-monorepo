@@ -15,7 +15,7 @@
     "build:desktop:mac": "npm run build:mac -w apps/desktop",
     "build:mcp": "npm run build -w packages/mcp-server",
     "build": "npm run build:web && npm run build:desktop && npm run build:mcp",
-    "test": "tsx --test apps/desktop/src/utils/__tests__/*.test.ts packages/editor/src/**/__tests__/*.test.ts apps/web/src/**/__tests__/*.test.ts"
+    "test": "tsx --test apps/desktop/src/utils/__tests__/*.test.ts packages/editor/src/**/__tests__/*.test.ts apps/web/src/**/__tests__/*.test.ts packages/mcp-server/src/**/__tests__/*.test.ts"
   },
   "devDependencies": {
     "tsx": "^4.19.3"
