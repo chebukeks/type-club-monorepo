@@ -1,6 +1,6 @@
 import React, { useState, useRef } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, User, Bot, Camera, Shield, CheckCircle2, AlertCircle, ExternalLink, KeyRound } from "lucide-react";
+import { ChevronLeft, User, Bot, Camera, Shield, CheckCircle2, AlertCircle, ExternalLink, KeyRound } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { authApi, usersApi } from "../api";
@@ -118,10 +118,10 @@ export default function Settings() {
       <div className="mb-6 sm:mb-8">
         <button
           onClick={() => navigate(`/${user.nickname}`)}
-          className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-900 dark:hover:text-gray-200 transition-colors mb-3"
+          className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-900 dark:hover:text-gray-200 transition-colors mb-3 cursor-pointer"
         >
-          <ArrowLeft size={14} />
-          {t('settings.backToProfile')}
+          <ChevronLeft size={15} />
+          <span>{t('settings.backToProfile')}</span>
         </button>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>

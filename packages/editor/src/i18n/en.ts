@@ -559,7 +559,7 @@ export const en = {
   'comments.loadMore': 'Load more (page {page} of {totalPages})',
 
   // Settings
-  'settings.backToProfile': '← Back to profile',
+  'settings.backToProfile': 'Back to profile',
   'settings.avatar': 'Avatar',
   'settings.uploadNew': 'Upload new',
   'settings.uploading': 'Uploading...',
@@ -602,6 +602,8 @@ export const en = {
   'settings.mcp.configSnippet': 'Configuration for Claude Desktop / Cursor',
   'settings.mcp.copied': 'Copied to clipboard',
   'settings.mcp.revoke': 'Revoke',
+  'settings.mcp.revokeTitle': 'Revoke API Key',
+  'settings.mcp.revokeWarning': 'All connected clients and AI assistants will immediately lose access to Type Club. This action cannot be undone.',
   'settings.mcp.revokeConfirm': 'Are you sure you want to revoke key "{name}"? All connected clients will immediately lose access.',
   'settings.mcp.lastUsed': 'Last used',
   'settings.mcp.neverUsed': 'Never used',

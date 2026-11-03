@@ -23,6 +23,8 @@ export function ApiKeySettings() {
   const [error, setError] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createdKey, setCreatedKey] = useState<ApiKeyCreatedItem | null>(null);
+  const [keyToRevoke, setKeyToRevoke] = useState<ApiKeyItem | null>(null);
+  const [revoking, setRevoking] = useState(false);
 
   // Form fields
   const [keyName, setKeyName] = useState("");
@@ -83,16 +85,18 @@ export function ApiKeySettings() {
     }
   };
 
-  const handleDelete = async (key: ApiKeyItem) => {
-    const confirmed = window.confirm(
-      t("settings.mcp.revokeConfirm", { name: key.name })
-    );
-    if (!confirmed) return;
+  const confirmRevoke = async () => {
+    if (!keyToRevoke) return;
+    setRevoking(true);
+    setError("");
     try {
-      await apiKeysApi.delete(key.id);
+      await apiKeysApi.delete(keyToRevoke.id);
+      setKeyToRevoke(null);
       loadKeys();
     } catch (err: any) {
       setError(err.message || "Failed to delete API key");
+    } finally {
+      setRevoking(false);
     }
   };
 
@@ -328,7 +332,7 @@ export function ApiKeySettings() {
 
                   <button
                     type="button"
-                    onClick={() => handleDelete(k)}
+                    onClick={() => setKeyToRevoke(k)}
                     className="inline-flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium self-end sm:self-center px-2.5 py-1.5 rounded-lg border border-red-200/60 dark:border-red-900/40 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer shrink-0"
                     title={t("settings.mcp.revoke")}
                   >
@@ -739,6 +743,55 @@ export function ApiKeySettings() {
                 className="px-6 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors cursor-pointer shadow-xs"
               >
                 {t("common.close")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 3: Custom Revoke Confirmation Modal */}
+      {keyToRevoke && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-200 dark:border-gray-800 space-y-4 my-8">
+            <div className="flex items-center gap-3">
+              <span className="p-2 rounded-xl bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 shrink-0">
+                <Trash2 size={18} />
+              </span>
+              <div>
+                <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">
+                  {t("settings.mcp.revokeTitle")}
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">
+                  {keyToRevoke.name} ({keyToRevoke.prefix})
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200/60 dark:border-red-900/40 text-red-800 dark:text-red-300 text-xs leading-relaxed space-y-1.5">
+              <p className="font-semibold">
+                Вы уверены, что хотите отозвать ключ «{keyToRevoke.name}»?
+              </p>
+              <p className="text-red-700 dark:text-red-400">
+                {t("settings.mcp.revokeWarning")}
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-gray-100 dark:border-gray-800">
+              <button
+                type="button"
+                disabled={revoking}
+                onClick={() => setKeyToRevoke(null)}
+                className="px-4 py-2 rounded-xl text-xs font-medium text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                type="button"
+                disabled={revoking}
+                onClick={confirmRevoke}
+                className="px-4 py-2 rounded-xl bg-red-600 text-white text-xs font-semibold hover:bg-red-700 disabled:opacity-50 transition-colors cursor-pointer shadow-xs"
+              >
+                {revoking ? t("settings.uploading") : t("settings.mcp.revoke")}
               </button>
             </div>
           </div>

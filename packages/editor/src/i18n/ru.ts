@@ -561,7 +561,7 @@ export const ru: Record<TranslationKey, string> = {
   'comments.loadMore': 'Загрузить ещё (страница {page} из {totalPages})',
 
   // Settings
-  'settings.backToProfile': '← Назад к профилю',
+  'settings.backToProfile': 'Назад к профилю',
   'settings.avatar': 'Аватар',
   'settings.uploadNew': 'Загрузить новый',
   'settings.uploading': 'Загрузка...',
@@ -604,6 +604,8 @@ export const ru: Record<TranslationKey, string> = {
   'settings.mcp.configSnippet': 'Конфигурация для Claude Desktop / Cursor',
   'settings.mcp.copied': 'Скопировано в буфер обмена',
   'settings.mcp.revoke': 'Отозвать',
+  'settings.mcp.revokeTitle': 'Отозвать API-ключ',
+  'settings.mcp.revokeWarning': 'Все подключенные клиенты и ИИ-ассистенты немедленно потеряют доступ к Type Club. Это действие нельзя отменить.',
   'settings.mcp.revokeConfirm': 'Вы уверены, что хотите отозвать ключ «{name}»? Все подключенные клиенты перестанут работать.',
   'settings.mcp.lastUsed': 'Использован',
   'settings.mcp.neverUsed': 'Ещё не использовался',
