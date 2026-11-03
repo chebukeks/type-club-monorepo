@@ -47,7 +47,7 @@ export function ApiKeySettings() {
       const data = await apiKeysApi.list();
       setKeys(data);
     } catch (err: any) {
-      setError(err.message || "Failed to load API keys");
+      setError(err.message || t("settings.mcp.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -79,7 +79,7 @@ export function ApiKeySettings() {
       setKeyName("");
       loadKeys();
     } catch (err: any) {
-      setError(err.message || "Failed to create API key");
+      setError(err.message || t("settings.mcp.createFailed"));
     } finally {
       setCreating(false);
     }
@@ -94,7 +94,7 @@ export function ApiKeySettings() {
       setKeyToRevoke(null);
       loadKeys();
     } catch (err: any) {
-      setError(err.message || "Failed to delete API key");
+      setError(err.message || t("settings.mcp.deleteFailed"));
     } finally {
       setRevoking(false);
     }
@@ -166,39 +166,39 @@ export function ApiKeySettings() {
 
   const getConfigPathHint = () => {
     if (configFormat === "claude") {
-      return "%APPDATA%\\Claude\\claude_desktop_config.json (Windows) или ~/Library/Application Support/Claude/claude_desktop_config.json (macOS)";
+      return t("settings.mcp.pathHintClaude");
     }
     if (configFormat === "cursor") {
-      return "Cursor Settings → Features → MCP Servers → Add New MCP Server";
+      return t("settings.mcp.pathHintCursor");
     }
-    return ".gemini/antigravity/mcp_config.json или настройки MCP в VS Code";
+    return t("settings.mcp.pathHintAntigravity");
   };
 
   const getScopeMeta = (id: string) => {
     switch (id) {
       case "articles:read":
         return {
-          title: "Чтение и поиск",
+          title: t("settings.mcp.scopeReadTitle"),
           tag: "read",
-          desc: "Поиск в каталоге, чтение публичных статей и личных черновиков",
+          desc: t("settings.mcp.scopeReadDesc"),
         };
       case "articles:write":
         return {
-          title: "Редактирование и советы",
+          title: t("settings.mcp.scopeWriteTitle"),
           tag: "write",
-          desc: "Режим предложений советника, комментирование и прямое редактирование",
+          desc: t("settings.mcp.scopeWriteDesc"),
         };
       case "articles:manage":
         return {
-          title: "Управление статьями",
+          title: t("settings.mcp.scopeManageTitle"),
           tag: "manage",
-          desc: "Создание новых статей и приглашение соавторов",
+          desc: t("settings.mcp.scopeManageDesc"),
         };
       case "articles:delete":
         return {
-          title: "Удаление",
+          title: t("settings.mcp.scopeDeleteTitle"),
           tag: "delete",
-          desc: "Удаление статей и комментариев (деструктивные действия)",
+          desc: t("settings.mcp.scopeDeleteDesc"),
         };
       default:
         return { title: id, tag: id, desc: "" };
@@ -267,7 +267,7 @@ export function ApiKeySettings() {
                   {t("settings.mcp.noKeys")}
                 </p>
                 <p className="text-xs text-gray-400 max-w-sm mx-auto">
-                  Создайте персональный ключ доступа, чтобы наделить ИИ-ассистента полномочиями для работы с вашими статьями.
+                  {t("settings.mcp.emptyDesc")}
                 </p>
               </div>
               <button
@@ -276,7 +276,7 @@ export function ApiKeySettings() {
                 className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
               >
                 <Plus size={14} />
-                <span>Создать первый ключ</span>
+                <span>{t("settings.mcp.createFirstKey")}</span>
               </button>
             </div>
           ) : (
@@ -325,7 +325,7 @@ export function ApiKeySettings() {
                           {new Date(k.expires_at).toLocaleDateString()}
                         </span>
                       ) : (
-                        <span>Бессрочный</span>
+                        <span>{t("settings.mcp.expiresNeverBadge")}</span>
                       )}
                     </div>
                   </div>
@@ -380,7 +380,7 @@ export function ApiKeySettings() {
             <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-800">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                  Пример конфигурации
+                  {t("settings.mcp.configExample")}
                 </span>
                 {/* Format switcher */}
                 <div className="flex gap-1 text-[11px] p-0.5 rounded-lg bg-gray-100 dark:bg-gray-800">
@@ -393,7 +393,7 @@ export function ApiKeySettings() {
                         : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
                     }`}
                   >
-                    Локально
+                    {t("settings.mcp.runLocal")}
                   </button>
                   <button
                     type="button"
@@ -404,7 +404,7 @@ export function ApiKeySettings() {
                         : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
                     }`}
                   >
-                    npx
+                    {t("settings.mcp.runNpx")}
                   </button>
                 </div>
               </div>
@@ -616,7 +616,7 @@ export function ApiKeySettings() {
             {/* Token box */}
             <div>
               <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
-                API Token ({createdKey.name})
+                {t("settings.mcp.apiTokenLabel", { name: createdKey.name })}
               </label>
               <div className="flex items-center gap-2">
                 <input
@@ -663,7 +663,7 @@ export function ApiKeySettings() {
                           : "text-gray-500"
                       }`}
                     >
-                      Локально
+                      {t("settings.mcp.runLocal")}
                     </button>
                     <button
                       type="button"
@@ -674,7 +674,7 @@ export function ApiKeySettings() {
                           : "text-gray-500"
                       }`}
                     >
-                      npx
+                      {t("settings.mcp.runNpx")}
                     </button>
                   </div>
 
@@ -769,7 +769,7 @@ export function ApiKeySettings() {
 
             <div className="p-3.5 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200/60 dark:border-red-900/40 text-red-800 dark:text-red-300 text-xs leading-relaxed space-y-1.5">
               <p className="font-semibold">
-                Вы уверены, что хотите отозвать ключ «{keyToRevoke.name}»?
+                {t("settings.mcp.revokeQuestion", { name: keyToRevoke.name })}
               </p>
               <p className="text-red-700 dark:text-red-400">
                 {t("settings.mcp.revokeWarning")}

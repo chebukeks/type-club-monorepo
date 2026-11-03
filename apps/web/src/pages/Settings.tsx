@@ -129,14 +129,14 @@ export default function Settings() {
               {t('titlebar.settings')}
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Управление личными данными, безопасностью и подключением ИИ через MCP
+              {t('settings.subtitle')}
             </p>
           </div>
           <Link
             to={`/${user.nickname}`}
             className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors self-start sm:self-auto py-1.5 px-3 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-700"
           >
-            <span>Публичная страница</span>
+            <span>{t('settings.publicProfile')}</span>
             <ExternalLink size={13} />
           </Link>
         </div>
@@ -219,7 +219,7 @@ export default function Settings() {
                   {user.nickname}
                 </h3>
                 <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
-                  {user.role === "moderator" ? "Модератор" : "Автор"}
+                  {user.role === "moderator" ? t('settings.roleModerator') : t('settings.roleAuthor')}
                 </span>
 
                 <button
@@ -410,7 +410,7 @@ export default function Settings() {
                   </div>
                 ) : (
                   <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-                    Пароль надёжно защищает ваш аккаунт. Для авторизации в сторонних инструментах и ИИ-клиентах используйте вкладку API-ключей MCP.
+                    {t('settings.passwordDesc')}
                   </p>
                 )}
               </div>
