@@ -1,3 +1,4 @@
+import * as http from "http"
 import { WebSocketServer, WebSocket } from "ws"
 import * as Y from "yjs"
 import * as encoding from "lib0/encoding"
@@ -354,8 +355,104 @@ function getClientIP(req: any): string {
   )
 }
 
+async function reloadArticleContent(articleId: number, content: string | null): Promise<void> {
+  let targetContent = content
+  if (targetContent === null) {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/articles/${articleId}/content`, {
+        headers: { Authorization: `Bearer ${SERVICE_TOKEN}` },
+      })
+      if (res.ok) {
+        const data = (await res.json()) as { content?: string }
+        targetContent = data.content || ""
+      }
+    } catch (err) {
+      console.error(`[reload] article=${articleId} failed to fetch from backend:`, err)
+    }
+  }
+
+  const state = states.get(articleId)
+  if (state) {
+    if (targetContent !== null) {
+      const fragment = state.doc.getXmlFragment(FRAGMENT_KEY)
+      const currentMarkdown = yFragmentToMarkdown(fragment)
+      if (currentMarkdown !== targetContent) {
+        state.doc.transact(() => {
+          fragment.delete(0, fragment.length)
+          seedYFragmentFromMarkdown(targetContent, fragment)
+        }, "reload-article")
+        console.log(`[reload] article=${articleId} re-seeded in-memory (${targetContent.length} chars) and broadcast to ${state.clients.size} clients`)
+        saveDocToDisk(state)
+      }
+    }
+  } else {
+    // If not in memory, evict any stale cached .ydoc on disk so next open seeds fresh from DB
+    const filePath = getDocFilePath(articleId)
+    if (fs.existsSync(filePath)) {
+      try {
+        fs.unlinkSync(filePath)
+        console.log(`[reload] article=${articleId} removed stale disk snapshot`)
+      } catch (err) {
+        console.warn(`[reload] article=${articleId} failed to delete disk snapshot:`, err)
+      }
+    }
+  }
+}
+
+const server = http.createServer((req, res) => {
+  if (req.method === "POST" && req.url?.startsWith("/internal/reload-article")) {
+    const authHeader = req.headers.authorization || ""
+    if (authHeader !== `Bearer ${SERVICE_TOKEN}`) {
+      res.writeHead(403, { "Content-Type": "application/json" })
+      res.end(JSON.stringify({ error: "Forbidden" }))
+      return
+    }
+
+    const params = getQueryParams(req.url)
+    const articleId = parseInt(params.articleId, 10)
+    if (!articleId || isNaN(articleId)) {
+      res.writeHead(400, { "Content-Type": "application/json" })
+      res.end(JSON.stringify({ error: "Missing or invalid articleId" }))
+      return
+    }
+
+    let body = ""
+    req.on("data", (chunk) => {
+      body += chunk
+    })
+    req.on("end", async () => {
+      try {
+        let content: string | null = null
+        if (body) {
+          try {
+            content = JSON.parse(body).content ?? null
+          } catch {
+            // ignore
+          }
+        }
+        await reloadArticleContent(articleId, content)
+        res.writeHead(200, { "Content-Type": "application/json" })
+        res.end(JSON.stringify({ status: "ok", articleId }))
+      } catch (err: any) {
+        res.writeHead(500, { "Content-Type": "application/json" })
+        res.end(JSON.stringify({ error: err.message }))
+      }
+    })
+    return
+  }
+
+  if (req.method === "GET" && (req.url === "/health" || req.url === "/")) {
+    res.writeHead(200, { "Content-Type": "application/json" })
+    res.end(JSON.stringify({ status: "ok", service: "collab-server" }))
+    return
+  }
+
+  res.writeHead(404)
+  res.end()
+})
+
 const wss = new WebSocketServer({
-  port: PORT,
+  server,
   maxPayload: MAX_PAYLOAD_BYTES,
   perMessageDeflate: {
     zlibDeflateOptions: {
@@ -523,6 +620,30 @@ wss.on("connection", async (ws, req) => {
     } else {
       await seedFromBackend(state)
     }
+  } else if (state.clients.size === 1) {
+    // If state was already seeded (e.g. from disk snapshot) and this is the first client connecting,
+    // verify against the backend in case content was updated externally via REST while collab-server was idle.
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/articles/${articleId}/content`, {
+        headers: { Authorization: `Bearer ${SERVICE_TOKEN}` },
+      })
+      if (res.ok) {
+        const data = (await res.json()) as { content?: string }
+        const backendContent = data.content || ""
+        const fragment = state.doc.getXmlFragment(FRAGMENT_KEY)
+        const currentMarkdown = yFragmentToMarkdown(fragment)
+        if (fragment.length > 0 && currentMarkdown !== backendContent) {
+          console.log(`[ws] article=${articleId} DB content differs from disk snapshot on connect, re-seeding (${backendContent.length} chars)`)
+          state.doc.transact(() => {
+            fragment.delete(0, fragment.length)
+            seedYFragmentFromMarkdown(backendContent, fragment)
+          }, "initial-db-sync")
+          saveDocToDisk(state)
+        }
+      }
+    } catch (err) {
+      console.warn(`[ws] article=${articleId} failed to check backend content on first connect:`, err)
+    }
   }
 
   if (ws.readyState !== WebSocket.OPEN) return
@@ -540,7 +661,7 @@ wss.on("connection", async (ws, req) => {
   pending.length = 0
 })
 
-wss.on("listening", () => {
+server.listen(PORT, () => {
   console.log(`[collab-server] listening on port ${PORT}`)
 })
 

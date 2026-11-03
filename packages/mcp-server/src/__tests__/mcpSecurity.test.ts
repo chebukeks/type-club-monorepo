@@ -67,4 +67,67 @@ describe('MCP Server Security Guardrails & OWASP Defenses', () => {
     assert.strictEqual(parsed.content.length, 1000)
     assert(parsed._security_note.includes('Untrusted user content'))
   })
+
+  test('edit_content should use collabClient directly even without collaborators', async () => {
+    let collabCalledWithArticleId: number | null = null
+    const mockCollabActive = {
+      modifyCollaborativeArticle: async (id: number, modifier: (s: string) => string) => {
+        collabCalledWithArticleId = id
+        return modifier('Existing text')
+      },
+    } as unknown as CollabClient
+
+    const activeServer = new McpServer({ name: 'test-mcp-collab', version: '1.0.0' })
+    registerTools(activeServer, mockApi, mockCollabActive)
+    const activeTools = (activeServer as any)._registeredTools
+
+    const editTool = activeTools['edit_content']
+    const res = await editTool.handler({
+      article_id: 42,
+      target_text: 'Existing',
+      replacement_text: 'Updated',
+    })
+
+    assert.strictEqual(res.isError, undefined)
+    assert.strictEqual(collabCalledWithArticleId, 42)
+  })
+
+  test('edit_content should gracefully fall back to REST if collabClient throws', async () => {
+    let restUpdatedArticleId: number | null = null
+    let restUpdatedContent: string | null = null
+
+    const mockApiWithRest = {
+      ...mockApi,
+      getArticleById: async (id: number) => ({
+        id,
+        title: 'Solo article',
+        content: 'Original content here',
+      }),
+      updateArticle: async (id: number, data: { content?: string }) => {
+        restUpdatedArticleId = id
+        restUpdatedContent = data.content ?? null
+      },
+    } as unknown as TypeClubApiClient
+
+    const mockCollabFailing = {
+      modifyCollaborativeArticle: async () => {
+        throw new Error('Connection refused to ws://localhost:8001')
+      },
+    } as unknown as CollabClient
+
+    const fallbackServer = new McpServer({ name: 'test-mcp-fallback', version: '1.0.0' })
+    registerTools(fallbackServer, mockApiWithRest, mockCollabFailing)
+    const fallbackTools = (fallbackServer as any)._registeredTools
+
+    const editTool = fallbackTools['edit_content']
+    const res = await editTool.handler({
+      article_id: 99,
+      target_text: 'Original',
+      replacement_text: 'Patched via REST',
+    })
+
+    assert.strictEqual(res.isError, undefined)
+    assert.strictEqual(restUpdatedArticleId, 99)
+    assert.strictEqual(restUpdatedContent, 'Patched via REST content here')
+  })
 })

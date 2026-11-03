@@ -1,6 +1,7 @@
 import json
 import logging
 import secrets
+import httpx
 
 from fastapi import APIRouter, Depends, HTTPException, Header, Query, Response
 from sqlalchemy import func, select, or_
@@ -264,6 +265,20 @@ async def get_article(
     return _article_to_response(article, author, current_user)
 
 
+async def _notify_collab_server_reload(article_id: int, content: str) -> None:
+    """Notify collab-server that article content was updated via REST so any live or cached Yjs doc resyncs."""
+    try:
+        collab_url = (getattr(settings, "collab_internal_url", "http://localhost:8001") or "http://localhost:8001").rstrip("/")
+        async with httpx.AsyncClient(timeout=1.5) as client:
+            await client.post(
+                f"{collab_url}/internal/reload-article?articleId={article_id}",
+                headers={"Authorization": f"Bearer {settings.service_token}"},
+                json={"content": content},
+            )
+    except Exception as e:
+        logger.debug("Could not notify collab-server of article %s reload: %s", article_id, e)
+
+
 @router.patch("/{article_id}", response_model=ArticleResponse)
 async def update_article(
     article_id: int,
@@ -286,15 +301,10 @@ async def update_article(
 
     if data.title is not None:
         article.title = data.title
+    content_updated = False
     if data.content is not None:
-        if article.collaborators:
-            logger.info(
-                "Ignoring content update for article %s via PATCH (has collaborators; "
-                "content is managed by collab-server)",
-                article_id,
-            )
-        else:
-            article.content = data.content
+        article.content = data.content
+        content_updated = True
     if data.access_state is not None:
         article.access_state = data.access_state
     if data.slug is not None:
@@ -313,6 +323,10 @@ async def update_article(
 
     await session.commit()
     await session.refresh(article)
+
+    if content_updated and data.content is not None:
+        await _notify_collab_server_reload(article_id, data.content)
+
     return _article_to_response(article, current_user)
 
 

@@ -28,17 +28,19 @@ export function registerTools(
     return `${cachedNickname} (AI)`
   }
 
-  // Helper to apply markdown changes either via collab-server or REST
+  // Helper to apply markdown changes via collab-server (with REST fallback)
   async function applyArticleContentChange(
     articleId: number,
     modifier: (currentMarkdown: string) => string
   ): Promise<string> {
-    const article = await api.getArticleById(articleId)
-    const hasCollaborators = (await api.listCollaborators(articleId)).length > 0
-
-    if (hasCollaborators) {
+    // Primary path: Use collab-server directly via WebSocket.
+    // This allows the AI agent to participate as a real-time collaborator, ensuring any
+    // active editor session (solo author, co-author, or advisor) receives live Yjs CRDT updates.
+    try {
       return await collab.modifyCollaborativeArticle(articleId, modifier)
-    } else {
+    } catch (collabErr: any) {
+      // Fallback path: If collab-server is unreachable, apply update via REST API.
+      const article = await api.getArticleById(articleId)
       const updatedMarkdown = modifier(article.content || '')
       await api.updateArticle(articleId, { content: updatedMarkdown })
       return updatedMarkdown

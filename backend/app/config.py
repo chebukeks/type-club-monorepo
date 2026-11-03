@@ -41,6 +41,7 @@ class Settings(BaseSettings):
 
     # Internal: shared secret for collab-server ↔ backend
     service_token: str = ""
+    collab_internal_url: str = "http://localhost:8001"
 
     # Uploads
     uploads_dir: str = "uploads"
