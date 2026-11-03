@@ -1,4 +1,18 @@
 import React, { useEffect, useState } from "react";
+import {
+  Key,
+  Plus,
+  Trash2,
+  Copy,
+  Check,
+  Terminal,
+  ShieldCheck,
+  AlertTriangle,
+  FileCode,
+  Sparkles,
+  Info,
+  ExternalLink,
+} from "lucide-react";
 import { apiKeysApi, ApiKeyItem, ApiKeyCreatedItem } from "../api";
 import { useLanguage } from "../context/LanguageContext";
 
@@ -19,8 +33,9 @@ export function ApiKeySettings() {
   ]);
   const [expiresInDays, setExpiresInDays] = useState<number | undefined>(undefined);
   const [creating, setCreating] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [configFormat, setConfigFormat] = useState<"claude" | "cursor">("claude");
+  const [copiedToken, setCopiedToken] = useState(false);
+  const [copiedConfig, setCopiedConfig] = useState(false);
+  const [configFormat, setConfigFormat] = useState<"claude" | "cursor" | "antigravity">("claude");
   const [runMode, setRunMode] = useState<"local" | "npx">("local");
 
   const loadKeys = async () => {
@@ -81,10 +96,15 @@ export function ApiKeySettings() {
     }
   };
 
-  const handleCopy = (text: string) => {
+  const handleCopyText = (text: string, type: "token" | "config") => {
     navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (type === "token") {
+      setCopiedToken(true);
+      setTimeout(() => setCopiedToken(false), 2000);
+    } else {
+      setCopiedConfig(true);
+      setTimeout(() => setCopiedConfig(false), 2000);
+    }
   };
 
   const currentOrigin =
@@ -121,7 +141,9 @@ export function ApiKeySettings() {
     return JSON.stringify(
       {
         typeClub: {
-          command: isLocal ? "node packages/mcp-server/dist/index.cjs" : "npx -y @type-club/mcp-server",
+          command: isLocal
+            ? "node packages/mcp-server/dist/index.cjs"
+            : "npx -y @type-club/mcp-server",
           env: {
             TYPECLUB_API_KEY: token,
             TYPECLUB_API_URL: currentOrigin,
@@ -134,105 +156,346 @@ export function ApiKeySettings() {
     );
   };
 
+  const getActiveConfigJson = (token: string) => {
+    return configFormat === "cursor" ? getCursorConfig(token) : getClaudeConfig(token);
+  };
+
+  const getConfigPathHint = () => {
+    if (configFormat === "claude") {
+      return "%APPDATA%\\Claude\\claude_desktop_config.json (Windows) или ~/Library/Application Support/Claude/claude_desktop_config.json (macOS)";
+    }
+    if (configFormat === "cursor") {
+      return "Cursor Settings → Features → MCP Servers → Add New MCP Server";
+    }
+    return ".gemini/antigravity/mcp_config.json или настройки MCP в VS Code";
+  };
+
+  const getScopeMeta = (id: string) => {
+    switch (id) {
+      case "articles:read":
+        return {
+          title: "Чтение и поиск",
+          tag: "read",
+          desc: "Поиск в каталоге, чтение публичных статей и личных черновиков",
+        };
+      case "articles:write":
+        return {
+          title: "Редактирование и советы",
+          tag: "write",
+          desc: "Режим предложений советника, комментирование и прямое редактирование",
+        };
+      case "articles:manage":
+        return {
+          title: "Управление статьями",
+          tag: "manage",
+          desc: "Создание новых статей и приглашение соавторов",
+        };
+      case "articles:delete":
+        return {
+          title: "Удаление",
+          tag: "delete",
+          desc: "Удаление статей и комментариев (деструктивные действия)",
+        };
+      default:
+        return { title: id, tag: id, desc: "" };
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="border-b border-gray-200 dark:border-gray-800 pb-4">
-        <h2 className="text-xl font-bold">{t("settings.mcp.title")}</h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          {t("settings.mcp.desc")}
-        </p>
-      </div>
-
-      {error && (
-        <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950 text-red-600 text-sm">
-          {error}
+    <div className="space-y-8">
+      {/* Introduction Banner */}
+      <div className="p-6 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/60 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
+              <Key size={18} />
+            </span>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+              {t("settings.mcp.title")}
+            </h2>
+          </div>
+          <p className="text-sm text-gray-500 dark:text-gray-400 max-w-2xl leading-relaxed">
+            {t("settings.mcp.desc")}
+          </p>
         </div>
-      )}
 
-      <div className="flex justify-between items-center">
-        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-          {keys.length > 0 ? `Активные ключи (${keys.length})` : ""}
-        </span>
         <button
           type="button"
           onClick={() => {
             setShowCreateModal(true);
             setError("");
           }}
-          className="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors shrink-0 shadow-xs cursor-pointer"
         >
-          {t("settings.mcp.createBtn")}
+          <Plus size={16} />
+          <span>{t("settings.mcp.createBtn")}</span>
         </button>
       </div>
 
-      {loading ? (
-        <div className="text-center py-8 text-gray-400">{t("settings.uploading")}</div>
-      ) : keys.length === 0 ? (
-        <div className="text-center py-8 px-4 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 text-gray-500 text-sm">
-          {t("settings.mcp.noKeys")}
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {keys.map((k) => (
-            <div
-              key={k.id}
-              className="p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-            >
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-gray-900 dark:text-gray-100">
-                    {k.name}
-                  </span>
-                  <code className="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded text-gray-600 dark:text-gray-400">
-                    {k.prefix}
-                  </code>
-                </div>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {k.scopes.map((s) => (
-                    <span
-                      key={s}
-                      className="text-[11px] px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400"
-                    >
-                      {s.replace("articles:", "")}
-                    </span>
-                  ))}
-                </div>
-                <div className="text-xs text-gray-400 flex gap-3 pt-1">
-                  <span>
-                    {t("settings.mcp.lastUsed")}:{" "}
-                    {k.last_used_at
-                      ? new Date(k.last_used_at).toLocaleDateString()
-                      : t("settings.mcp.neverUsed")}
-                  </span>
-                  {k.expires_at && (
-                    <span>
-                      {t("settings.mcp.expiresAt")}:{" "}
-                      {new Date(k.expires_at).toLocaleDateString()}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleDelete(k)}
-                className="text-xs text-red-600 hover:text-red-700 dark:hover:text-red-400 font-medium self-end sm:self-center"
-              >
-                {t("settings.mcp.revoke")}
-              </button>
-            </div>
-          ))}
+      {error && (
+        <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/50 text-red-800 dark:text-red-200 text-sm flex items-center gap-2">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span>{error}</span>
         </div>
       )}
 
-      {/* Create Key Modal */}
+      {/* Main Grid: Left = Keys list, Right = Quick Setup Guide */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left Column: API Keys List */}
+        <div className="lg:col-span-7 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+              {t("settings.mcp.activeKeys")} ({keys.length})
+            </h3>
+          </div>
+
+          {loading ? (
+            <div className="p-8 text-center text-sm text-gray-400 bg-white dark:bg-gray-900/40 rounded-2xl border border-gray-200 dark:border-gray-800">
+              {t("settings.uploading")}
+            </div>
+          ) : keys.length === 0 ? (
+            <div className="p-8 text-center rounded-2xl border border-dashed border-gray-300 dark:border-gray-800 bg-white/50 dark:bg-gray-900/20 space-y-3">
+              <div className="w-12 h-12 mx-auto rounded-full bg-gray-100 dark:bg-gray-800/80 flex items-center justify-center text-gray-400">
+                <Key size={20} />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {t("settings.mcp.noKeys")}
+                </p>
+                <p className="text-xs text-gray-400 max-w-sm mx-auto">
+                  Создайте персональный ключ доступа, чтобы наделить ИИ-ассистента полномочиями для работы с вашими статьями.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(true)}
+                className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+              >
+                <Plus size={14} />
+                <span>Создать первый ключ</span>
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {keys.map((k) => (
+                <div
+                  key={k.id}
+                  className="p-5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/60 shadow-xs flex flex-col sm:flex-row sm:items-start justify-between gap-4 hover:border-gray-300 dark:hover:border-gray-700 transition-colors"
+                >
+                  <div className="space-y-2.5 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                        {k.name}
+                      </span>
+                      <code className="text-[11px] font-mono bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md text-gray-600 dark:text-gray-300">
+                        {k.prefix}
+                      </code>
+                    </div>
+
+                    {/* Scopes Badges */}
+                    <div className="flex flex-wrap gap-1.5">
+                      {k.scopes.map((s) => {
+                        const meta = getScopeMeta(s);
+                        return (
+                          <span
+                            key={s}
+                            className="text-[11px] px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40 font-medium"
+                          >
+                            {meta.title}
+                          </span>
+                        );
+                      })}
+                    </div>
+
+                    {/* Metadata line */}
+                    <div className="text-xs text-gray-400 flex flex-wrap gap-x-4 gap-y-1 pt-1 font-mono">
+                      <span>
+                        {t("settings.mcp.lastUsed")}:{" "}
+                        {k.last_used_at
+                          ? new Date(k.last_used_at).toLocaleDateString()
+                          : t("settings.mcp.neverUsed")}
+                      </span>
+                      {k.expires_at ? (
+                        <span>
+                          {t("settings.mcp.expiresAt")}:{" "}
+                          {new Date(k.expires_at).toLocaleDateString()}
+                        </span>
+                      ) : (
+                        <span>Бессрочный</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(k)}
+                    className="inline-flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium self-end sm:self-center px-2.5 py-1.5 rounded-lg border border-red-200/60 dark:border-red-900/40 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer shrink-0"
+                    title={t("settings.mcp.revoke")}
+                  >
+                    <Trash2 size={13} />
+                    <span>{t("settings.mcp.revoke")}</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Right Column: Quick Connect Guide */}
+        <div className="lg:col-span-5 space-y-4">
+          <div className="p-6 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/60 shadow-xs space-y-5">
+            <div className="flex items-center gap-2">
+              <Sparkles size={16} className="text-blue-600 dark:text-blue-400" />
+              <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                {t("settings.mcp.quickGuide")}
+              </h3>
+            </div>
+
+            <ol className="space-y-3 text-xs text-gray-600 dark:text-gray-400">
+              <li className="flex gap-2.5">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 font-semibold flex items-center justify-center text-[11px]">
+                  1
+                </span>
+                <span>{t("settings.mcp.step1")}</span>
+              </li>
+              <li className="flex gap-2.5">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 font-semibold flex items-center justify-center text-[11px]">
+                  2
+                </span>
+                <span>{t("settings.mcp.step2")}</span>
+              </li>
+              <li className="flex gap-2.5">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 font-semibold flex items-center justify-center text-[11px]">
+                  3
+                </span>
+                <span>{t("settings.mcp.step3")}</span>
+              </li>
+            </ol>
+
+            {/* Client selector tabs */}
+            <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                  Пример конфигурации
+                </span>
+                {/* Format switcher */}
+                <div className="flex gap-1 text-[11px] p-0.5 rounded-lg bg-gray-100 dark:bg-gray-800">
+                  <button
+                    type="button"
+                    onClick={() => setRunMode("local")}
+                    className={`px-2 py-0.5 rounded-md font-medium transition-colors ${
+                      runMode === "local"
+                        ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs"
+                        : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                    }`}
+                  >
+                    Локально
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRunMode("npx")}
+                    className={`px-2 py-0.5 rounded-md font-medium transition-colors ${
+                      runMode === "npx"
+                        ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs"
+                        : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                    }`}
+                  >
+                    npx
+                  </button>
+                </div>
+              </div>
+
+              {/* Client Choice */}
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setConfigFormat("claude")}
+                  className={`flex-1 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                    configFormat === "claude"
+                      ? "border-blue-600 bg-blue-50/60 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-semibold"
+                      : "border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/60 text-gray-600 dark:text-gray-400"
+                  }`}
+                >
+                  Claude Desktop
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfigFormat("cursor")}
+                  className={`flex-1 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                    configFormat === "cursor"
+                      ? "border-blue-600 bg-blue-50/60 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-semibold"
+                      : "border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/60 text-gray-600 dark:text-gray-400"
+                  }`}
+                >
+                  Cursor
+                </button>
+              </div>
+
+              {/* Snippet box */}
+              <div className="relative group">
+                <pre className="p-3.5 rounded-xl bg-gray-950 text-gray-200 font-mono text-[11px] leading-relaxed overflow-x-auto max-h-56 border border-gray-800 selection:bg-blue-600/40">
+                  {getActiveConfigJson("YOUR_API_TOKEN_HERE")}
+                </pre>
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleCopyText(getActiveConfigJson("YOUR_API_TOKEN_HERE"), "config")
+                  }
+                  className="absolute top-2 right-2 inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-lg bg-gray-800/90 hover:bg-gray-700 text-gray-200 border border-gray-700 transition-colors shadow-xs cursor-pointer"
+                >
+                  {copiedConfig ? (
+                    <>
+                      <Check size={12} className="text-emerald-400" />
+                      <span className="text-emerald-400">{t("settings.mcp.copied")}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={12} />
+                      <span>{t("settings.mcp.copyJson")}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="pt-1 text-[11px] text-gray-400 space-y-1">
+                <p className="font-semibold text-gray-500 dark:text-gray-400">
+                  {t("settings.mcp.whereConfig")}
+                </p>
+                <p className="font-mono break-all text-[10px] text-gray-500">
+                  {getConfigPathHint()}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Modal 1: Create Key Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-md w-full p-6 shadow-xl border border-gray-200 dark:border-gray-800 space-y-4">
-            <h3 className="text-lg font-bold">{t("settings.mcp.createBtn")}</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-200 dark:border-gray-800 space-y-5 my-8">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-800">
+              <div className="flex items-center gap-2">
+                <span className="p-1 rounded-md bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
+                  <Key size={16} />
+                </span>
+                <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">
+                  {t("settings.mcp.createBtn")}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-lg leading-none cursor-pointer"
+              >
+                &times;
+              </button>
+            </div>
+
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  {t("settings.mcp.keyName")}
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                  {t("settings.mcp.keyName")} *
                 </label>
                 <input
                   type="text"
@@ -240,39 +503,61 @@ export function ApiKeySettings() {
                   value={keyName}
                   onChange={(e) => setKeyName(e.target.value)}
                   placeholder={t("settings.mcp.keyNamePlaceholder")}
-                  className="w-full px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
                 />
               </div>
 
+              {/* Scopes with detailed explanations */}
               <div>
-                <label className="block text-sm font-medium mb-2">
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
                   {t("settings.mcp.scopes")}
                 </label>
-                <div className="space-y-2 text-sm">
+                <div className="space-y-2">
                   {[
-                    { id: "articles:read", label: t("settings.mcp.scopeRead") },
-                    { id: "articles:write", label: t("settings.mcp.scopeWrite") },
-                    { id: "articles:manage", label: t("settings.mcp.scopeManage") },
-                    { id: "articles:delete", label: t("settings.mcp.scopeDelete") },
-                  ].map((s) => (
-                    <label
-                      key={s.id}
-                      className="flex items-center gap-2 cursor-pointer select-none"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedScopes.includes(s.id)}
-                        onChange={() => handleScopeToggle(s.id)}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span>{s.label}</span>
-                    </label>
-                  ))}
+                    "articles:read",
+                    "articles:write",
+                    "articles:manage",
+                    "articles:delete",
+                  ].map((scopeId) => {
+                    const meta = getScopeMeta(scopeId);
+                    const isChecked = selectedScopes.includes(scopeId);
+                    return (
+                      <div
+                        key={scopeId}
+                        onClick={() => handleScopeToggle(scopeId)}
+                        className={`p-3 rounded-xl border transition-all cursor-pointer select-none flex items-start gap-3 ${
+                          isChecked
+                            ? "border-blue-500 bg-blue-50/40 dark:bg-blue-950/30"
+                            : "border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 hover:border-gray-300 dark:hover:border-gray-700"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {}} // handled by parent onClick
+                          className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 pointer-events-none"
+                        />
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-gray-900 dark:text-gray-100">
+                              {meta.title}
+                            </span>
+                            <code className="text-[10px] font-mono text-gray-400">
+                              {scopeId}
+                            </code>
+                          </div>
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-normal">
+                            {meta.desc}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
                   {t("settings.mcp.expires")}
                 </label>
                 <select
@@ -280,7 +565,7 @@ export function ApiKeySettings() {
                   onChange={(e) =>
                     setExpiresInDays(e.target.value ? Number(e.target.value) : undefined)
                   }
-                  className="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                 >
                   <option value="">{t("settings.mcp.expiresNever")}</option>
                   <option value="30">{t("settings.mcp.expires30")}</option>
@@ -289,18 +574,18 @@ export function ApiKeySettings() {
                 </select>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-gray-100 dark:border-gray-800">
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  className="px-4 py-2 rounded-xl text-xs font-medium text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
                 >
                   {t("common.cancel")}
                 </button>
                 <button
                   type="submit"
                   disabled={creating || !keyName.trim() || selectedScopes.length === 0}
-                  className="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors cursor-pointer shadow-xs"
                 >
                   {creating ? t("settings.uploading") : t("settings.mcp.createBtn")}
                 </button>
@@ -310,136 +595,148 @@ export function ApiKeySettings() {
         </div>
       )}
 
-      {/* Success Modal (Token & Config Snippet) */}
+      {/* Modal 2: Success Modal with Key & Injected Config Snippet */}
       {createdKey && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-200 dark:border-gray-800 space-y-4">
-            <h3 className="text-lg font-bold text-green-600 dark:text-green-400 flex items-center gap-2">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              {t("settings.mcp.createdSuccess")}
-            </h3>
-
-            <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-200 text-xs">
-              ⚠️ {t("settings.mcp.copyWarning")}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-xl w-full p-6 sm:p-7 shadow-2xl border border-gray-200 dark:border-gray-800 space-y-5 my-8">
+            <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold text-base">
+              <ShieldCheck size={20} />
+              <span>{t("settings.mcp.createdSuccess")}</span>
             </div>
 
+            <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-2.5 leading-relaxed">
+              <AlertTriangle size={15} className="shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+              <span>{t("settings.mcp.copyWarning")}</span>
+            </div>
+
+            {/* Token box */}
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">
-                API Token
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                API Token ({createdKey.name})
               </label>
               <div className="flex items-center gap-2">
                 <input
                   type="text"
                   readOnly
                   value={createdKey.token}
-                  className="w-full px-3 py-2 font-mono text-xs rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-950 select-all"
+                  className="w-full px-3.5 py-2.5 font-mono text-xs rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 select-all focus:outline-none"
                 />
                 <button
                   type="button"
-                  onClick={() => handleCopy(createdKey.token)}
-                  className="px-3 py-2 text-xs font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 shrink-0"
+                  onClick={() => handleCopyText(createdKey.token, "token")}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 shrink-0 cursor-pointer shadow-xs transition-colors"
                 >
-                  {copied ? t("settings.mcp.copied") : "Copy"}
+                  {copiedToken ? (
+                    <>
+                      <Check size={14} />
+                      <span>{t("settings.mcp.copied")}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={14} />
+                      <span>{t("settings.mcp.copyToken")}</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
 
-            <div>
-              <div className="flex flex-col gap-2 mb-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                    {t("settings.mcp.configSnippet")}
-                  </label>
-                  <div className="flex gap-1 text-[11px]">
+            {/* Ready config with this key */}
+            <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                  {t("settings.mcp.configSnippet")}
+                </label>
+                <div className="flex items-center gap-2">
+                  {/* Local vs npx */}
+                  <div className="flex gap-1 text-[11px] p-0.5 rounded-lg bg-gray-100 dark:bg-gray-800">
                     <button
                       type="button"
                       onClick={() => setRunMode("local")}
-                      className={`px-2 py-0.5 rounded font-medium ${
+                      className={`px-2 py-0.5 rounded font-medium transition-colors ${
                         runMode === "local"
-                          ? "bg-emerald-600 text-white"
-                          : "bg-gray-100 dark:bg-gray-800 text-gray-500"
+                          ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs"
+                          : "text-gray-500"
                       }`}
                     >
-                      Локально (директория)
+                      Локально
                     </button>
                     <button
                       type="button"
                       onClick={() => setRunMode("npx")}
-                      className={`px-2 py-0.5 rounded font-medium ${
+                      className={`px-2 py-0.5 rounded font-medium transition-colors ${
                         runMode === "npx"
-                          ? "bg-emerald-600 text-white"
-                          : "bg-gray-100 dark:bg-gray-800 text-gray-500"
+                          ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs"
+                          : "text-gray-500"
                       }`}
                     >
-                      NPM (npx)
+                      npx
+                    </button>
+                  </div>
+
+                  {/* Format */}
+                  <div className="flex gap-1 text-[11px] p-0.5 rounded-lg bg-gray-100 dark:bg-gray-800">
+                    <button
+                      type="button"
+                      onClick={() => setConfigFormat("claude")}
+                      className={`px-2 py-0.5 rounded font-medium transition-colors ${
+                        configFormat === "claude"
+                          ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs"
+                          : "text-gray-500"
+                      }`}
+                    >
+                      Claude
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfigFormat("cursor")}
+                      className={`px-2 py-0.5 rounded font-medium transition-colors ${
+                        configFormat === "cursor"
+                          ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs"
+                          : "text-gray-500"
+                      }`}
+                    >
+                      Cursor
                     </button>
                   </div>
                 </div>
-
-                <div className="flex gap-1 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setConfigFormat("claude")}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                      configFormat === "claude"
-                        ? "bg-blue-600 text-white"
-                        : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
-                    }`}
-                  >
-                    Claude Desktop
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfigFormat("cursor")}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                      configFormat === "cursor"
-                        ? "bg-blue-600 text-white"
-                        : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
-                    }`}
-                  >
-                    Cursor / Antigravity
-                  </button>
-                </div>
               </div>
 
-              <div className="relative">
-                <pre className="p-3 rounded-xl bg-gray-950 text-gray-100 text-[11px] font-mono overflow-x-auto max-h-44 border border-gray-800">
-                  {configFormat === "claude"
-                    ? getClaudeConfig(createdKey.token)
-                    : getCursorConfig(createdKey.token)}
+              <div className="relative group">
+                <pre className="p-3.5 rounded-xl bg-gray-950 text-gray-100 text-[11px] font-mono leading-relaxed overflow-x-auto max-h-52 border border-gray-800 selection:bg-blue-600/40">
+                  {getActiveConfigJson(createdKey.token)}
                 </pre>
                 <button
                   type="button"
                   onClick={() =>
-                    handleCopy(
-                      configFormat === "claude"
-                        ? getClaudeConfig(createdKey.token)
-                        : getCursorConfig(createdKey.token)
-                    )
+                    handleCopyText(getActiveConfigJson(createdKey.token), "config")
                   }
-                  className="absolute top-2 right-2 px-2 py-1 text-[10px] font-medium rounded-lg bg-gray-800 hover:bg-gray-700 text-white"
+                  className="absolute top-2 right-2 inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-lg bg-gray-800/90 hover:bg-gray-700 text-gray-200 border border-gray-700 transition-colors shadow-xs cursor-pointer"
                 >
-                  {copied ? t("settings.mcp.copied") : "Copy JSON"}
+                  {copiedConfig ? (
+                    <>
+                      <Check size={12} className="text-emerald-400" />
+                      <span className="text-emerald-400">{t("settings.mcp.copied")}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={12} />
+                      <span>{t("settings.mcp.copyJson")}</span>
+                    </>
+                  )}
                 </button>
               </div>
+
+              <p className="text-[11px] text-gray-400 font-mono pt-1">
+                {getConfigPathHint()}
+              </p>
             </div>
 
-            <div className="pt-2 flex justify-end">
+            <div className="pt-3 border-t border-gray-100 dark:border-gray-800 flex justify-end">
               <button
                 type="button"
                 onClick={() => setCreatedKey(null)}
-                className="px-5 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700"
+                className="px-6 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors cursor-pointer shadow-xs"
               >
                 {t("common.close")}
               </button>
