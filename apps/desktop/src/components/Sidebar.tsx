@@ -596,15 +596,31 @@ export function Sidebar({ width }: { width: number }) {
                 </div>
               )
             ) : visibleTree.length === 0 && !state.creating ? (
-              <EmptyState 
-                onOpenFolder={openFolder} 
-                isFolderOpen={!!state.folderPath} 
-                onCreateFile={() => startCreating('file')} 
-              />
+              <div className="px-1">
+                {state.tocLayoutMode === 'separate' && activeTab?.filePath === '__draft__' && state.activeToc && state.activeToc.length > 0 && (
+                  <DraftTocSidebarItem
+                    title={activeTab.fileName || 'Без названия'}
+                    activeToc={state.activeToc}
+                    t={t}
+                  />
+                )}
+                <EmptyState 
+                  onOpenFolder={openFolder} 
+                  isFolderOpen={!!state.folderPath} 
+                  onCreateFile={() => startCreating('file')} 
+                />
+              </div>
             ) : (
               <div className="px-1" onClick={(e) => {
                 if (e.target === e.currentTarget) setActiveExplorerPath(null)
               }}>
+                {state.tocLayoutMode === 'separate' && activeTab?.filePath === '__draft__' && state.activeToc && state.activeToc.length > 0 && (
+                  <DraftTocSidebarItem
+                    title={activeTab.fileName || 'Без названия'}
+                    activeToc={state.activeToc}
+                    t={t}
+                  />
+                )}
                 {/* Pinned local items */}
                 {state.pinnedLocalPaths.length > 0 && !isLocalSearching && (
                   <div
@@ -969,6 +985,76 @@ export function Sidebar({ width }: { width: number }) {
           </div>
         )
       })()}
+    </div>
+  )
+}
+
+// ── Draft TOC Item (for separate mode) ──
+
+function DraftTocSidebarItem({
+  title,
+  activeToc,
+  t,
+}: {
+  title: string
+  activeToc: TocItem[]
+  t: (key: any) => string
+}) {
+  const [isOpen, setIsOpen] = useState(true)
+
+  return (
+    <div className="mb-2 px-1">
+      <div
+        className="w-full flex items-center gap-1.5 text-[13px] rounded transition-colors bg-[var(--bg-hover)] text-[var(--text-primary)]"
+        style={{ paddingLeft: '8px', paddingRight: '8px', paddingTop: '5px', paddingBottom: '5px' }}
+      >
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="p-1 rounded hover:bg-[var(--border-default)]"
+          title={isOpen ? t('sidebar.collapseToc') || 'Свернуть оглавление' : t('sidebar.expandToc') || 'Развернуть оглавление'}
+        >
+          <svg
+            width="10"
+            height="10"
+            viewBox="0 0 12 12"
+            className={`transition-transform flex-shrink-0 text-[var(--text-dim)] ${isOpen ? 'rotate-90' : ''}`}
+            fill="currentColor"
+          >
+            <path d="M4 2l4 4-4 4z" />
+          </svg>
+        </button>
+        <div className="flex-1 flex items-center gap-1.5 overflow-hidden font-medium">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-[var(--accent)]">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+          </svg>
+          <span className="truncate">{title}</span>
+          <span className="text-[10px] text-[var(--text-dim)] ml-auto px-1.5 py-0.5 rounded bg-[var(--bg-surface)] border border-[var(--border-default)]">
+            {t('sidebar.draft') || 'черновик'}
+          </span>
+        </div>
+      </div>
+
+      <div className={`grid transition-all duration-200 ease-out ${isOpen ? 'grid-rows-[1fr] opacity-100 mt-0.5' : 'grid-rows-[0fr] opacity-0'}`}>
+        <div className="overflow-hidden">
+          {activeToc.map((toc) => (
+            <button
+              key={toc.id}
+              onClick={() => window.dispatchEvent(new CustomEvent('editor-scroll-to', { detail: { pos: toc.pos } }))}
+              className="w-full text-left truncate text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded transition-colors"
+              style={{
+                paddingTop: '3px',
+                paddingBottom: '3px',
+                paddingLeft: `${26 + (toc.level - 1) * 12}px`,
+                paddingRight: '8px',
+              }}
+              title={toc.text}
+            >
+              {toc.text}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

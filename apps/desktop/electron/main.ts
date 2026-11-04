@@ -8,14 +8,13 @@ import crypto from 'node:crypto'
 import { spawn } from 'node:child_process'
 import os from 'node:os'
 import Store from 'electron-store'
-import nspell from 'nspell'
-import dictRu from 'dictionary-ru'
-import dictEn from 'dictionary-en'
 
 // Используем встроенный оффлайн Hunspell вместо Windows Native Spellchecker.
 if (process.platform === 'win32') {
   app.commandLine.appendSwitch('disable-features', 'WinUseBrowserSpellChecker')
 }
+// Оптимизация потребления ресурсов в фоне
+app.commandLine.appendSwitch('disable-background-timer-throttling', 'false')
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -23,57 +22,94 @@ import { createRequire } from 'node:module'
 import { MODERN_WORDS, RUSSIAN_PRODUCTIVE_PREFIXES, RUSSIAN_NOUN_SUFFIXES } from './modernWords'
 
 const esmRequire = createRequire(import.meta.url)
-let englishWordsSet = new Set<string>()
 
-try {
-  const englishArray = esmRequire('an-array-of-english-words')
-  if (Array.isArray(englishArray)) {
-    englishWordsSet = new Set(englishArray)
-  }
-} catch (err) {
-  console.error('[SPELLCHECK] Error loading extended english wordlist:', err)
-}
-
-// Локальный спеллчекер (0ms latency, оффлайн)
+// Локальный спеллчекер (0ms latency, оффлайн) с отложенной фоновой инициализацией
 let spellRu: any = null
 let spellEn: any = null
+let englishWordsSet: Set<string> | null = null
 const customWordsSet = new Set<string>()
 
-function initSpellchecker() {
-  try {
-    spellRu = nspell(dictRu)
-    spellEn = nspell(dictEn)
-    customWordsSet.clear()
+let spellcheckInitialized = false
+let spellcheckInitPromise: Promise<void> | null = null
 
-    // Добавляем расширенный словарь терминов
-    for (const w of MODERN_WORDS) {
-      if (spellRu) spellRu.add(w)
-      if (spellEn) spellEn.add(w)
-    }
+async function ensureSpellcheckerReady(): Promise<void> {
+  if (spellcheckInitialized) return
+  if (spellcheckInitPromise) return spellcheckInitPromise
 
-    const stored = (store.get('customDictionaryWords', []) as string[]) || []
-    for (const w of stored) {
-      const clean = w.trim().toLowerCase()
-      if (clean) {
-        customWordsSet.add(clean)
-        if (spellRu) spellRu.add(clean)
-        if (spellEn) spellEn.add(clean)
+  spellcheckInitPromise = (async () => {
+    try {
+      const nspellModule = esmRequire('nspell')
+      const dictRuModule = esmRequire('dictionary-ru')
+      const dictEnModule = esmRequire('dictionary-en')
+      const nspellFn = nspellModule.default || nspellModule
+
+      spellRu = nspellFn(dictRuModule.default || dictRuModule)
+      spellEn = nspellFn(dictEnModule.default || dictEnModule)
+      customWordsSet.clear()
+
+      // Добавляем расширенный словарь терминов
+      for (const w of MODERN_WORDS) {
+        if (spellRu) spellRu.add(w)
+        if (spellEn) spellEn.add(w)
       }
+
+      const stored = (store.get('customDictionaryWords', []) as string[]) || []
+      for (const w of stored) {
+        const clean = w.trim().toLowerCase()
+        if (clean) {
+          customWordsSet.add(clean)
+          if (spellRu) spellRu.add(clean)
+          if (spellEn) spellEn.add(clean)
+        }
+      }
+
+      try {
+        const englishArray = esmRequire('an-array-of-english-words')
+        if (Array.isArray(englishArray)) {
+          englishWordsSet = new Set(englishArray)
+        } else {
+          englishWordsSet = new Set()
+        }
+      } catch (err) {
+        console.error('[SPELLCHECK] Error loading extended english wordlist:', err)
+        englishWordsSet = new Set()
+      }
+
+      spellcheckInitialized = true
+    } catch (err) {
+      console.error('[SPELLCHECK] Error initializing spellchecker in main:', err)
+    } finally {
+      spellcheckInitPromise = null
     }
-  } catch (err) {
-    console.error('[SPELLCHECK] Error initializing spellchecker in main:', err)
+  })()
+
+  return spellcheckInitPromise
+}
+
+async function reinitCustomWords(): Promise<void> {
+  await ensureSpellcheckerReady()
+  customWordsSet.clear()
+  const stored = (store.get('customDictionaryWords', []) as string[]) || []
+  for (const w of stored) {
+    const clean = w.trim().toLowerCase()
+    if (clean) {
+      customWordsSet.add(clean)
+      if (spellRu) spellRu.add(clean)
+      if (spellEn) spellEn.add(clean)
+    }
   }
 }
 
 function isWordValidInternal(word: string, checkRu: boolean, checkEn: boolean): boolean {
   if (!word) return true
   if (word.length <= 1) return true
+  if (!spellcheckInitialized) return true
   const lower = word.toLowerCase()
 
   if (customWordsSet.has(lower)) return true
 
   // 1. Проверка по полному расширенному словарю английского языка SCOWL (275 000 слов)
-  if (checkEn && (englishWordsSet.has(lower) || englishWordsSet.has(word))) return true
+  if (checkEn && englishWordsSet && (englishWordsSet.has(lower) || englishWordsSet.has(word))) return true
 
   // 2. Проверка прямого написания и в нижнем регистре по Hunspell
   if (checkRu && spellRu) {
@@ -174,6 +210,7 @@ function isWordValidInternal(word: string, checkRu: boolean, checkEn: boolean): 
 
 function checkWordMisspelled(rawWord: string): boolean {
   if (!rawWord) return false
+  if (!spellcheckInitialized) return false
   const word = rawWord.trim()
   if (word.length <= 1) return false
 
@@ -472,6 +509,7 @@ function createWindow() {
   const opts: any = {
     minWidth: 800,
     minHeight: 500,
+    backgroundColor: '#18181b',       // Предотвращает белое мерцание при создании окна
     show: false,                      // Скрываем окно до применения координат
     frame: false,                     // Убираем системную рамку
     titleBarStyle: 'hidden',          // Скрываем заголовок
@@ -513,6 +551,21 @@ function createWindow() {
       win!.maximize()
     }
     win!.show()
+
+    // Отложенная фоновая инициализация спеллчекера (не блокирует отображение окна)
+    setTimeout(() => {
+      ensureSpellcheckerReady().then(() => {
+        const enabledSpellcheckLangs = (store.get('spellcheckLanguages', ['ru-RU', 'en-US']) as string[]) || ['ru-RU', 'en-US']
+        applySpellCheckerLanguages(enabledSpellcheckLangs)
+
+        const customWords = (store.get('customDictionaryWords', []) as string[]) || []
+        for (const word of customWords) {
+          try {
+            win?.webContents.session.addWordToSpellCheckerDictionary(word)
+          } catch { /* ignore */ }
+        }
+      }).catch((err) => console.error('[SPELLCHECK] Deferred init error:', err))
+    }, 800)
   })
 
   // Разрешаем открытие DevTools по F12 или Ctrl+Shift+I для отладки
@@ -625,20 +678,6 @@ function createWindow() {
     shell.openExternal(url)
   })
 
-  // Инициализация локального спеллчекера nspell
-  initSpellchecker()
-
-  // Настройка языков спеллчекера и пользовательских слов
-  const enabledSpellcheckLangs = (store.get('spellcheckLanguages', ['ru-RU', 'en-US']) as string[]) || ['ru-RU', 'en-US']
-  applySpellCheckerLanguages(enabledSpellcheckLangs)
-
-  const customWords = (store.get('customDictionaryWords', []) as string[]) || []
-  for (const word of customWords) {
-    try {
-      win.webContents.session.addWordToSpellCheckerDictionary(word)
-    } catch { /* ignore */ }
-  }
-
   // Перехват контекстного меню спеллчекера для отправки слова с ошибкой и вариантов в renderer
   win.webContents.on('context-menu', (_event, params) => {
     win?.webContents.send('context-menu-info', {
@@ -663,12 +702,12 @@ interface FileEntry {
 }
 
 /**
- * Рекурсивное чтение директории.
+ * Рекурсивное чтение директории (неблокирующее асинхронное).
  * Возвращает дерево файлов/папок, фильтруя только .md файлы и папки.
  */
-function readDirRecursive(dirPath: string): FileEntry[] {
+async function readDirRecursive(dirPath: string): Promise<FileEntry[]> {
   try {
-    const entries = fs.readdirSync(dirPath, { withFileTypes: true })
+    const entries = await fs.promises.readdir(dirPath, { withFileTypes: true })
     const result: FileEntry[] = []
 
     for (const entry of entries) {
@@ -678,7 +717,7 @@ function readDirRecursive(dirPath: string): FileEntry[] {
       const fullPath = path.join(dirPath, entry.name)
 
       if (entry.isDirectory()) {
-        const children = readDirRecursive(fullPath)
+        const children = await readDirRecursive(fullPath)
         result.push({
           name: entry.name,
           path: fullPath,
@@ -955,6 +994,10 @@ ipcMain.handle('export:pdf', async (_event, htmlContent: string, defaultName: st
 // ============================================================
 // IPC-хэндлеры для хранилища настроек (electron-store)
 // ============================================================
+ipcMain.handle('store:getAll', async () => {
+  return store.store
+})
+
 ipcMain.handle('store:get', async (_event, key: string) => {
   return store.get(key)
 })
@@ -1006,22 +1049,26 @@ ipcMain.handle('spellcheck:getCustomWords', async () => {
 
 /** Проверить, считается ли слово ошибочным */
 ipcMain.handle('spellcheck:isMisspelled', async (_event, word: string) => {
+  await ensureSpellcheckerReady()
   return checkWordMisspelled(word)
 })
 
 /** Получить варианты исправлений для слова */
 ipcMain.handle('spellcheck:getSuggestions', async (_event, word: string) => {
+  await ensureSpellcheckerReady()
   return getWordSuggestions(word)
 })
 
 /** Пакетная проверка списка слов */
 ipcMain.handle('spellcheck:checkWords', async (_event, words: string[]) => {
   if (!Array.isArray(words)) return []
+  await ensureSpellcheckerReady()
   return words.filter((w) => checkWordMisspelled(w))
 })
 
 /** Добавить слово в пользовательский словарь */
 ipcMain.handle('spellcheck:addCustomWord', async (_event, word: string) => {
+  await ensureSpellcheckerReady()
   const trimmed = word.trim()
   if (!trimmed) return false
   const lower = trimmed.toLowerCase()
@@ -1051,7 +1098,7 @@ ipcMain.handle('spellcheck:removeCustomWord', async (_event, word: string) => {
   const current = (store.get('customDictionaryWords', []) as string[]) || []
   const filtered = current.filter((w) => w.toLowerCase() !== lower)
   store.set('customDictionaryWords', filtered)
-  initSpellchecker()
+  await reinitCustomWords()
   if (win) {
     try {
       win.webContents.session.removeWordFromSpellCheckerDictionary(word)

@@ -131,7 +131,7 @@ export function TabBar() {
               </svg>
             )}
             <span className="text-[13px] truncate">{tab.fileName}</span>
-            {!state.autosave && tab.isModified && (
+            {((!state.autosave && tab.isModified) || (tab.filePath === '__draft__' && tab.isModified)) && (
               <span className="w-2 h-2 rounded-full bg-[var(--accent)] flex-shrink-0" />
             )}
             <button

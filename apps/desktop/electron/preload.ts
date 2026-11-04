@@ -186,6 +186,11 @@ contextBridge.exposeInMainWorld('api', {
   // Хранилище настроек (electron-store)
   // ==========================================
 
+  /** Получить все значения из хранилища за один вызов */
+  storeGetAll: () => {
+    return ipcRenderer.invoke('store:getAll')
+  },
+
   /** Получить значение из хранилища */
   storeGet: (key: string) => {
     return ipcRenderer.invoke('store:get', key)

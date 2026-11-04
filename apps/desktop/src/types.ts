@@ -127,6 +127,8 @@ export interface Tab {
   articleId?: number;
   /** Активен ли режим советчика для этой вкладки */
   suggestionMode?: boolean;
+  /** Является ли вкладка временным черновиком (быстрой заметкой) */
+  isDraft?: boolean;
 }
 
 /** Тип ограничения (символы или слова) */
@@ -218,6 +220,8 @@ export type AppAction =
   | { type: 'CLOSE_TAB'; payload: { tabId: string } }
   | { type: 'SET_ACTIVE_TAB'; payload: { tabId: string } }
   | { type: 'UPDATE_CONTENT'; payload: { tabId: string; content: string } }
+  | { type: 'CREATE_DRAFT_TAB'; payload: { content: string; fileName?: string } }
+  | { type: 'SAVE_DRAFT_SUCCESS'; payload: { tabId: string; filePath: string; fileName: string } }
   | { type: 'SET_FILE_TREE'; payload: { folderPath: string; fileTree: FileEntry[] } }
   | { type: 'MARK_SAVED'; payload: { tabId: string } }
   | { type: 'START_CREATING'; payload: { itemType: 'file' | 'folder', targetPath: string } }
@@ -289,6 +293,8 @@ export interface IElectronAPI {
   openExternal: (url: string) => void;
   exportHtml: (content: string, defaultName: string) => Promise<boolean>;
   exportPdf: (content: string, defaultName: string) => Promise<boolean>;
+  /** Чтение всех настроек из electron-store за один вызов */
+  storeGetAll: () => Promise<Record<string, unknown>>;
   /** Чтение настроек из electron-store */
   storeGet: (key: string) => Promise<unknown>;
   /** Запись настроек в electron-store */

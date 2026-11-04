@@ -5,7 +5,7 @@ import {
   validateUpdateUrl,
   sanitizeUpdateFileName,
   verifySha256Checksum,
-} from '../updaterSecurity'
+} from '../updaterSecurity.ts'
 
 describe('OWASP ASVS V10.3 & Top 10 (A08:2021) — Software Updater Security', () => {
   describe('Downgrade & Rollback Attack Protection (ASVS V10.3.3)', () => {

@@ -2,10 +2,11 @@
  * EditorContext.tsx — Централизованное управление состоянием приложения.
  */
 import React, { createContext, useContext, useReducer, useCallback, useEffect, useRef } from 'react'
-import type { AppState, AppAction, FileEntry, ThemeMode, EditorMode, WordLimit, FocusMode, TocLayoutMode, StatsLayoutMode, AppTheme } from '../types'
+import type { AppState, AppAction, FileEntry, ThemeMode, EditorMode, WordLimit, FocusMode, TocLayoutMode, StatsLayoutMode, AppTheme, Tab } from '../types'
 import { articlesApi } from '../api'
 import { Locale, TranslationKey, getTranslation } from '@type-club/editor'
 import { DARK_THEME, LIGHT_THEME, BUILTIN_THEMES, applyThemeToDOM as applyCustomThemeToDOM } from '../utils/themePresets'
+import { suggestFileName } from '../utils/fileUtils'
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal'
 import { ConfirmExitModal } from '../components/ConfirmExitModal'
 
@@ -109,6 +110,46 @@ function appReducer(state: AppState, action: AppAction): AppState {
         tabs: state.tabs.map((t) =>
           t.id === tabId ? { ...t, content, isModified: t.articleId ? false : true } : t
         ),
+      }
+    }
+    case 'CREATE_DRAFT_TAB': {
+      const { content, fileName } = action.payload
+      const existingDraft = state.tabs.find((t) => t.id === 'draft')
+      if (existingDraft) {
+        return {
+          ...state,
+          tabs: state.tabs.map((t) =>
+            t.id === 'draft' ? { ...t, content, isModified: true } : t
+          ),
+          activeTabId: 'draft',
+        }
+      }
+      const draftTab: Tab = {
+        id: 'draft',
+        filePath: '__draft__',
+        fileName: fileName || (state.language === 'ru' ? 'Без названия' : 'Untitled'),
+        content,
+        isModified: true,
+        refreshCounter: 0,
+        scrollTop: 0,
+        isDraft: true,
+      }
+      return {
+        ...state,
+        tabs: [...state.tabs, draftTab],
+        activeTabId: draftTab.id,
+      }
+    }
+    case 'SAVE_DRAFT_SUCCESS': {
+      const { tabId, filePath, fileName } = action.payload
+      const sep = filePath.includes('/') ? '/' : '\\'
+      const dirPath = filePath.substring(0, filePath.lastIndexOf(sep))
+      return {
+        ...state,
+        tabs: state.tabs.map((t) =>
+          t.id === tabId ? { ...t, filePath, fileName, isModified: false, isDraft: false } : t
+        ),
+        activeExplorerPath: dirPath,
       }
     }
     case 'SET_FILE_TREE': {
@@ -384,17 +425,19 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
-        const customThemes = (await window.api.getCustomThemes?.()) || []
+        const [customThemes, allSettings] = await Promise.all([
+          window.api.getCustomThemes?.() || Promise.resolve([]),
+          (window.api.storeGetAll ? window.api.storeGetAll() : Promise.resolve({})) as Promise<Record<string, unknown>>,
+        ])
         dispatch({ type: 'SET_CUSTOM_THEMES', payload: { customThemes } })
 
-        const savedThemeMode = (await window.api.storeGet('theme')) as ThemeMode | undefined
-        const themeMode: ThemeMode = savedThemeMode || 'dark'
+        const getSetting = (key: string, fallback?: unknown) => {
+          return key in allSettings ? allSettings[key] : fallback
+        }
 
-        const savedLightId = (await window.api.storeGet('lightThemeId')) as string | undefined
-        const lightThemeId = savedLightId || 'light'
-
-        const savedDarkId = (await window.api.storeGet('darkThemeId')) as string | undefined
-        const darkThemeId = savedDarkId || 'dark'
+        const themeMode = (getSetting('theme', 'dark') as ThemeMode) || 'dark'
+        const lightThemeId = (getSetting('lightThemeId', 'light') as string) || 'light'
+        const darkThemeId = (getSetting('darkThemeId', 'dark') as string) || 'dark'
 
         const findTheme = (id: string) => {
           return BUILTIN_THEMES.find(t => t.id === id) || customThemes.find((t: AppTheme) => t.id === id)
@@ -416,56 +459,56 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         })
         applyCustomThemeToDOM(activeTheme)
 
-        const savedLang = await window.api.storeGet('language') as Locale | undefined
+        const savedLang = getSetting('language') as Locale | undefined
         const language = savedLang === 'ru' ? 'ru' : 'en'
         dispatch({ type: 'SET_LANGUAGE', payload: { language } })
         applyLanguageToDOM(language)
 
-        const savedTocLayoutMode = await window.api.storeGet('tocLayoutMode') as TocLayoutMode | undefined
+        const savedTocLayoutMode = getSetting('tocLayoutMode') as TocLayoutMode | undefined
         if (savedTocLayoutMode) dispatch({ type: 'SET_TOC_LAYOUT_MODE', payload: { mode: savedTocLayoutMode } })
 
-        const savedStatsLayoutMode = await window.api.storeGet('statsLayoutMode') as StatsLayoutMode | undefined
+        const savedStatsLayoutMode = getSetting('statsLayoutMode') as StatsLayoutMode | undefined
         if (savedStatsLayoutMode) dispatch({ type: 'SET_STATS_LAYOUT_MODE', payload: { mode: savedStatsLayoutMode } })
 
-        const savedAutosave = await window.api.storeGet('autosave') as boolean | undefined
+        const savedAutosave = getSetting('autosave') as boolean | undefined
         dispatch({ type: 'SET_AUTOSAVE', payload: { enabled: savedAutosave !== false } })
 
-        const savedStats = await window.api.storeGet('showStats') as boolean | undefined
+        const savedStats = getSetting('showStats') as boolean | undefined
         dispatch({ type: 'SET_SHOW_STATS', payload: { enabled: savedStats !== false } })
 
-        const savedTypewriter = await window.api.storeGet('typewriterMode') as boolean | undefined
+        const savedTypewriter = getSetting('typewriterMode') as boolean | undefined
         dispatch({ type: 'SET_TYPEWRITER_MODE', payload: { enabled: savedTypewriter === true } })
 
-        const savedFocusMode = await window.api.storeGet('focusMode') as FocusMode | undefined
+        const savedFocusMode = getSetting('focusMode') as FocusMode | undefined
         dispatch({ type: 'SET_FOCUS_MODE', payload: { mode: savedFocusMode || 'none' } })
 
-        const savedEmptyFolders = await window.api.storeGet('showEmptyFolders') as boolean | undefined
+        const savedEmptyFolders = getSetting('showEmptyFolders') as boolean | undefined
         dispatch({ type: 'SET_SHOW_EMPTY_FOLDERS', payload: { enabled: savedEmptyFolders !== false } })
 
-        const savedEditorMode = await window.api.storeGet('editorMode') as EditorMode | undefined
+        const savedEditorMode = getSetting('editorMode') as EditorMode | undefined
         if (savedEditorMode) dispatch({ type: 'SET_EDITOR_MODE', payload: { mode: savedEditorMode } })
 
-        const savedSidebarOpen = await window.api.storeGet('sidebarOpen') as boolean | undefined
+        const savedSidebarOpen = getSetting('sidebarOpen') as boolean | undefined
         if (savedSidebarOpen !== undefined) dispatch({ type: 'SET_SIDEBAR_OPEN', payload: { open: savedSidebarOpen } })
 
-        const savedTabBarOpen = await window.api.storeGet('tabBarOpen') as boolean | undefined
+        const savedTabBarOpen = getSetting('tabBarOpen') as boolean | undefined
         if (savedTabBarOpen !== undefined) dispatch({ type: 'SET_TAB_BAR_OPEN', payload: { open: savedTabBarOpen } })
 
-        const savedTextZoom = await window.api.storeGet('textZoom') as number | undefined
+        const savedTextZoom = getSetting('textZoom') as number | undefined
         if (savedTextZoom) dispatch({ type: 'SET_TEXT_ZOOM', payload: { zoom: savedTextZoom } })
 
-        const savedDocZoom = await window.api.storeGet('documentZoom') as number | undefined
+        const savedDocZoom = getSetting('documentZoom') as number | undefined
         if (savedDocZoom) dispatch({ type: 'SET_DOCUMENT_ZOOM', payload: { zoom: savedDocZoom } })
 
-        let savedPinnedByFolder = (await window.api.storeGet('pinnedLocalPathsByFolder')) as Record<string, string[]> | undefined
+        let savedPinnedByFolder = getSetting('pinnedLocalPathsByFolder') as Record<string, string[]> | undefined
         if (!savedPinnedByFolder || typeof savedPinnedByFolder !== 'object') {
           savedPinnedByFolder = {}
-          const savedPinnedLocal = await window.api.storeGet('pinnedLocalPaths')
+          const savedPinnedLocal = getSetting('pinnedLocalPaths')
           if (Array.isArray(savedPinnedLocal) && savedPinnedLocal.length > 0) {
             savedPinnedByFolder['__default__'] = savedPinnedLocal as string[]
           }
         }
-        const savedPinnedOnline = await window.api.storeGet('pinnedOnlineArticleIds')
+        const savedPinnedOnline = getSetting('pinnedOnlineArticleIds')
         dispatch({
           type: 'SET_PINNED_ITEMS',
           payload: {
@@ -474,7 +517,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
           },
         })
 
-        const lastFolder = await window.api.storeGet('lastFolderPath') as string | undefined
+        const lastFolder = getSetting('lastFolderPath') as string | undefined
         if (lastFolder) {
           try {
             const fileTree = await window.api.readDir(lastFolder)
@@ -616,19 +659,69 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     } catch (err) { console.error('Ошибка сохранения статьи:', err) }
   }, [state.tabs])
 
+  // --- Сохранить как... ---
+  const saveActiveFileAs = useCallback(async () => {
+    try {
+      window.dispatchEvent(new CustomEvent('editor-flush-sync'))
+    } catch { /* ignore */ }
+    const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
+    const contentToSave = activeTab?.content || ''
+    try {
+      const defaultFallback = state.language === 'ru' ? 'Без названия.md' : 'Untitled.md'
+      const baseName = (!activeTab || activeTab.filePath === '__draft__')
+        ? suggestFileName(contentToSave, defaultFallback)
+        : activeTab.fileName
+
+      const defaultPath = state.folderPath
+        ? (state.folderPath.endsWith('\\') || state.folderPath.endsWith('/')
+            ? `${state.folderPath}${baseName}`
+            : `${state.folderPath}/${baseName}`)
+        : baseName
+
+      const result = await window.api.saveFileAs(contentToSave, defaultPath)
+      if (!result) return
+      const sep = result.filePath.includes('/') ? '/' : '\\'
+      const fileName = result.filePath.substring(result.filePath.lastIndexOf(sep) + 1) || baseName
+
+      if (activeTab?.filePath === '__draft__') {
+        dispatch({
+          type: 'SAVE_DRAFT_SUCCESS',
+          payload: { tabId: activeTab.id, filePath: result.filePath, fileName },
+        })
+      } else {
+        dispatch({ type: 'OPEN_FILE', payload: { filePath: result.filePath, fileName, content: contentToSave } })
+      }
+
+      if (state.folderPath) {
+        const fileTree: FileEntry[] = await window.api.readDir(state.folderPath)
+        dispatch({ type: 'SET_FILE_TREE', payload: { folderPath: state.folderPath, fileTree } })
+      }
+    } catch (err) {
+      console.error('Ошибка сохранения файла как:', err)
+    }
+  }, [state.tabs, state.activeTabId, state.folderPath, state.language])
+
   // --- Сохранить ---
   const saveActiveFile = useCallback(async () => {
+    try {
+      window.dispatchEvent(new CustomEvent('editor-flush-sync'))
+    } catch { /* ignore */ }
     const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
-    if (!activeTab) return
-    if (activeTab.articleId || activeTab.filePath.startsWith('__online')) {
+    if (!activeTab || activeTab.filePath === '__draft__') {
+      await saveActiveFileAs()
+      return
+    }
+    if (activeTab.articleId || activeTab.filePath.startsWith('__online__')) {
       await saveOnlineArticle(activeTab.id)
       return
     }
     try {
       await window.api.writeFile(activeTab.filePath, activeTab.content)
       dispatch({ type: 'MARK_SAVED', payload: { tabId: activeTab.id } })
-    } catch (err) { console.error('Ошибка сохранения файла:', err) }
-  }, [state.tabs, state.activeTabId, saveOnlineArticle])
+    } catch (err) {
+      console.error('Ошибка сохранения файла:', err)
+    }
+  }, [state.tabs, state.activeTabId, saveOnlineArticle, saveActiveFileAs])
 
   // --- Открыть папку ---
   const openFolder = useCallback(async () => {
@@ -651,22 +744,6 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       dispatch({ type: 'OPEN_FILE', payload: { filePath: result.filePath, fileName, content: result.content } })
     } catch (err) { /* ignore */ }
   }, [])
-
-  // --- Сохранить как... ---
-  const saveActiveFileAs = useCallback(async () => {
-    const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
-    if (!activeTab) return
-    try {
-      const result = await window.api.saveFileAs(activeTab.content, activeTab.fileName)
-      if (!result) return
-      const fileName = result.filePath.replace(/^.*[/]/, '') || 'untitled.md'
-      dispatch({ type: 'OPEN_FILE', payload: { filePath: result.filePath, fileName, content: activeTab.content } })
-      if (state.folderPath) {
-        const fileTree: FileEntry[] = await window.api.readDir(state.folderPath)
-        dispatch({ type: 'SET_FILE_TREE', payload: { folderPath: state.folderPath, fileTree } })
-      }
-    } catch (err) { /* ignore */ }
-  }, [state.tabs, state.activeTabId, state.folderPath])
 
   // --- Создать .md файл ---
   const createFile = useCallback(async (fileName: string, targetPath: string) => {
@@ -1058,8 +1135,8 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!state.autosave || !isModified) return
-    // Skip online tabs (they use interval-based autosave)
-    if (activeTab?.articleId) return
+    // Skip online tabs (they use interval-based autosave) and draft tabs (not saved to disk yet)
+    if (activeTab?.articleId || activeTab?.filePath === '__draft__') return
 
     autosaveTimerRef.current = setTimeout(() => {
       saveActiveFileRef.current()
@@ -1068,7 +1145,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     return () => {
       if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
     }
-  }, [state.autosave, isModified, activeTab?.content, activeTab?.articleId])
+  }, [state.autosave, isModified, activeTab?.content, activeTab?.articleId, activeTab?.filePath])
 
   // --- Автосохранение при потере фокуса окна ---
   useEffect(() => {
@@ -1078,7 +1155,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       if (tab?.isModified) {
         if (tab.articleId) {
           saveOnlineArticleRef.current(tab.id)
-        } else {
+        } else if (tab.filePath !== '__draft__') {
           saveActiveFileRef.current()
         }
       }
@@ -1092,7 +1169,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (prevActiveTabIdRef.current && prevActiveTabIdRef.current !== state.activeTabId && state.autosave) {
       const prevTab = state.tabs.find(t => t.id === prevActiveTabIdRef.current)
-      if (prevTab?.isModified) {
+      if (prevTab?.isModified && prevTab.filePath !== '__draft__') {
         // Сохраняем предыдущую вкладку
         void (async () => {
           try {
@@ -1141,6 +1218,8 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
           try {
             if (tab.articleId) {
               await articlesApi.update(tab.articleId, { title: tab.fileName, content: tab.content })
+            } else if (tab.filePath === '__draft__') {
+              await saveActiveFileAs()
             } else {
               await window.api.writeFile(tab.filePath, tab.content)
             }
@@ -1153,7 +1232,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       // 'cancel' — ничего не делаем, окно не закроется
     })
     return unsubscribe
-  }, [confirmExit])
+  }, [confirmExit, saveActiveFileAs])
 
   // --- Закрытие вкладки с проверкой несохранённых изменений ---
   const closeTab = useCallback(async (tabId: string) => {
@@ -1166,8 +1245,12 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       const result = await confirmExit([tab.fileName])
       if (result === 'save') {
         try {
-          await window.api.writeFile(tab.filePath, tab.content)
-          dispatch({ type: 'MARK_SAVED', payload: { tabId: tab.id } })
+          if (tab.filePath === '__draft__') {
+            await saveActiveFileAs()
+          } else {
+            await window.api.writeFile(tab.filePath, tab.content)
+            dispatch({ type: 'MARK_SAVED', payload: { tabId: tab.id } })
+          }
         } catch (err) { console.error('Ошибка сохранения:', err) }
         dispatch({ type: 'CLOSE_TAB', payload: { tabId } })
       } else if (result === 'discard') {
@@ -1176,7 +1259,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     } else {
       dispatch({ type: 'CLOSE_TAB', payload: { tabId } })
     }
-  }, [state.tabs, confirmExit])
+  }, [state.tabs, confirmExit, saveActiveFileAs])
 
   // ============================================================
   // Online articles

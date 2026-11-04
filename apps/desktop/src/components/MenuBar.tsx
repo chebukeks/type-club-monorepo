@@ -111,7 +111,17 @@ export function MenuBar() {
       else if (ctrl && shift && code === 'KeyB') { e.preventDefault(); toggleSidebar() }
       else if (ctrl && !shift && code === 'KeyN') {
         e.preventDefault()
-        if (folderPath) startCreating('file')
+        if (folderPath) {
+          startCreating('file')
+        } else {
+          dispatch({
+            type: 'CREATE_DRAFT_TAB',
+            payload: {
+              content: '',
+              fileName: state.language === 'ru' ? 'Без названия' : 'Untitled',
+            },
+          })
+        }
       }
       else if (ctrl && shift && code === 'KeyN') {
         e.preventDefault()
@@ -169,7 +179,20 @@ export function MenuBar() {
     const html = generateExportHtml(activeTab.content, resolveTheme())
     await window.api.exportPdf(html, activeTab.fileName.replace(/\.md$/i, '.pdf'))
   }
-  const handleCreateFile = () => { closeMenu(); if (folderPath) startCreating('file') }
+  const handleCreateFile = () => {
+    closeMenu()
+    if (folderPath) {
+      startCreating('file')
+    } else {
+      dispatch({
+        type: 'CREATE_DRAFT_TAB',
+        payload: {
+          content: '',
+          fileName: state.language === 'ru' ? 'Без названия' : 'Untitled',
+        },
+      })
+    }
+  }
   const handleCreateFolder = () => { closeMenu(); if (folderPath) startCreating('folder') }
   const handleOpenFile = () => { closeMenu(); openFileViaDialog() }
   const handleOpenFolder = () => { closeMenu(); openFolder() }
@@ -230,7 +253,7 @@ export function MenuBar() {
       <div className="relative">
         <button onClick={() => toggleMenu('file')} className={menuBtnCls('file')} style={{ padding: '2px 12px' }}>{t('menu.file')}</button>
         <AnimatedMenu isOpen={openMenu === 'file'} className="absolute top-full left-0 mt-1 min-w-[240px] w-max py-1 bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-50">
-          <div className={itemCls(!!folderPath)} onClick={folderPath ? handleCreateFile : undefined}>
+          <div className={itemCls(true)} onClick={handleCreateFile}>
             <span>{t('menu.file.newFile')}</span><span className="text-[11px] text-[var(--text-dim)]">Ctrl+N</span>
           </div>
           <div className={itemCls(!!folderPath)} onClick={folderPath ? handleCreateFolder : undefined}>

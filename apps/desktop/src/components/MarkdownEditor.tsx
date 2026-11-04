@@ -8,7 +8,7 @@ import { toggleMark } from 'prosemirror-commands'
 import { Plugin, TextSelection, NodeSelection, Selection } from 'prosemirror-state'
 import { deleteTable } from 'prosemirror-tables'
 import type { EditorView } from 'prosemirror-view'
-import { EditorCore, injectEditorStyles, schema, tableEditPluginKey, spellcheckService } from '@type-club/editor'
+import { EditorCore, injectEditorStyles, schema, tableEditPluginKey, spellcheckService, serializeMarkdown } from '@type-club/editor'
 import { ChangeImageSourceModal } from './ChangeImageSourceModal'
 import { useEditor } from '../context/EditorContext'
 import { useAuth } from '../context/AuthContext'
@@ -507,9 +507,20 @@ export function MarkdownEditor() {
   const activeTabId = activeTab?.id
   // ── Content handlers ──
   const handleChange = useCallback((md: string) => {
-    if (!activeTabId) return
+    if (!activeTabId) {
+      if (md.length > 0) {
+        dispatch({
+          type: 'CREATE_DRAFT_TAB',
+          payload: {
+            content: md,
+            fileName: state.language === 'ru' ? 'Без названия' : 'Untitled',
+          },
+        })
+      }
+      return
+    }
     dispatch({ type: 'UPDATE_CONTENT', payload: { tabId: activeTabId, content: md } })
-  }, [activeTabId, dispatch])
+  }, [activeTabId, dispatch, state.language])
 
   useEffect(() => {
     if (state.editorMode === 'raw' && activeTabId) {
@@ -523,12 +534,48 @@ export function MarkdownEditor() {
 
   const handleRawChange = useCallback((text: string) => {
     setRawContent(text)
-    rawTabIdRef.current = activeTabId ?? null
+    if (!activeTabId) {
+      if (text.length > 0) {
+        dispatch({
+          type: 'CREATE_DRAFT_TAB',
+          payload: {
+            content: text,
+            fileName: state.language === 'ru' ? 'Без названия' : 'Untitled',
+          },
+        })
+      }
+      return
+    }
+    rawTabIdRef.current = activeTabId
     if (rawSyncTimerRef.current) clearTimeout(rawSyncTimerRef.current)
     rawSyncTimerRef.current = setTimeout(() => {
       flushRawContentRef.current?.()
     }, 1500)
-  }, [activeTabId])
+  }, [activeTabId, dispatch, state.language])
+
+  // --- Immediate sync for save/export ---
+  useEffect(() => {
+    const handleFlushSync = () => {
+      if (state.editorMode === 'raw') {
+        flushRawContentRef.current?.()
+      } else if (editorView && !editorView.isDestroyed) {
+        const md = serializeMarkdown(editorView.state.doc)
+        if (!activeTabId && md.length > 0) {
+          dispatch({
+            type: 'CREATE_DRAFT_TAB',
+            payload: {
+              content: md,
+              fileName: state.language === 'ru' ? 'Без названия' : 'Untitled',
+            },
+          })
+        } else if (activeTabId) {
+          dispatch({ type: 'UPDATE_CONTENT', payload: { tabId: activeTabId, content: md } })
+        }
+      }
+    }
+    window.addEventListener('editor-flush-sync', handleFlushSync)
+    return () => window.removeEventListener('editor-flush-sync', handleFlushSync)
+  }, [editorView, activeTabId, dispatch, state.editorMode, state.language])
 
   // ── Typewriter plugin ──
   const isTypewriterModeRef = useRef(state.typewriterMode)
@@ -1265,7 +1312,7 @@ export function MarkdownEditor() {
       )}
 
       <EditorCore
-        key={state.activeTabId || 'none'}
+        key={state.activeTabId || 'draft'}
         content={state.editorMode === 'raw' ? (rawContent ?? content) : content}
         editorMode={state.editorMode}
         onChange={state.editorMode === 'raw' ? handleRawChange : handleChange}
