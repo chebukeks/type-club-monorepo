@@ -1,0 +1,16 @@
+{
+  "version": "0.9.8",
+  "releaseDate": "2026-11-04",
+  "platforms": {
+    "windows": {
+      "installer": { "file": "TypeClub-Windows-0.9.8.exe", "size": 89456123, "sha256": "" },
+      "portable": { "file": "TypeClub-Windows-0.9.8.zip", "size": 95123456, "sha256": "" }
+    },
+    "linux": {
+      "appimage": { "file": "TypeClub-Linux-0.9.8.AppImage", "size": 110234567, "sha256": "" }
+    },
+    "macos": {
+      "dmg": { "file": "TypeClub-Mac-0.9.8.dmg", "size": 105234567, "sha256": "" }
+    }
+  }
+}

@@ -7,12 +7,41 @@ import { config } from "./config";
 
 const BASE = config.apiUrl;
 
-let token: string | null = localStorage.getItem("access_token");
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
 
-export function setToken(t: string | null) {
+// If token was not stored in localStorage (user did not check "Remember me"),
+// ensure it does not persist across desktop application restarts.
+if (typeof localStorage !== "undefined" && !localStorage.getItem("access_token")) {
+  if (typeof sessionStorage !== "undefined") {
+    sessionStorage.removeItem("access_token");
+  }
+}
+
+let token: string | null =
+  (typeof localStorage !== "undefined" ? localStorage.getItem("access_token") : null) ||
+  (typeof sessionStorage !== "undefined" ? sessionStorage.getItem("access_token") : null);
+
+export function setToken(t: string | null, remember: boolean = true) {
   token = t;
-  if (t) localStorage.setItem("access_token", t);
-  else localStorage.removeItem("access_token");
+  if (t) {
+    if (remember) {
+      localStorage.setItem("access_token", t);
+      sessionStorage.removeItem("access_token");
+    } else {
+      sessionStorage.setItem("access_token", t);
+      localStorage.removeItem("access_token");
+    }
+  } else {
+    localStorage.removeItem("access_token");
+    sessionStorage.removeItem("access_token");
+  }
 }
 
 export function getToken() {
@@ -33,11 +62,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     const detail = err.detail;
-    if (typeof detail === "string") throw new Error(detail);
-    if (Array.isArray(detail) && detail.length > 0) {
-      throw new Error(detail.map((d: any) => d.msg || JSON.stringify(d)).join("; "));
+    let msg = res.statusText || "Request failed";
+    if (typeof detail === "string") msg = detail;
+    else if (Array.isArray(detail) && detail.length > 0) {
+      msg = detail.map((d: any) => d.msg || JSON.stringify(d)).join("; ");
     }
-    throw new Error(res.statusText || "Request failed");
+    throw new ApiError(msg, res.status);
   }
   return res.json();
 }
@@ -69,8 +99,15 @@ export interface TokenResponse {
 export const authApi = {
   register: (data: { nickname: string; email: string; password: string; confirm_password: string }) =>
     api.post<TokenResponse>("/auth/register", { ...data, email: data.email.trim().toLowerCase() }),
-  login: (data: { email: string; password: string }) =>
+  login: (data: { email: string; password: string; remember_me?: boolean }) =>
     api.post<TokenResponse>("/auth/login", { ...data, email: data.email.trim().toLowerCase() }),
+  initQr: () => api.post<{ session_id: string; url: string; expires_at: string }>("/auth/qr/init"),
+  getQrStatus: (sessionId: string) =>
+    api.get<{ status: string; access_token?: string }>(`/auth/qr/status/${sessionId}`),
+  approveQr: (sessionId: string) =>
+    api.post<{ status: string }>("/auth/qr/approve", { session_id: sessionId }),
+  rejectQr: (sessionId: string) =>
+    api.post<{ status: string }>("/auth/qr/reject", { session_id: sessionId }),
   me: () => api.get<User>("/auth/me"),
   updateMe: (data: { nickname?: string; password?: string; confirm_password?: string }) =>
     api.patch<User>("/auth/me", data),
@@ -182,4 +219,3 @@ export const usersApi = {
   search: (query: string, limit = 6) =>
     api.get<UserSearchResult[]>(`/users/search?q=${encodeURIComponent(query)}&limit=${limit}`),
 };
-

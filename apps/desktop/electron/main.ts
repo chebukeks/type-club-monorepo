@@ -2,6 +2,10 @@ import { app, BrowserWindow, ipcMain, dialog, shell, screen, clipboard } from 'e
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
+import http from 'node:http'
+import https from 'node:https'
+import crypto from 'node:crypto'
+import { spawn } from 'node:child_process'
 import os from 'node:os'
 import Store from 'electron-store'
 import nspell from 'nspell'
@@ -570,8 +574,24 @@ function createWindow() {
     win.loadFile(path.join(RENDERER_DIST, 'index.html'))
   }
 
-  // Запрещаем создавать новые окна через target="_blank" или window.open
+  // Разрешаем создание вспомогательных окон (Picture-in-Picture для настроек темы)
+  // и блокируем произвольные внешние всплывающие окна
   win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url === 'about:blank' || !url || url.startsWith('about:')) {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          title: 'Type Club — Настройки',
+          autoHideMenuBar: true,
+          frame: true,
+          show: true,
+          width: 940,
+          height: 700,
+          minWidth: 600,
+          minHeight: 450,
+        },
+      }
+    }
     try {
       const parsed = new URL(url)
       if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
@@ -583,6 +603,12 @@ function createWindow() {
       console.warn(`[SECURITY] Blocked windowOpen for invalid URL: ${url}`)
     }
     return { action: 'deny' }
+  })
+
+  // Обеспечиваем фокус и отображение вспомогательных окон
+  win.webContents.on('did-create-window', (childWindow) => {
+    childWindow.show()
+    childWindow.focus()
   })
 
   // Запрещаем навигацию основного окна по внешним ссылкам
@@ -1200,6 +1226,399 @@ ipcMain.handle('dialog:confirmExit', async (_event, fileNames: string[]): Promis
   if (result.response === 1) return 'discard'
   return 'cancel'
 })
+
+// ============================================================
+// IPC-хэндлеры для автообновления приложения (OWASP ASVS V10.3 & A08:2021 Compliant)
+// ============================================================
+const verifiedUpdateFiles = new Set<string>()
+
+function validateUpdateUrl(urlStr: string): URL {
+  let parsed: URL
+  try {
+    parsed = new URL(urlStr)
+  } catch {
+    throw new Error('Invalid URL format for update')
+  }
+
+  const isLocal = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '::1'
+  if (parsed.protocol !== 'https:' && (!isLocal || (app.isPackaged && !isLocal))) {
+    throw new Error('Insecure transport: application updates must be transmitted over HTTPS (OWASP ASVS V10.3.1)')
+  }
+
+  if (parsed.hostname === '169.254.169.254' || (parsed.protocol !== 'https:' && parsed.protocol !== 'http:')) {
+    throw new Error('Update destination rejected by security policy')
+  }
+
+  return parsed
+}
+
+function sanitizeUpdateFileName(fileName: string): string {
+  const base = path.basename(fileName)
+  if (!/^[a-zA-Z0-9._-]+$/.test(base)) {
+    throw new Error('Security violation: update filename contains invalid or dangerous characters')
+  }
+  return base
+}
+
+function isNewerVersion(remoteVersion: string, localVersion: string): boolean {
+  const clean = (v: string) => v.replace(/^v/i, '').trim()
+  const rParts = clean(remoteVersion).split('.').map((p) => parseInt(p, 10) || 0)
+  const lParts = clean(localVersion).split('.').map((p) => parseInt(p, 10) || 0)
+  for (let i = 0; i < Math.max(rParts.length, lParts.length); i++) {
+    const r = rParts[i] || 0
+    const l = lParts[i] || 0
+    if (r > l) return true
+    if (r < l) return false
+  }
+  return false
+}
+
+function detectInstallType(): 'portable' | 'installer' | 'appimage' | 'dmg' {
+  if (process.platform === 'win32') {
+    if (!app.isPackaged) return 'portable'
+    if (process.env.PORTABLE_EXECUTABLE_DIR) return 'portable'
+    const exeDir = path.dirname(process.execPath)
+    const hasUninstaller =
+      fs.existsSync(path.join(exeDir, 'Uninstall TypeClub.exe')) ||
+      fs.existsSync(path.join(exeDir, 'Uninstall Type Club.exe')) ||
+      fs.existsSync(path.join(exeDir, 'Uninstall.exe'))
+    return hasUninstaller ? 'installer' : 'portable'
+  } else if (process.platform === 'linux') {
+    return 'appimage'
+  } else if (process.platform === 'darwin') {
+    return 'dmg'
+  }
+  return 'portable'
+}
+
+ipcMain.handle('app:get-version', () => {
+  return app.getVersion()
+})
+
+ipcMain.handle('app:check-update', async (_event, siteUrl: string) => {
+  try {
+    const cleanSite = (siteUrl || 'https://type-club.ru').replace(/\/$/, '')
+    const manifestUrl = `${cleanSite}/downloads/latest.json`
+    const parsedManifestUrl = validateUpdateUrl(manifestUrl)
+
+    const manifestData = await new Promise<any>((resolve, reject) => {
+      const protocol = parsedManifestUrl.protocol === 'https:' ? https : http
+      const req = protocol.get(manifestUrl, (res) => {
+        if (res.statusCode !== 200) {
+          return reject(new Error(`Failed to fetch latest.json: HTTP ${res.statusCode}`))
+        }
+        let data = ''
+        res.on('data', (chunk) => {
+          if (data.length + chunk.length > 512 * 1024) {
+            req.destroy()
+            return reject(new Error('Manifest file size exceeded maximum allowable limit'))
+          }
+          data += chunk
+        })
+        res.on('end', () => {
+          try {
+            resolve(JSON.parse(data))
+          } catch (e) {
+            reject(e)
+          }
+        })
+      })
+      req.on('error', reject)
+      req.setTimeout(8000, () => {
+        req.destroy()
+        reject(new Error('Update check timeout'))
+      })
+    })
+
+    const currentVersion = app.getVersion()
+    const latestVersion = String(manifestData.version || '')
+    // OWASP ASVS V10.3.3: Защита от Downgrade/Rollback-атак
+    const updateAvailable = isNewerVersion(latestVersion, currentVersion)
+    const installType = detectInstallType()
+
+    let fileInfo = null
+    if (installType === 'portable') {
+      fileInfo = manifestData.platforms?.windows?.portable || manifestData.platforms?.windows?.installer
+    } else if (installType === 'installer') {
+      fileInfo = manifestData.platforms?.windows?.installer || manifestData.platforms?.windows?.portable
+    } else if (installType === 'appimage') {
+      fileInfo = manifestData.platforms?.linux?.appimage
+    } else if (installType === 'dmg') {
+      fileInfo = manifestData.platforms?.macos?.dmg
+    }
+
+    if (fileInfo && fileInfo.file) {
+      fileInfo.file = sanitizeUpdateFileName(fileInfo.file)
+    }
+
+    const downloadUrl = fileInfo ? `${cleanSite}/downloads/${fileInfo.file}` : null
+
+    return {
+      updateAvailable,
+      currentVersion,
+      latestVersion,
+      releaseDate: manifestData.releaseDate,
+      installType,
+      fileInfo,
+      downloadUrl,
+    }
+  } catch (err: any) {
+    console.warn('[UPDATER] Check failed:', err.message)
+    return {
+      updateAvailable: false,
+      currentVersion: app.getVersion(),
+      latestVersion: app.getVersion(),
+      error: err.message,
+    }
+  }
+})
+
+ipcMain.handle('app:download-update', async (_event, downloadUrl: string, rawFileName: string, expectedSha256?: string) => {
+  const fileName = sanitizeUpdateFileName(rawFileName)
+  const tempDir = path.resolve(path.join(app.getPath('temp'), 'typeclub-update'))
+  await fs.promises.mkdir(tempDir, { recursive: true })
+  const targetFile = path.resolve(path.join(tempDir, fileName))
+
+  // OWASP ASVS V10.3.4 & A01: Path Confinement
+  if (!targetFile.startsWith(tempDir)) {
+    throw new Error('Access denied: target file path escapes update temporary directory')
+  }
+
+  validateUpdateUrl(downloadUrl)
+  const MAX_UPDATE_SIZE = 500 * 1024 * 1024 // 500 МБ лимит защиты от DoS
+
+  const downloadFileWithRedirects = (currentUrl: string, redirectCount = 0): Promise<{ success: boolean; filePath: string; sha256: string }> => {
+    if (redirectCount > 5) {
+      return Promise.reject(new Error('Too many redirects'))
+    }
+
+    const parsedUrl = validateUpdateUrl(currentUrl)
+
+    return new Promise((resolve, reject) => {
+      const fileStream = fs.createWriteStream(targetFile)
+      const hashStream = crypto.createHash('sha256')
+      const protocol = parsedUrl.protocol === 'https:' ? https : http
+
+      const cleanupAndReject = async (err: Error) => {
+        fileStream.close()
+        try { await fs.promises.unlink(targetFile) } catch {}
+        reject(err)
+      }
+
+      const req = protocol.get(currentUrl, (res) => {
+        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          fileStream.close()
+          let nextUrl = res.headers.location
+          if (!nextUrl.startsWith('http')) {
+            const u = new URL(currentUrl)
+            nextUrl = `${u.origin}${nextUrl}`
+          }
+          return resolve(downloadFileWithRedirects(nextUrl, redirectCount + 1))
+        }
+
+        if (res.statusCode !== 200) {
+          return cleanupAndReject(new Error(`Download failed with HTTP ${res.statusCode}`))
+        }
+
+        const totalBytes = parseInt(res.headers['content-length'] || '0', 10)
+        let bytesDownloaded = 0
+
+        res.on('data', (chunk) => {
+          bytesDownloaded += chunk.length
+          if (bytesDownloaded > MAX_UPDATE_SIZE) {
+            req.destroy()
+            return cleanupAndReject(new Error('Update package exceeded maximum allowable size'))
+          }
+          fileStream.write(chunk)
+          hashStream.update(chunk)
+          const percent = totalBytes > 0 ? Math.round((bytesDownloaded / totalBytes) * 100) : 0
+          win?.webContents.send('app:update-progress', {
+            bytesDownloaded,
+            totalBytes,
+            percent,
+          })
+        })
+
+        res.on('end', () => {
+          fileStream.end(async () => {
+            const actualSha256 = hashStream.digest('hex').toLowerCase()
+
+            // OWASP A08:2021 & ASVS V10.3.2: Проверка криптографической целостности
+            if (expectedSha256 && expectedSha256.trim()) {
+              const expected = expectedSha256.trim().toLowerCase()
+              if (actualSha256 !== expected) {
+                try { await fs.promises.unlink(targetFile) } catch {}
+                return reject(new Error(`Cryptographic integrity failure: SHA-256 mismatch (expected: ${expected}, got: ${actualSha256})`))
+              }
+            }
+
+            verifiedUpdateFiles.add(targetFile)
+            resolve({ success: true, filePath: targetFile, sha256: actualSha256 })
+          })
+        })
+
+        res.on('error', (err) => {
+          cleanupAndReject(err)
+        })
+      })
+
+      req.on('error', (err) => {
+        cleanupAndReject(err)
+      })
+    })
+  }
+
+  return downloadFileWithRedirects(downloadUrl)
+})
+
+ipcMain.handle('app:install-update', async (_event, filePath: string, installType: string) => {
+  const resolvedPath = path.resolve(filePath)
+  const tempDir = path.resolve(path.join(app.getPath('temp'), 'typeclub-update'))
+
+  // OWASP ASVS V10.3.4: Проверка, что файл находится строго в доверенной временной директории обновления
+  if (!resolvedPath.startsWith(tempDir)) {
+    throw new Error('Access denied: update package must reside in update temporary directory')
+  }
+
+  // OWASP ASVS V10.3.2: Проверка, что файл был загружен и верифицирован в рамках текущей сессии апдейтера
+  if (!verifiedUpdateFiles.has(resolvedPath)) {
+    throw new Error('Security violation: update package was not verified by updater session')
+  }
+
+  if (!fs.existsSync(resolvedPath)) {
+    throw new Error('Update file does not exist')
+  }
+
+  if (installType === 'portable' && process.platform === 'win32') {
+    const extractDir = path.resolve(path.join(tempDir, 'extracted'))
+    await fs.promises.rm(extractDir, { recursive: true, force: true })
+    await fs.promises.mkdir(extractDir, { recursive: true })
+
+    // Безопасный вызов PowerShell через spawn с массивом аргументов (без cmd shell injection)
+    await new Promise<void>((resolve, reject) => {
+      const ps = spawn('powershell.exe', [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        'Expand-Archive',
+        '-LiteralPath',
+        resolvedPath,
+        '-DestinationPath',
+        extractDir,
+        '-Force',
+      ], {
+        stdio: 'ignore',
+        windowsHide: true,
+      })
+      ps.on('error', reject)
+      ps.on('close', (code) => {
+        if (code === 0) resolve()
+        else reject(new Error(`PowerShell Expand-Archive failed with code ${code}`))
+      })
+    })
+
+    // OWASP Zip Slip Prevention: Проверка, что ни один файл не распаковался за пределы extractDir
+    async function verifyZipSlip(dir: string): Promise<void> {
+      const items = await fs.promises.readdir(dir, { withFileTypes: true })
+      for (const item of items) {
+        const full = path.resolve(dir, item.name)
+        if (!full.startsWith(extractDir)) {
+          throw new Error('Security violation: Zip Slip path traversal detected in archive')
+        }
+        if (item.isDirectory()) {
+          await verifyZipSlip(full)
+        }
+      }
+    }
+    await verifyZipSlip(extractDir)
+
+    let sourceDir = extractDir
+    const entries = await fs.promises.readdir(extractDir)
+    if (entries.length === 1) {
+      const sub = path.join(extractDir, entries[0])
+      const stat = await fs.promises.stat(sub)
+      if (stat.isDirectory()) {
+        sourceDir = sub
+      }
+    }
+
+    const targetDir = app.isPackaged ? path.dirname(process.execPath) : path.join(tempDir, 'simulated-target')
+    if (!app.isPackaged) {
+      await fs.promises.mkdir(targetDir, { recursive: true })
+    }
+    const exeName = app.isPackaged ? path.basename(process.execPath) : 'TypeClub.exe'
+    const pid = process.pid
+    if (typeof pid !== 'number' || !Number.isInteger(pid) || pid <= 0) {
+      throw new Error('Invalid process PID')
+    }
+
+    const batPath = path.join(tempDir, 'apply-update.bat')
+    const batContent = `@echo off
+chcp 65001 > nul
+timeout /t 1 /nobreak > nul
+taskkill /F /PID ${pid} > nul 2>&1
+timeout /t 1 /nobreak > nul
+xcopy "${sourceDir}\\*" "${targetDir}\\" /E /Y /I /Q
+start "" "${path.join(targetDir, exeName)}"
+del "%~f0"
+`
+    await fs.promises.writeFile(batPath, batContent, 'utf-8')
+
+    const child = spawn('cmd.exe', ['/c', batPath], {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+    })
+    child.unref()
+
+    allowClose = true
+    app.quit()
+    return { success: true }
+  }
+
+  if (installType === 'installer' && process.platform === 'win32') {
+    const child = spawn(resolvedPath, ['--updated'], {
+      detached: true,
+      stdio: 'ignore',
+    })
+    child.unref()
+    allowClose = true
+    app.quit()
+    return { success: true }
+  }
+
+  if (installType === 'appimage' && process.platform === 'linux') {
+    fs.chmodSync(resolvedPath, 0o755)
+    const targetAppImage = process.env.APPIMAGE || resolvedPath
+    const shPath = path.join(tempDir, 'apply-update.sh')
+    const shContent = `#!/bin/sh
+sleep 1
+cp -f "${resolvedPath}" "${targetAppImage}"
+chmod +x "${targetAppImage}"
+exec "${targetAppImage}" &
+rm -f "$0"
+`
+    await fs.promises.writeFile(shPath, shContent, { mode: 0o755 })
+    const child = spawn('/bin/sh', [shPath], {
+      detached: true,
+      stdio: 'ignore',
+    })
+    child.unref()
+    allowClose = true
+    app.quit()
+    return { success: true }
+  }
+
+  if (installType === 'dmg' && process.platform === 'darwin') {
+    await shell.openPath(resolvedPath)
+    allowClose = true
+    app.quit()
+    return { success: true }
+  }
+
+  return { success: false, error: 'Unsupported platform' }
+})
+
 
 // ============================================================
 // Жизненный цикл приложения

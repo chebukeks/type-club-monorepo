@@ -123,8 +123,9 @@ export class ImageView implements NodeView {
       // и решает проблему GPU растеризатора Chromium (16 МБ лимит).
       if (this.currentSrc.startsWith('data:')) {
         img.src = dataUriToBlobUrl(this.currentSrc)
-      } else if (this.currentSrc.startsWith('/uploads/') && typeof window !== 'undefined' && (window as any).__TYPE_CLUB_SITE_URL__) {
-        img.src = `${(window as any).__TYPE_CLUB_SITE_URL__}${this.currentSrc}`
+      } else if (this.currentSrc.startsWith('/uploads/')) {
+        const siteUrl = (typeof window !== 'undefined' && (window as any).__TYPE_CLUB_SITE_URL__) || 'https://type-club.ru'
+        img.src = `${siteUrl.replace(/\/$/, '')}${this.currentSrc}`
       } else {
         img.src = this.currentSrc
       }

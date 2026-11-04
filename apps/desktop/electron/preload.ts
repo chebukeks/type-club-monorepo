@@ -360,4 +360,32 @@ contextBridge.exposeInMainWorld('api', {
   importThemes: (): Promise<any[] | null> => {
     return ipcRenderer.invoke('theme:importThemes')
   },
+
+  // ==========================================
+  // Автообновление приложения
+  // ==========================================
+
+  getAppVersion: (): Promise<string> => {
+    return ipcRenderer.invoke('app:get-version')
+  },
+
+  checkUpdate: (siteUrl: string): Promise<any> => {
+    return ipcRenderer.invoke('app:check-update', siteUrl)
+  },
+
+  downloadUpdate: (downloadUrl: string, fileName: string, expectedSha256?: string): Promise<{ success: boolean; filePath: string; sha256?: string }> => {
+    return ipcRenderer.invoke('app:download-update', downloadUrl, fileName, expectedSha256)
+  },
+
+  installUpdate: (filePath: string, installType: string): Promise<{ success: boolean; error?: string }> => {
+    return ipcRenderer.invoke('app:install-update', filePath, installType)
+  },
+
+  onUpdateProgress: (callback: (progress: { bytesDownloaded: number; totalBytes: number; percent: number }) => void) => {
+    const handler = (_event: any, progress: any) => callback(progress)
+    ipcRenderer.on('app:update-progress', handler)
+    return () => {
+      ipcRenderer.removeListener('app:update-progress', handler)
+    }
+  },
 })

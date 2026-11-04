@@ -28,6 +28,7 @@ class Settings(BaseSettings):
 
     # Frontend URL for email links
     frontend_url: str = "http://localhost:5173"
+    site_url: str = "https://type-club.ru"
 
     # Allowed CORS origins (comma-separated)
     cors_origins: str = "https://type-club.ru,https://www.type-club.ru"

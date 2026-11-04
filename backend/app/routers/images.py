@@ -128,7 +128,7 @@ async def upload_image(
     target_path.parent.mkdir(parents=True, exist_ok=True)
     target_path.write_bytes(content)
     abs_path = str(target_path)
-    url = f"/uploads/{rel_path}"
+    url = f"{settings.site_url.rstrip('/')}/uploads/{rel_path}"
 
     image = ArticleImage(
         article_id=article_id,

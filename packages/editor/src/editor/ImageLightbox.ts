@@ -300,8 +300,9 @@ export class ImageLightbox {
 
     if (options.src) {
       let src = options.src;
-      if (src.startsWith('/uploads/') && typeof window !== 'undefined' && (window as any).__TYPE_CLUB_SITE_URL__) {
-        src = `${(window as any).__TYPE_CLUB_SITE_URL__}${src}`;
+      if (src.startsWith('/uploads/')) {
+        const siteUrl = (typeof window !== 'undefined' && (window as any).__TYPE_CLUB_SITE_URL__) || 'https://type-club.ru'
+        src = `${siteUrl.replace(/\/$/, '')}${src}`
       }
       const img = document.createElement('img');
       img.src = src;

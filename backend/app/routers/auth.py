@@ -20,7 +20,7 @@ from app.config import settings
 from app.database import get_session
 from app.mail import send_reset_password_email, send_verification_email
 import hashlib
-from app.models import ApiKey, User, VerificationToken
+from app.models import ApiKey, User, VerificationToken, QRSession
 from app.schemas import (
     ForgotPasswordRequest,
     ForgotPasswordResponse,
@@ -32,6 +32,9 @@ from app.schemas import (
     UpdateProfileRequest,
     UserResponse,
     VerifyEmailRequest,
+    QRInitResponse,
+    QRStatusResponse,
+    QRActionRequest,
 )
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -198,8 +201,83 @@ async def login(
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    token = create_jwt(user.id)
+    expire = settings.jwt_expire_minutes if data.remember_me else 120
+    token = create_jwt(user.id, expire_minutes=expire)
     return TokenResponse(access_token=token)
+
+
+@router.post("/qr/init", response_model=QRInitResponse)
+@limiter.limit("20/minute")
+async def init_qr_login(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+):
+    import secrets
+    session_id = secrets.token_urlsafe(32)
+    expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=5)
+    qr_session = QRSession(
+        id=session_id,
+        status="pending",
+        expires_at=expires_at,
+    )
+    session.add(qr_session)
+    await session.commit()
+    qr_url = f"{settings.site_url.rstrip('/')}/qr-login?session={session_id}"
+    return QRInitResponse(session_id=session_id, url=qr_url, expires_at=expires_at)
+
+
+@router.get("/qr/status/{session_id}", response_model=QRStatusResponse)
+async def get_qr_status(
+    session_id: str,
+    session: AsyncSession = Depends(get_session),
+):
+    qr_session = (await session.execute(select(QRSession).where(QRSession.id == session_id))).scalar_one_or_none()
+    if not qr_session:
+        raise HTTPException(status_code=404, detail="QR session not found")
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    if qr_session.expires_at < now and qr_session.status == "pending":
+        qr_session.status = "expired"
+        await session.commit()
+
+    return QRStatusResponse(status=qr_session.status, access_token=qr_session.token)
+
+
+@router.post("/qr/approve")
+async def approve_qr_login(
+    data: QRActionRequest,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    qr_session = (await session.execute(select(QRSession).where(QRSession.id == data.session_id))).scalar_one_or_none()
+    if not qr_session:
+        raise HTTPException(status_code=404, detail="QR session not found")
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    if qr_session.expires_at < now or qr_session.status != "pending":
+        raise HTTPException(status_code=400, detail="QR session is no longer active")
+
+    expire = settings.jwt_expire_minutes if data.remember_me else 120
+    token = create_jwt(current_user.id, expire_minutes=expire)
+    qr_session.status = "approved"
+    qr_session.user_id = current_user.id
+    qr_session.token = token
+    await session.commit()
+    return {"status": "approved"}
+
+
+@router.post("/qr/reject")
+async def reject_qr_login(
+    data: QRActionRequest,
+    session: AsyncSession = Depends(get_session),
+):
+    qr_session = (await session.execute(select(QRSession).where(QRSession.id == data.session_id))).scalar_one_or_none()
+    if not qr_session:
+        raise HTTPException(status_code=404, detail="QR session not found")
+
+    qr_session.status = "rejected"
+    await session.commit()
+    return {"status": "rejected"}
 
 
 @router.get("/me", response_model=UserResponse)

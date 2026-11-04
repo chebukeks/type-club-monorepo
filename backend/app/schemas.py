@@ -63,6 +63,7 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+    remember_me: bool = True
 
     @field_validator("email")
     @classmethod
@@ -482,3 +483,19 @@ class ApiKeyResponse(BaseModel):
 
 class ApiKeyCreatedResponse(ApiKeyResponse):
     token: str
+
+
+class QRInitResponse(BaseModel):
+    session_id: str
+    url: str
+    expires_at: datetime
+
+
+class QRStatusResponse(BaseModel):
+    status: str
+    access_token: Optional[str] = None
+
+
+class QRActionRequest(BaseModel):
+    session_id: str
+    remember_me: bool = True

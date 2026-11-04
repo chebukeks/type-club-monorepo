@@ -1,5 +1,6 @@
 import { useState, useRef, useMemo, useEffect } from "react";
-import { MessageCircleMore, Copy, Link2, HardDriveDownload, CloudUpload, Trash2, X } from "lucide-react";
+import { MessageCircleMore, Copy, Link2, HardDriveDownload, CloudUpload, Trash2, X, RefreshCw } from "lucide-react";
+import { ChangeImageSourceModal } from "./ChangeImageSourceModal";
 import { toggleMark } from "prosemirror-commands";
 import { TextSelection, NodeSelection, Selection } from "prosemirror-state";
 import {
@@ -76,6 +77,7 @@ export function MarkdownEditor({
   const [showTableSheet, setShowTableSheet] = useState(false);
   const [editorView, setEditorView] = useState<EditorView | null>(null);
 
+  const [changeImageSrcTarget, setChangeImageSrcTarget] = useState<{ pos: number; src: string } | null>(null);
   const [imageContextMenu, setImageContextMenu] = useState<{
     visible: boolean;
     x: number;
@@ -255,7 +257,12 @@ export function MarkdownEditor({
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
         blob = new Blob([bytes], { type: mime })
       } else {
-        const res = await fetch(src)
+        let resolvedSrc = src;
+      if (resolvedSrc.startsWith('/uploads/')) {
+        const baseUrl = window.location.origin.includes('localhost') ? 'https://type-club.ru' : window.location.origin;
+        resolvedSrc = `${baseUrl}${resolvedSrc}`;
+      }
+      const res = await fetch(resolvedSrc)
         blob = await res.blob()
       }
       await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })])
@@ -266,7 +273,12 @@ export function MarkdownEditor({
 
   const handleEmbedImage = async (src: string, pos: number) => {
     try {
-      const res = await fetch(src)
+      let resolvedSrc = src;
+      if (resolvedSrc.startsWith('/uploads/')) {
+        const baseUrl = window.location.origin.includes('localhost') ? 'https://type-club.ru' : window.location.origin;
+        resolvedSrc = `${baseUrl}${resolvedSrc}`;
+      }
+      const res = await fetch(resolvedSrc)
       const blob = await res.blob()
       const reader = new FileReader()
       reader.onloadend = () => {
@@ -308,7 +320,12 @@ export function MarkdownEditor({
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
         file = new File([bytes], `image-${Date.now()}.${ext}`, { type: mime })
       } else {
-        const res = await fetch(src)
+        let resolvedSrc = src;
+      if (resolvedSrc.startsWith('/uploads/')) {
+        const baseUrl = window.location.origin.includes('localhost') ? 'https://type-club.ru' : window.location.origin;
+        resolvedSrc = `${baseUrl}${resolvedSrc}`;
+      }
+      const res = await fetch(resolvedSrc)
         const blob = await res.blob()
         const ext = blob.type.split('/')[1] || 'png'
         file = new File([blob], `image-${Date.now()}.${ext}`, { type: blob.type })
@@ -319,7 +336,10 @@ export function MarkdownEditor({
       if (view && response?.url) {
         const node = view.state.doc.nodeAt(pos)
         if (node) {
-          const tr = view.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: response.url })
+        const fullUrl = response.url.startsWith('/')
+          ? `${window.location.origin.includes('localhost') ? 'https://type-club.ru' : window.location.origin}${response.url}`
+          : response.url;
+        const tr = view.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: fullUrl })
           view.dispatch(tr)
         }
       }
@@ -338,6 +358,21 @@ export function MarkdownEditor({
       view.focus();
     }
     setImageContextMenu(null);
+  };
+
+  const handleChangeImageSource = (newSrc: string) => {
+    if (!changeImageSrcTarget || !viewRef.current) return;
+    const view = viewRef.current;
+    const node = view.state.doc.nodeAt(changeImageSrcTarget.pos);
+    if (node) {
+      const tr = view.state.tr.setNodeMarkup(changeImageSrcTarget.pos, undefined, {
+        ...node.attrs,
+        src: newSrc,
+      });
+      view.dispatch(tr);
+      view.focus();
+    }
+    setChangeImageSrcTarget(null);
   };
 
   const handleInsertImageFile = async (fileOrUrl: File | string) => {
@@ -1074,6 +1109,17 @@ export function MarkdownEditor({
                   <span>{t('image.contextMenu.copy') || 'Copy Image'}</span>
                 </button>
 
+                <button
+                  className="w-full px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200 flex items-center gap-3 transition-colors text-left"
+                  onClick={() => {
+                    setChangeImageSrcTarget({ pos: imageContextMenu.pos, src: imageContextMenu.src });
+                    setImageContextMenu(null);
+                  }}
+                >
+                  <RefreshCw className="w-4 h-4 text-gray-500 dark:text-gray-400 shrink-0" />
+                  <span>{t('image.contextMenu.changeSource') || 'Change Source'}</span>
+                </button>
+
                 {!imageContextMenu.src.startsWith('data:') && (
                   <button
                     className="w-full px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200 flex items-center gap-3 transition-colors text-left"
@@ -1096,7 +1142,7 @@ export function MarkdownEditor({
                     }}
                   >
                     <HardDriveDownload className="w-4 h-4 text-gray-500 dark:text-gray-400 shrink-0" />
-                    <span>{t('image.contextMenu.embed') || 'Embed Image'}</span>
+                    <span>{t('image.contextMenu.embed') || 'Embed in document'}</span>
                   </button>
                 )}
 
@@ -1147,6 +1193,18 @@ export function MarkdownEditor({
               <Copy className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400 shrink-0" />
               <span>{t('image.contextMenu.copy') || 'Copy Image'}</span>
             </button>
+
+            <button
+              className="text-left text-xs hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200 transition-colors flex items-center gap-2.5"
+              style={{ padding: '7px 12px' }}
+              onClick={() => {
+                setChangeImageSrcTarget({ pos: imageContextMenu.pos, src: imageContextMenu.src });
+                setImageContextMenu(null);
+              }}
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400 shrink-0" />
+              <span>{t('image.contextMenu.changeSource') || 'Change Source'}</span>
+            </button>
             
             {!imageContextMenu.src.startsWith('data:') && (
               <button
@@ -1172,7 +1230,7 @@ export function MarkdownEditor({
                 }}
               >
                 <HardDriveDownload className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400 shrink-0" />
-                <span>{t('image.contextMenu.embed') || 'Embed Image'}</span>
+                <span>{t('image.contextMenu.embed') || 'Embed in document'}</span>
               </button>
             )}
 

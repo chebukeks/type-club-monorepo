@@ -5,6 +5,16 @@ const chevronSvg = `<svg width="12" height="12" viewBox="0 0 12 12" fill="curren
   <path d="M4 2l4 4-4 4z" transform="rotate(90, 6, 6)"></path>
 </svg>`
 
+export function headingToSlug(text: string): string {
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s\-_]/gu, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
 export class HeadingView implements NodeView {
   dom: HTMLElement
   contentDOM: HTMLElement
@@ -21,6 +31,12 @@ export class HeadingView implements NodeView {
     const level = node.attrs.level
     this.dom = document.createElement(`h${level}`)
     this.dom.classList.add('editor-heading')
+
+    const slug = headingToSlug(node.textContent)
+    if (slug) {
+      this.dom.id = slug
+      this.dom.setAttribute('data-heading-slug', slug)
+    }
 
     const foldBtn = document.createElement('button')
     foldBtn.className = 'heading-fold-btn'
@@ -54,6 +70,16 @@ export class HeadingView implements NodeView {
   update(node: Node) {
     if (node.type.name !== 'heading' || node.attrs.level !== this.node.attrs.level) return false
     this.node = node
+
+    const slug = headingToSlug(node.textContent)
+    if (slug) {
+      this.dom.id = slug
+      this.dom.setAttribute('data-heading-slug', slug)
+    } else {
+      this.dom.removeAttribute('id')
+      this.dom.removeAttribute('data-heading-slug')
+    }
+
     return true
   }
 

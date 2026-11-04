@@ -15,12 +15,13 @@ def verify_password(password: str, hashed: str) -> bool:
     return bcrypt.checkpw(password.encode(), hashed.encode())
 
 
-def create_jwt(user_id: int) -> str:
+def create_jwt(user_id: int, expire_minutes: int | None = None) -> str:
     now = datetime.datetime.now(datetime.timezone.utc)
+    mins = expire_minutes if expire_minutes is not None else settings.jwt_expire_minutes
     payload = {
         "sub": str(user_id),
         "iat": now,
-        "exp": now + datetime.timedelta(minutes=settings.jwt_expire_minutes),
+        "exp": now + datetime.timedelta(minutes=mins),
     }
     return jwt.encode(payload, settings.jwt_secret_key, algorithm="HS256")
 

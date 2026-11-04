@@ -15,6 +15,7 @@ import VerifyEmail from "./pages/VerifyEmail";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import JoinPage from "./pages/JoinPage";
+import QrLogin from "./pages/QrLogin";
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/qr-login" element={<QrLogin />} />
         <Route path="/join/:token" element={<JoinPage />} />
         <Route path="/:username" element={<UserProfile />} />
         <Route path="/:username/:slug" element={<ReadArticle />} />

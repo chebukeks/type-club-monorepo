@@ -9,8 +9,10 @@ import { Plugin, TextSelection, NodeSelection, Selection } from 'prosemirror-sta
 import { deleteTable } from 'prosemirror-tables'
 import type { EditorView } from 'prosemirror-view'
 import { EditorCore, injectEditorStyles, schema, tableEditPluginKey, spellcheckService } from '@type-club/editor'
+import { ChangeImageSourceModal } from './ChangeImageSourceModal'
 import { useEditor } from '../context/EditorContext'
 import { useAuth } from '../context/AuthContext'
+import { config } from '../config'
 import { useCollaboration } from '../hooks/useCollaboration'
 import { ChevronRight } from 'lucide-react'
 import { articlesApi, collaborationApi } from '../api'
@@ -191,6 +193,7 @@ export function MarkdownEditor() {
     rect: { top: number; left: number; bottom: number; right: number }
   } | null>(null)
 
+  const [changeImageSrcTarget, setChangeImageSrcTarget] = useState<{ pos: number; src: string } | null>(null)
   const [imageContextMenu, setImageContextMenu] = useState<{
     visible: boolean
     x: number
@@ -274,7 +277,12 @@ export function MarkdownEditor() {
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
         blob = new Blob([bytes], { type: mime })
       } else {
-        const res = await fetch(src)
+        let resolvedSrc = src
+      if (resolvedSrc.startsWith('/uploads/')) {
+        const baseUrl = config.siteUrl || 'https://type-club.ru'
+        resolvedSrc = `${baseUrl.replace(/\/$/, '')}${resolvedSrc}`
+      }
+      const res = await fetch(resolvedSrc)
         blob = await res.blob()
       }
       await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })])
@@ -285,7 +293,12 @@ export function MarkdownEditor() {
 
   const handleEmbedImage = async (src: string, pos: number) => {
     try {
-      const res = await fetch(src)
+      let resolvedSrc = src
+      if (resolvedSrc.startsWith('/uploads/')) {
+        const baseUrl = config.siteUrl || 'https://type-club.ru'
+        resolvedSrc = `${baseUrl.replace(/\/$/, '')}${resolvedSrc}`
+      }
+      const res = await fetch(resolvedSrc)
       const blob = await res.blob()
       const reader = new FileReader()
       reader.onloadend = () => {
@@ -327,7 +340,12 @@ export function MarkdownEditor() {
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
         file = new File([bytes], `image-${Date.now()}.${ext}`, { type: mime })
       } else {
-        const res = await fetch(src)
+        let resolvedSrc = src
+      if (resolvedSrc.startsWith('/uploads/')) {
+        const baseUrl = config.siteUrl || 'https://type-club.ru'
+        resolvedSrc = `${baseUrl.replace(/\/$/, '')}${resolvedSrc}`
+      }
+      const res = await fetch(resolvedSrc)
         const blob = await res.blob()
         const ext = blob.type.split('/')[1] || 'png'
         file = new File([blob], `image-${Date.now()}.${ext}`, { type: blob.type })
@@ -336,7 +354,10 @@ export function MarkdownEditor() {
       if (editorView && response?.url) {
         const node = editorView.state.doc.nodeAt(pos)
         if (node) {
-          const tr = editorView.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: response.url })
+          const fullUrl = response.url.startsWith('/')
+            ? `${(config.siteUrl || 'https://type-club.ru').replace(/\/$/, '')}${response.url}`
+            : response.url
+          const tr = editorView.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: fullUrl })
           editorView.dispatch(tr)
         }
       }
@@ -344,6 +365,20 @@ export function MarkdownEditor() {
       console.error('Failed to upload image', e)
       alert(t('image.contextMenu.uploadFailed') || 'Failed to upload image')
     }
+  }
+
+  const handleChangeImageSource = (newSrc: string) => {
+    if (!changeImageSrcTarget || !editorView) return
+    const node = editorView.state.doc.nodeAt(changeImageSrcTarget.pos)
+    if (node) {
+      const tr = editorView.state.tr.setNodeMarkup(changeImageSrcTarget.pos, undefined, {
+        ...node.attrs,
+        src: newSrc,
+      })
+      editorView.dispatch(tr)
+      editorView.focus()
+    }
+    setChangeImageSrcTarget(null)
   }
 
   const handleSaveLocally = async (src: string, pos: number) => {
@@ -362,7 +397,12 @@ export function MarkdownEditor() {
         base64 = src.slice(comma + 1)
         mime = header.match(/data:([^;]+)/)?.[1] || 'image/png'
       } else {
-        const res = await fetch(src)
+        let resolvedSrc = src
+      if (resolvedSrc.startsWith('/uploads/')) {
+        const baseUrl = config.siteUrl || 'https://type-club.ru'
+        resolvedSrc = `${baseUrl.replace(/\/$/, '')}${resolvedSrc}`
+      }
+      const res = await fetch(resolvedSrc)
         const blob = await res.blob()
         mime = blob.type
         const buf = await blob.arrayBuffer()
@@ -1208,6 +1248,14 @@ export function MarkdownEditor() {
       onContextMenu={handleContextMenu}
       onClick={() => closeCtxMenu()}
     >
+      {changeImageSrcTarget && (
+        <ChangeImageSourceModal
+          currentSrc={changeImageSrcTarget.src}
+          onClose={() => setChangeImageSrcTarget(null)}
+          onApply={handleChangeImageSource}
+        />
+      )}
+
       {state.editorMode !== 'raw' && showSearch && editorView && (
         <SearchBar view={editorView} onClose={() => setShowSearch(false)} />
       )}
@@ -1508,6 +1556,17 @@ export function MarkdownEditor() {
           >
             <span>{t('image.contextMenu.copy') || 'Copy Image'}</span>
           </button>
+
+          <button
+            className="menu-item enabled text-left w-full"
+            style={{ padding: '6px 12px', border: 'none', background: 'transparent' }}
+            onClick={() => {
+              setChangeImageSrcTarget({ pos: imageContextMenu.pos, src: imageContextMenu.src })
+              setImageContextMenu(null)
+            }}
+          >
+            <span>{t('image.contextMenu.changeSource') || 'Change Source'}</span>
+          </button>
           
           {!imageContextMenu.src.startsWith('data:') && (
             <button
@@ -1531,7 +1590,7 @@ export function MarkdownEditor() {
                 setImageContextMenu(null)
               }}
             >
-              <span>{t('image.contextMenu.embed') || 'Embed Image'}</span>
+              <span>{t('image.contextMenu.embed') || 'Embed in document'}</span>
             </button>
           )}
 

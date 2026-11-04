@@ -19,6 +19,7 @@ import markPlugin from 'markdown-it-mark'
 import texmath from 'markdown-it-texmath'
 import katex from 'katex'
 import { schema } from './schema'
+import { headingToSlug } from './headingView'
 // @ts-ignore
 import taskListsPlugin from 'markdown-it-task-lists'
 
@@ -822,8 +823,25 @@ export function generateExportHtml(markdown: string, theme: 'dark' | 'light' = '
     return defaultFence ? defaultFence(tokens, idx, options, env, self) : self.renderToken(tokens, idx, options)
   }
 
+  const defaultHeadingOpen = exportMd.renderer.rules.heading_open || ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options))
+  exportMd.renderer.rules.heading_open = (tokens, idx, options, env, self) => {
+    const nextToken = tokens[idx + 1]
+    if (nextToken && nextToken.type === 'inline') {
+      const slug = headingToSlug(nextToken.content)
+      if (slug) {
+        tokens[idx].attrSet('id', slug)
+      }
+    }
+    return defaultHeadingOpen(tokens, idx, options, env, self)
+  }
+
+  // Нормализуем относительные ссылки на загруженные картинки Type Club для внешних программ и экспорта в HTML/PDF
+  const normalizedMarkdown = markdown
+    .replace(/(\]\()\/uploads\//g, '$1https://type-club.ru/uploads/')
+    .replace(/(src=["'])\/uploads\//g, '$1https://type-club.ru/uploads/')
+
   // Конвертируем Markdown в HTML тело
-  const bodyHtml = exportMd.render(markdown)
+  const bodyHtml = exportMd.render(normalizedMarkdown)
   
   // Стили повторяют CSS-переменные из index.css и стили из editorTheme.ts,
   // чтобы экспорт выглядел идентично Preview режиму в редакторе.

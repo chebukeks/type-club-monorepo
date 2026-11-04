@@ -196,3 +196,16 @@ class ApiKey(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped["User"] = relationship(back_populates="api_keys")
+
+
+class QRSession(Base):
+    __tablename__ = "typeclub_qr_sessions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
+    user_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("typeclub_users.id", ondelete="CASCADE"), nullable=True)
+    token: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped[Optional["User"]] = relationship()

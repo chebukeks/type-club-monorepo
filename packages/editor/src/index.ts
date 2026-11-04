@@ -36,7 +36,7 @@ export { tocPlugin } from "./editor/tocPlugin";
 export { typographyPlugin } from "./editor/typographyPlugin";
 
 export { CodeBlockView } from "./editor/codeBlockView";
-export { HeadingView } from "./editor/headingView";
+export { HeadingView, headingToSlug } from "./editor/headingView";
 export { ImageView } from "./editor/imageView";
 export {
   parseVideoEmbed,

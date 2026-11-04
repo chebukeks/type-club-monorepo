@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useEditor } from "../context/EditorContext";
+import { QRCodeSection } from "./QRCodeSection";
 
 interface AuthModalProps {
   onClose: () => void;
@@ -13,12 +14,12 @@ export function AuthModal({ onClose }: AuthModalProps) {
   const { t } = useEditor();
   const [tab, setTab] = useState<"login" | "register">("login");
   const [step, setStep] = useState<"form" | "verify">("form");
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [nickname, setNickname] = useState("");
   const [confirm, setConfirm] = useState("");
   const [code, setCode] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState("");
   const [infoMsg, setInfoMsg] = useState("");
   const [loading, setLoading] = useState(false);
@@ -46,7 +47,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
   }, [step, cooldown]);
 
   const handleOverlayMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    overlayMouseDownRef.current = (e.target === e.currentTarget);
+    overlayMouseDownRef.current = e.target === e.currentTarget;
   };
 
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -61,7 +62,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
     setError("");
     setLoading(true);
     try {
-      await login(email, password);
+      await login(email, password, rememberMe);
       onClose();
     } catch (err: any) {
       setError(err.message || t('auth.loginFailed'));
@@ -103,18 +104,12 @@ export function AuthModal({ onClose }: AuthModalProps) {
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setInfoMsg("");
-    const trimmedCode = code.trim();
-    if (trimmedCode.length < 6) {
-      setError(t('auth.enterVerificationCode'));
-      return;
-    }
     setLoading(true);
     try {
-      await verifyEmail(trimmedCode, email.trim());
+      await verifyEmail(code, email.trim());
       onClose();
     } catch (err: any) {
-      setError(err.message || t('auth.invalidCode') || 'Неверный или истекший код');
+      setError(err.message || t('auth.verifyFailed'));
     } finally {
       setLoading(false);
     }
@@ -123,15 +118,14 @@ export function AuthModal({ onClose }: AuthModalProps) {
   const handleResend = async () => {
     if (!canResend) return;
     setError("");
-    setInfoMsg("");
     setLoading(true);
     try {
       await resendVerification(email.trim());
-      setInfoMsg(t('auth.codeResent') || 'Новый код отправлен на почту');
       setCooldown(60);
       setCanResend(false);
+      setInfoMsg(t('auth.codeResent'));
     } catch (err: any) {
-      setError(err.message || t('auth.resetFailed'));
+      setError(err.message || t('auth.resendFailed'));
     } finally {
       setLoading(false);
     }
@@ -146,7 +140,11 @@ export function AuthModal({ onClose }: AuthModalProps) {
 
   return (
     <div className="modal-overlay" onMouseDown={handleOverlayMouseDown} onClick={handleOverlayClick}>
-      <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="modal-panel"
+        style={tab === "login" ? { maxWidth: "620px" } : undefined}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Tabs */}
         <div className="modal-tabs">
           <button
@@ -167,31 +165,49 @@ export function AuthModal({ onClose }: AuthModalProps) {
         {infoMsg && <div className="p-2 mb-3 rounded text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">{infoMsg}</div>}
 
         {tab === "login" ? (
-          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div>
-              <label className="modal-label">{t('auth.email')}</label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="modal-input"
-              />
-            </div>
-            <div>
-              <label className="modal-label">{t('auth.password')}</label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="modal-input"
-              />
-            </div>
-            <button type="submit" disabled={loading} className="btn-primary">
-              {loading ? t('auth.signingIn') : t('auth.login')}
-            </button>
-          </form>
+          <div style={{ display: 'flex', flexDirection: 'row', gap: '20px', alignItems: 'stretch' }}>
+            <form onSubmit={handleLogin} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <label className="modal-label">{t('auth.email')}</label>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="modal-input"
+                />
+              </div>
+              <div>
+                <label className="modal-label">{t('auth.password')}</label>
+                <input
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="modal-input"
+                />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input
+                  type="checkbox"
+                  id="auth-remember-me"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  style={{ cursor: 'pointer' }}
+                />
+                <label htmlFor="auth-remember-me" style={{ fontSize: '12px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                  {t('auth.rememberMe')}
+                </label>
+              </div>
+
+              <button type="submit" disabled={loading} className="btn-primary" style={{ marginTop: '4px' }}>
+                {loading ? t('auth.signingIn') : t('auth.login')}
+              </button>
+            </form>
+
+            <QRCodeSection onApproved={onClose} rememberMe={rememberMe} />
+          </div>
         ) : step === "verify" ? (
           <form onSubmit={handleVerify} style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '8px 0' }}>
             <div style={{ textAlign: 'center' }}>
@@ -209,36 +225,36 @@ export function AuthModal({ onClose }: AuthModalProps) {
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
                 className="modal-input"
-                style={{ textAlign: 'center', fontSize: '20px', letterSpacing: '8px', padding: '10px 14px' }}
+                style={{
+                  fontSize: '24px',
+                  letterSpacing: '8px',
+                  textAlign: 'center',
+                  fontWeight: 600,
+                  padding: '10px 12px',
+                }}
               />
             </div>
-            <button type="submit" disabled={loading || code.length < 6} className="btn-primary" style={{ padding: '10px 16px' }}>
-              {loading ? t('common.loading') : t('auth.verifyCode')}
+            <button type="submit" disabled={loading || code.length < 6} className="btn-primary">
+              {loading ? t('common.loading') : t('auth.confirm')}
             </button>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px', paddingTop: '12px', borderTop: '1px solid var(--border-default)', fontSize: '12px' }}>
+            <div style={{ textAlign: 'center', marginTop: '4px' }}>
               <button
                 type="button"
-                onClick={() => setStep("form")}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', padding: '4px 8px' }}
-              >
-                {t('common.back')}
-              </button>
-              <button
-                type="button"
-                disabled={!canResend || loading}
                 onClick={handleResend}
+                disabled={!canResend || loading}
                 style={{
                   background: 'none',
                   border: 'none',
-                  cursor: canResend ? 'pointer' : 'not-allowed',
-                  color: canResend ? 'var(--accent)' : 'var(--text-dim)',
-                  opacity: canResend ? 1 : 0.6,
-                  padding: '4px 8px'
+                  fontSize: '12px',
+                  color: canResend ? 'var(--accent)' : 'var(--text-muted)',
+                  cursor: canResend ? 'pointer' : 'default',
+                  textDecoration: canResend ? 'underline' : 'none',
+                  padding: '4px 8px',
                 }}
               >
                 {canResend
                   ? t('auth.resendCode')
-                  : t('auth.resendCodeIn', { seconds: String(cooldown) })}
+                  : t('auth.resendCodeCooldown', { seconds: cooldown })}
               </button>
             </div>
           </form>
@@ -249,10 +265,9 @@ export function AuthModal({ onClose }: AuthModalProps) {
               <input
                 type="text"
                 required
-                minLength={2}
-                maxLength={30}
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
+                placeholder={t('auth.nicknamePlaceholder')}
                 className="modal-input"
               />
             </div>
@@ -271,9 +286,9 @@ export function AuthModal({ onClose }: AuthModalProps) {
               <input
                 type="password"
                 required
-                minLength={6}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                placeholder={t('auth.passwordPlaceholder')}
                 className="modal-input"
               />
             </div>

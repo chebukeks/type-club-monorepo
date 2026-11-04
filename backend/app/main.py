@@ -71,6 +71,10 @@ uploads_dir = settings.uploads_dir
 os.makedirs(uploads_dir, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
+downloads_dir = getattr(settings, 'downloads_dir', os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'downloads'))
+os.makedirs(downloads_dir, exist_ok=True)
+app.mount("/downloads", StaticFiles(directory=downloads_dir), name="downloads")
+
 
 from app.tasks.cleanup_images import cleanup_orphaned_images
 from app.database import async_session

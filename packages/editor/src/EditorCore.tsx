@@ -7,7 +7,8 @@ import { Node as PMNode } from "prosemirror-model";
 import { history } from "prosemirror-history";
 import { dropCursor } from "prosemirror-dropcursor";
 import { gapCursor } from "prosemirror-gapcursor";
-import { columnResizing, tableEditing, goToNextCell, TableView } from "prosemirror-tables";
+import { tableEditing, goToNextCell, TableView } from "prosemirror-tables";
+import { customColumnResizing } from "./editor/columnResizingPlugin";
 import { keymap } from "prosemirror-keymap";
 import { prosemirrorToYXmlFragment, yXmlFragmentToProsemirrorJSON } from "y-prosemirror";
 
@@ -251,13 +252,32 @@ export function EditorCore({
 
     const historyPlugins = collaboration ? [] : [history()];
 
+    const selectionTrackingPlugin = new Plugin({
+      view() {
+        return {
+          update(v, prevState) {
+            if (!v.state.selection.eq(prevState.selection)) {
+              const { from, to, empty } = v.state.selection;
+              const selectedText = empty ? '' : v.state.doc.textBetween(from, to, ' ');
+              window.dispatchEvent(
+                new CustomEvent('editor-selection-change', {
+                  detail: { selectedText, empty },
+                })
+              );
+            }
+          },
+        };
+      },
+    });
+
     const plugins: Plugin[] = isPreview
-      ? [...historyPlugins, dropCursor(), gapCursor(), syncPlugin, foldingPlugin, interactivePlugin, syntaxHighlightPlugin, typographyPlugin(), focusModePlugin(() => focusModeRef.current || 'none'), tocPlugin((toc, sug) => onTocUpdateRef.current?.(toc, sug)), ...collabPlugins, ...(extraPlugins || [])]
+      ? [...historyPlugins, dropCursor(), gapCursor(), syncPlugin, foldingPlugin, interactivePlugin, syntaxHighlightPlugin, typographyPlugin(), focusModePlugin(() => focusModeRef.current || 'none'), tocPlugin((toc, sug) => onTocUpdateRef.current?.(toc, sug)), customColumnResizing({}), selectionTrackingPlugin, ...collabPlugins, ...(extraPlugins || [])]
       : [
           ...suggestionPlugins,
           ...getKeymapPlugins(),
           getInputRulesPlugin(),
-          columnResizing({}),
+          customColumnResizing({}),
+          selectionTrackingPlugin,
           tableEditing(),
           pastePlugin(),
           tabPlugin,
@@ -397,6 +417,15 @@ export function EditorCore({
             scrollContainerRef.current = el;
           }}
           onScroll={handleScroll}
+          onSelect={(e) => {
+            const target = e.currentTarget;
+            const text = target.value.slice(target.selectionStart, target.selectionEnd);
+            window.dispatchEvent(
+              new CustomEvent('editor-selection-change', {
+                detail: { selectedText: text, empty: !text },
+              })
+            );
+          }}
           spellCheck={false}
           autoCorrect="off"
           autoCapitalize="off"

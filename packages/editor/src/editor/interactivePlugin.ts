@@ -1,4 +1,5 @@
 import { Plugin, PluginKey } from 'prosemirror-state'
+import { headingToSlug } from './headingView'
 
 function openUrl(url: string) {
   const electronApi = (window as any).api
@@ -13,6 +14,7 @@ function openUrl(url: string) {
  * Плагин для перехвата и обработки кликов в редакторе.
  * - Чекбоксы (в seamless режиме)
  * - Ссылки (в preview или с Ctrl в seamless)
+ * - Ссылки на заголовки (#anchor)
  * - Спойлеры (в preview)
  */
 export const interactivePluginKey = new PluginKey('interactive')
@@ -29,7 +31,7 @@ export const interactivePlugin = new Plugin({
         if (!target) return false
 
         // Проверяем режим
-        const isPreview = view.dom.closest('.preview-mode') !== null
+        const isPreview = view.dom.closest('.preview-mode') !== null || !view.editable
         const isSeamless = !isPreview
 
         // 1. Спойлеры
@@ -48,7 +50,48 @@ export const interactivePlugin = new Plugin({
           const rawHref = link.getAttribute('href')
           if (rawHref && (isPreview || event.ctrlKey || event.metaKey)) {
             event.preventDefault()
-            const isRelative = !/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(rawHref) && !rawHref.startsWith('//') && !rawHref.startsWith('#')
+
+            // Внутренние ссылки на заголовки (#заголовок / #anchor)
+            if (rawHref.startsWith('#')) {
+              const hash = decodeURIComponent(rawHref.slice(1)).trim().toLowerCase()
+              if (!hash) return true
+
+              const container = view.dom.closest('.editor-content') || view.dom.parentElement || document
+              let targetEl: HTMLElement | null = null
+
+              // 1. По id
+              try {
+                targetEl = container.querySelector(`#${CSS.escape(hash)}`) as HTMLElement
+              } catch {}
+
+              // 2. По data-heading-slug
+              if (!targetEl) {
+                try {
+                  targetEl = container.querySelector(`[data-heading-slug="${CSS.escape(hash)}"]`) as HTMLElement
+                } catch {}
+              }
+
+              // 3. По совпадению текста или слага заголовка
+              if (!targetEl) {
+                const headings = container.querySelectorAll('h1, h2, h3, h4, h5, h6')
+                const targetSlug = headingToSlug(hash)
+                for (const h of headings) {
+                  const text = (h.textContent || '').trim().toLowerCase()
+                  const hSlug = headingToSlug(text)
+                  if (hSlug === targetSlug || text === hash || (targetSlug && hSlug.includes(targetSlug))) {
+                    targetEl = h as HTMLElement
+                    break
+                  }
+                }
+              }
+
+              if (targetEl) {
+                targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              }
+              return true
+            }
+
+            const isRelative = !/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(rawHref) && !rawHref.startsWith('//')
             
             if (isRelative) {
               if ((window as any).api) { // desktop check

@@ -55,6 +55,7 @@
     "prosemirror-tables": "^1.8.5",
     "prosemirror-transform": "^1.11.0",
     "prosemirror-view": "^1.42.6",
+    "qrcode.react": "^4.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "tailwindcss": "^4.2.2"

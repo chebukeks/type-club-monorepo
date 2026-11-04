@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { MenuBar } from './MenuBar'
 import { SettingsPopup } from './SettingsPopup'
 import { SettingsModal } from './SettingsModal'
+import { UpdateModal } from './UpdateModal'
+import { ArrowDownCircle } from 'lucide-react'
 import { AuthModal } from './AuthModal'
 import { PublishModal } from './PublishModal'
 import { CollaborationModal } from './CollaborationModal'
@@ -103,6 +105,25 @@ function ProfileMenuPopup({ user, logout, onClose }: { user: { nickname: string;
 export function TitleBar() {
   const [showSettings, setShowSettings] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [updateInfo, setUpdateInfo] = useState<any>(null)
+  const [showUpdateModal, setShowUpdateModal] = useState(false)
+
+  // Периодическая проверка наличия обновлений с сайта
+  useEffect(() => {
+    let isMounted = true
+    const check = async () => {
+      try {
+        const info = await window.api.checkUpdate(config.siteUrl)
+        if (isMounted) setUpdateInfo(info)
+      } catch {}
+    }
+    check()
+    const timer = setInterval(check, 30 * 60 * 1000)
+    return () => {
+      isMounted = false
+      clearInterval(timer)
+    }
+  }, [])
   const [showAuth, setShowAuth] = useState(false)
   const [showPublish, setShowPublish] = useState(false)
   const [showCollab, setShowCollab] = useState(false)
@@ -282,6 +303,28 @@ export function TitleBar() {
           className="flex items-center h-full"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
+          {/* Кнопка обновления программы — отображается только при наличии новой версии */}
+          {updateInfo?.updateAvailable && (
+            <button
+              onClick={() => setShowUpdateModal(true)}
+              className="w-9 h-full flex items-center justify-center transition-colors relative text-[var(--accent)] hover:bg-[var(--bg-hover)]"
+              title={t('titlebar.updateAvailable', { version: updateInfo.latestVersion })}
+            >
+              <ArrowDownCircle size={15} />
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '9px',
+                  right: '9px',
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  backgroundColor: 'var(--accent)',
+                }}
+              />
+            </button>
+          )}
+
           {/* Кнопка поиска (Ctrl+F) */}
           <button
             onClick={() => window.dispatchEvent(new Event('editor-open-search'))}
@@ -437,6 +480,17 @@ export function TitleBar() {
       {showPublish && <PublishModal onClose={() => setShowPublish(false)} />}
       {showCollab && articleId && <CollaborationModal articleId={articleId} onClose={() => setShowCollab(false)} />}
       {showSettingsModal && <SettingsModal onClose={() => setShowSettingsModal(false)} />}
+      {showUpdateModal && (
+        <UpdateModal
+          updateInfo={updateInfo}
+          onRefreshUpdateInfo={async () => {
+            const info = await window.api.checkUpdate(config.siteUrl)
+            setUpdateInfo(info)
+            return info
+          }}
+          onClose={() => setShowUpdateModal(false)}
+        />
+      )}
       {showRawWarning && (
         <RawModeWarningModal
           onConfirm={() => {

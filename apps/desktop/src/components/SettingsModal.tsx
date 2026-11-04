@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useEditor } from "../context/EditorContext";
 import {
   Palette,
@@ -20,6 +21,9 @@ import {
   Sun,
   Moon,
   Laptop,
+  ExternalLink,
+  Minimize2,
+  GripHorizontal,
 } from "lucide-react";
 import { type Locale, spellcheckService } from "@type-club/editor";
 import type { AppTheme, ThemeColors, ThemeTypography } from "../types";
@@ -51,6 +55,144 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>("language");
   const [closing, setClosing] = useState(false);
   const overlayMouseDownRef = useRef(false);
+
+  // Dragging and detachment state (only for theme tab)
+  const [panelOffset, setPanelOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef<{ startX: number; startY: number; initialOffsetX: number; initialOffsetY: number } | null>(null);
+
+  const [isDetached, setIsDetached] = useState(false);
+  const [pipWindow, setPipWindow] = useState<Window | null>(null);
+  const pipWindowRef = useRef<Window | null>(null);
+
+  const handleHeaderPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (activeTab !== "theme" || isDetached) return;
+    if ((e.target as HTMLElement).closest("button, input, select, textarea, a")) {
+      return;
+    }
+    e.preventDefault();
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {}
+    setIsDragging(true);
+    dragStartRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      initialOffsetX: panelOffset.x,
+      initialOffsetY: panelOffset.y,
+    };
+  };
+
+  const handleHeaderPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging || !dragStartRef.current) return;
+    const dx = e.clientX - dragStartRef.current.startX;
+    const dy = e.clientY - dragStartRef.current.startY;
+    setPanelOffset({
+      x: dragStartRef.current.initialOffsetX + dx,
+      y: dragStartRef.current.initialOffsetY + dy,
+    });
+  };
+
+  const handleHeaderPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
+    setIsDragging(false);
+    dragStartRef.current = null;
+  };
+
+  const handleSelectTab = (tabKey: SettingsTab) => {
+    if (tabKey !== "theme") {
+      setPanelOffset({ x: 0, y: 0 });
+      if (pipWindowRef.current && !pipWindowRef.current.closed) {
+        pipWindowRef.current.close();
+        pipWindowRef.current = null;
+        setPipWindow(null);
+        setIsDetached(false);
+      }
+    }
+    setActiveTab(tabKey);
+  };
+
+  const handleToggleDetach = () => {
+    if (isDetached) {
+      if (pipWindowRef.current && !pipWindowRef.current.closed) {
+        pipWindowRef.current.close();
+      }
+      pipWindowRef.current = null;
+      setPipWindow(null);
+      setIsDetached(false);
+      setPanelOffset({ x: 0, y: 0 });
+      return;
+    }
+
+    try {
+      const win = window.open(
+        "about:blank",
+        "_blank",
+        "width=940,height=700,menubar=no,toolbar=no,location=no,status=no,resizable=yes"
+      );
+
+      if (!win) {
+        console.error("Could not open detached window");
+        return;
+      }
+
+      pipWindowRef.current = win;
+      win.document.title = t("settings.modalTitle") + " — Type Club";
+
+      // Clone existing styles into detached window
+      document.querySelectorAll('style, link[rel="stylesheet"]').forEach((el) => {
+        try {
+          win.document.head.appendChild(el.cloneNode(true));
+        } catch {}
+      });
+
+      win.document.documentElement.className = document.documentElement.className;
+      win.document.documentElement.style.cssText = document.documentElement.style.cssText;
+      win.document.body.className = document.body.className;
+      win.document.body.style.margin = "0";
+      win.document.body.style.padding = "0";
+      win.document.body.style.height = "100vh";
+      win.document.body.style.overflow = "hidden";
+      win.document.body.style.background = "var(--bg-base)";
+      win.document.body.style.display = "flex";
+      win.document.body.style.flexDirection = "column";
+
+      const observer = new MutationObserver(() => {
+        if (win && !win.closed) {
+          win.document.documentElement.className = document.documentElement.className;
+          win.document.documentElement.style.cssText = document.documentElement.style.cssText;
+        }
+      });
+      observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["class", "style", "data-theme"],
+      });
+
+      const handleWindowClose = () => {
+        observer.disconnect();
+        pipWindowRef.current = null;
+        setPipWindow(null);
+        setIsDetached(false);
+        setPanelOffset({ x: 0, y: 0 });
+      };
+
+      const pollTimer = setInterval(() => {
+        if (!win || win.closed) {
+          clearInterval(pollTimer);
+          handleWindowClose();
+        }
+      }, 200);
+
+      win.focus();
+      setPipWindow(win);
+      setIsDetached(true);
+    } catch (err) {
+      console.error("Failed to detach window:", err);
+    }
+  };
 
   // --- Dictionaries & Custom Words State ---
   const [spellcheckLangs, setSpellcheckLangs] = useState<string[]>(["ru-RU", "en-US"]);
@@ -103,8 +245,21 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
 
   const handleClose = () => {
     setClosing(true);
+    if (pipWindowRef.current && !pipWindowRef.current.closed) {
+      pipWindowRef.current.close();
+      pipWindowRef.current = null;
+    }
     setTimeout(onClose, 100);
   };
+
+  useEffect(() => {
+    return () => {
+      if (pipWindowRef.current && !pipWindowRef.current.closed) {
+        pipWindowRef.current.close();
+        pipWindowRef.current = null;
+      }
+    };
+  }, []);
 
   const handleOverlayMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     overlayMouseDownRef.current = e.target === e.currentTarget;
@@ -273,49 +428,75 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
 
   const currentTabInfo = tabs.find((tItem) => tItem.key === activeTab) || tabs[0];
 
-  return (
+  const panelContent = (
     <div
-      className={`modal-overlay ${activeTab === "theme" ? "no-blur" : ""} ${
+      className={`modal-panel ${activeTab === "theme" ? "no-shadow theme-tab" : ""} ${
+        isDragging ? "dragging" : ""
+      } ${
         closing
-          ? "animate-out fade-out duration-100 ease-in fill-mode-forwards"
-          : "animate-in fade-in duration-150 ease-out"
+          ? "animate-out fade-out zoom-out-95 duration-100 ease-in fill-mode-forwards"
+          : "animate-in fade-in zoom-in-95 duration-150 ease-out"
       }`}
-      onMouseDown={handleOverlayMouseDown}
-      onClick={handleOverlayClick}
+      style={{
+        width: "100%",
+        maxWidth: isDetached ? "100%" : "940px",
+        height: isDetached ? "100%" : "700px",
+        maxHeight: isDetached ? "100%" : "92vh",
+        padding: 0,
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        pointerEvents: "auto",
+        borderRadius: isDetached ? 0 : undefined,
+        border: isDetached ? "none" : undefined,
+        boxShadow: isDetached ? "none" : undefined,
+        transform: isDetached ? "none" : `translate(${panelOffset.x}px, ${panelOffset.y}px)`,
+        transition: isDragging ? "none" : "transform 0.35s cubic-bezier(0.16, 1, 0.3, 1)",
+        animation: (activeTab === "theme" || isDragging || panelOffset.x !== 0 || panelOffset.y !== 0) ? "none" : undefined,
+      }}
+      onClick={(e) => e.stopPropagation()}
     >
+      {/* Header */}
       <div
-        className={`modal-panel ${activeTab === "theme" ? "no-shadow" : ""} ${
-          closing
-            ? "animate-out fade-out zoom-out-95 duration-100 ease-in fill-mode-forwards"
-            : "animate-in fade-in zoom-in-95 duration-150 ease-out"
-        }`}
+        className="flex items-center justify-between select-none"
         style={{
-          width: "100%",
-          maxWidth: "940px",
-          height: "700px",
-          maxHeight: "92vh",
-          padding: 0,
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
+          padding: "16px 20px 10px 20px",
+          cursor: activeTab === "theme" && !isDetached ? (isDragging ? "grabbing" : "grab") : "default",
+          touchAction: activeTab === "theme" && !isDetached ? "none" : undefined,
         }}
-        onClick={(e) => e.stopPropagation()}
+        onPointerDown={handleHeaderPointerDown}
+        onPointerMove={handleHeaderPointerMove}
+        onPointerUp={handleHeaderPointerUp}
+        onPointerCancel={handleHeaderPointerUp}
       >
-        {/* Header */}
-        <div
-          className="flex items-center justify-between select-none"
-          style={{ padding: "16px 20px 10px 20px" }}
-        >
-          <div className="flex items-center gap-2">
-            <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">
-              {t("settings.modalTitle")}
-            </h2>
-            {themeStatusMessage && (
-              <span className="text-[11px] text-[var(--accent)] font-medium animate-in fade-in duration-150">
-                • {themeStatusMessage}
-              </span>
-            )}
-          </div>
+        <div className="flex items-center gap-2">
+          <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">
+            {t("settings.modalTitle")}
+          </h2>
+          {activeTab === "theme" && !isDetached && (
+            <span
+              className="text-[11px] text-[var(--text-dim)] flex items-center gap-1 opacity-70 ml-1 cursor-grab"
+              title={t("settings.theme.dragHint")}
+            >
+              <GripHorizontal size={13} />
+            </span>
+          )}
+          {themeStatusMessage && (
+            <span className="text-[11px] text-[var(--accent)] font-medium animate-in fade-in duration-150">
+              • {themeStatusMessage}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1">
+          {activeTab === "theme" && (
+            <button
+              onClick={handleToggleDetach}
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+              title={isDetached ? t("settings.theme.attachWindow") : t("settings.theme.detachWindow")}
+            >
+              {isDetached ? <Minimize2 size={15} /> : <ExternalLink size={15} />}
+            </button>
+          )}
           <button
             onClick={handleClose}
             className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
@@ -324,6 +505,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
             <X size={15} />
           </button>
         </div>
+      </div>
 
         {/* Body */}
         <div className="flex-1 flex overflow-hidden">
@@ -342,7 +524,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                 return (
                   <button
                     key={tab.key}
-                    onClick={() => setActiveTab(tab.key)}
+                    onClick={() => handleSelectTab(tab.key)}
                     className={`flex items-center rounded-md transition-all border text-left text-[12.5px] font-medium ${
                       isActive
                         ? "bg-[var(--bg-base)] text-[var(--text-primary)] shadow-xs border-[var(--border-default)]"
@@ -1154,6 +1336,26 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
           </div>
         </div>
       </div>
+  );
+
+  if (isDetached && pipWindow) {
+    return createPortal(panelContent, pipWindow.document.body);
+  }
+
+  return (
+    <div
+      className={`modal-overlay ${activeTab === "theme" ? "no-blur" : ""} ${
+        closing
+          ? "animate-out fade-out duration-100 ease-in fill-mode-forwards"
+          : "animate-in fade-in duration-150 ease-out"
+      }`}
+      onMouseDown={handleOverlayMouseDown}
+      onClick={handleOverlayClick}
+      style={{
+        pointerEvents: activeTab === "theme" ? "none" : "auto",
+      }}
+    >
+      {panelContent}
     </div>
   );
 }
