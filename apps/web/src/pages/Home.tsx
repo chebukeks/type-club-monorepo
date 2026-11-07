@@ -27,7 +27,7 @@ export default function Home() {
 
   useEffect(() => {
     articlesApi
-      .list(1, 4)
+      .list(1, 8)
       .then((items) => setCommunityArticles(items))
       .catch(() => {})
       .finally(() => setLoadingCommunity(false));

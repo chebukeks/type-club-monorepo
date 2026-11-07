@@ -420,6 +420,16 @@ html[data-lang="ru"] figure[data-sug-delete]::after {
 }
 
 /* Заголовки */
+.ProseMirror h1,
+.ProseMirror h2,
+.ProseMirror h3,
+.ProseMirror h4,
+.ProseMirror h5,
+.ProseMirror h6,
+.ProseMirror [data-heading-slug],
+.ProseMirror .suggestion-note-node {
+  scroll-margin-top: 80px;
+}
 .ProseMirror h1 { font-size: 2em; font-weight: 700; color: var(--editor-heading); line-height: 1.3; margin: 1em 0 0.4em 0; }
 .ProseMirror h2 { font-size: 1.5em; font-weight: 650; color: var(--editor-heading); line-height: 1.35; margin: 0.8em 0 0.3em 0; }
 .ProseMirror h3 { font-size: 1.25em; font-weight: 600; color: var(--editor-heading); line-height: 1.4; margin: 0.7em 0 0.3em 0; }

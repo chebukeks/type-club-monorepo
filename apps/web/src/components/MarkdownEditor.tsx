@@ -167,7 +167,9 @@ export function MarkdownEditor({
         if (!domNode) {
           try { domNode = viewRef.current.domAtPos(pos).node; } catch {}
         }
-        const el = domNode instanceof Element ? domNode : domNode?.parentElement;
+        let el = domNode instanceof Element ? domNode : domNode?.parentElement;
+        const target = el?.closest("h1, h2, h3, h4, h5, h6, [data-heading-slug], .suggestion-note-node") as HTMLElement | null;
+        if (target) el = target;
         if (el) {
           el.scrollIntoView({ behavior: "smooth", block: "start" });
         }
@@ -208,7 +210,9 @@ export function MarkdownEditor({
         if (!domNode) {
           try { domNode = view.domAtPos(validPos).node; } catch {}
         }
-        const el = domNode instanceof Element ? domNode : domNode?.parentElement;
+        let el = domNode instanceof Element ? domNode : domNode?.parentElement;
+        const target = el?.closest("h1, h2, h3, h4, h5, h6, [data-heading-slug], .suggestion-note-node") as HTMLElement | null;
+        if (target) el = target;
         if (el) {
           el.scrollIntoView({ behavior: "smooth", block: "start" });
         }
@@ -739,7 +743,7 @@ export function MarkdownEditor({
 
   return (
     <div
-      className="flex-1 flex flex-col overflow-auto bg-[var(--bg-base)]"
+      className="flex-1 flex flex-col overflow-auto bg-[var(--bg-base)] scroll-pt-20"
       onContextMenu={handleContextMenu}
       onClick={() => closeCtxMenu()}
     >
