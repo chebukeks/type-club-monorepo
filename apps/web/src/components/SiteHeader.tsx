@@ -1,7 +1,7 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
-import { PenTool, BookOpen, User, LogOut, LogIn, Menu, X, Bell, MessageSquare, Users } from "lucide-react";
+import { PenTool, BookOpen, User, LogOut, LogIn, Menu, X, Bell, MessageSquare, Users, Download } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import ThemeSwitcher from "./ThemeSwitcher";
 import { notificationsApi, NotificationItem, formatNotificationItem } from "../api";
@@ -88,6 +88,7 @@ export default function SiteHeader({ onLogoClick }: SiteHeaderProps) {
 
   const navLinks = [
     { to: "/articles", label: t('nav.articles'), icon: BookOpen },
+    { to: "/download", label: t('nav.download'), icon: Download },
   ];
 
   if (user) {
@@ -124,8 +125,9 @@ export default function SiteHeader({ onLogoClick }: SiteHeaderProps) {
               <Link
                 key={l.to}
                 to={l.to}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${location.pathname === l.to ? "bg-gray-100 dark:bg-gray-800" : "hover:bg-gray-100 dark:hover:bg-gray-800"}`}
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${location.pathname === l.to ? "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100" : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"}`}
               >
+                {l.to === "/download" && <Download size={14} className="opacity-70" />}
                 {l.label}
               </Link>
             ))}
@@ -267,8 +269,8 @@ export default function SiteHeader({ onLogoClick }: SiteHeaderProps) {
         <div className="md:hidden border-t border-gray-200 dark:border-gray-800 p-4 bg-white dark:bg-gray-950 animate-in slide-in-from-top-2 fade-in duration-200 ease-out">
           {navLinks.map((l) => (
             <Link key={l.to} to={l.to} onClick={() => setMenuOpen(false)}
-              className="block px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800">
-              {l.label}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800">
+              <l.icon size={16} className="opacity-70" /> {l.label}
             </Link>
           ))}
           {user ? (
@@ -278,7 +280,7 @@ export default function SiteHeader({ onLogoClick }: SiteHeaderProps) {
                 {t('nav.newArticle')}
               </Link>
               <Link to={`/${user.nickname}`} onClick={() => setMenuOpen(false)}
-                className="block px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800">
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800">
                 {t('nav.profile')}
               </Link>
               <button onClick={() => { logout(); navigate("/"); setMenuOpen(false); }}

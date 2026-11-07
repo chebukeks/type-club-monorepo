@@ -1,7 +1,8 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import Layout from "./components/Layout";
 import Landing from "./pages/Landing";
+import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Settings from "./pages/Settings";
@@ -24,11 +25,29 @@ function Protected({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function RootPage() {
+  const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const view = searchParams.get("view");
+
+  if (view === "landing") return <Landing />;
+  if (view === "home") return <Home />;
+
+  const hasVisited = typeof window !== "undefined" && localStorage.getItem("typeclub_visited") === "true";
+  if (user || hasVisited) {
+    return <Home />;
+  }
+
+  return <Landing />;
+}
+
 export default function App() {
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route path="/" element={<Landing />} />
+        <Route path="/" element={<RootPage />} />
+        <Route path="/home" element={<Home />} />
+        <Route path="/landing" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/settings" element={<Protected><Settings /></Protected>} />

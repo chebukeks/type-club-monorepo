@@ -1,9 +1,13 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import desktopPkg from "../desktop/package.json";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  define: {
+    __DESKTOP_VERSION__: JSON.stringify(desktopPkg.version),
+  },
   server: {
     port: 5173,
     strictPort: true,

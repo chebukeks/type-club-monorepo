@@ -147,8 +147,10 @@ export const syntaxHighlightPlugin = new Plugin({
       for (const step of tr.steps) {
         step.getMap().forEach((oldStart, oldEnd, newStart, newEnd) => {
           if (codeBlockTouched) return
-          const $oldStart = oldState.doc.resolve(Math.min(oldStart, oldState.doc.content.size))
-          const $oldEnd = oldState.doc.resolve(Math.min(oldEnd, oldState.doc.content.size))
+          const sOld = Math.min(oldStart, oldState.doc.content.size)
+          const eOld = Math.min(oldEnd, oldState.doc.content.size)
+          const $oldStart = oldState.doc.resolve(sOld)
+          const $oldEnd = oldState.doc.resolve(eOld)
           if (
             $oldStart.parent.type.name === 'code_block' ||
             $oldEnd.parent.type.name === 'code_block' ||
@@ -158,8 +160,19 @@ export const syntaxHighlightPlugin = new Plugin({
             codeBlockTouched = true
             return
           }
-          const $newStart = newState.doc.resolve(Math.min(newStart, newState.doc.content.size))
-          const $newEnd = newState.doc.resolve(Math.min(newEnd, newState.doc.content.size))
+          if (eOld > sOld) {
+            oldState.doc.nodesBetween(sOld, eOld, (node) => {
+              if (node.type.name === 'code_block') {
+                codeBlockTouched = true
+                return false
+              }
+            })
+            if (codeBlockTouched) return
+          }
+          const sNew = Math.min(newStart, newState.doc.content.size)
+          const eNew = Math.min(newEnd, newState.doc.content.size)
+          const $newStart = newState.doc.resolve(sNew)
+          const $newEnd = newState.doc.resolve(eNew)
           if (
             $newStart.parent.type.name === 'code_block' ||
             $newEnd.parent.type.name === 'code_block' ||
@@ -168,6 +181,14 @@ export const syntaxHighlightPlugin = new Plugin({
           ) {
             codeBlockTouched = true
             return
+          }
+          if (eNew > sNew) {
+            newState.doc.nodesBetween(sNew, eNew, (node) => {
+              if (node.type.name === 'code_block') {
+                codeBlockTouched = true
+                return false
+              }
+            })
           }
         })
         if (codeBlockTouched) break

@@ -35,10 +35,12 @@ export default function ThemeSwitcher() {
     <div className="relative shrink-0" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-        title={t('theme.title')}
+        className="px-2.5 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors inline-flex items-center gap-1 text-xs font-semibold text-gray-700 dark:text-gray-300"
+        title={`${t('language.title')} / ${t('theme.title')}`}
       >
-        <CurrentIcon size={18} />
+        <span>{language.toUpperCase()}</span>
+        <span className="text-gray-400 dark:text-gray-500 font-normal">/</span>
+        <CurrentIcon size={15} />
       </button>
 
       {open && (
