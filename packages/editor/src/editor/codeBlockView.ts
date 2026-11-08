@@ -32,6 +32,60 @@ function getMermaid() {
 }
 
 /**
+ * Рендерит диаграмму с обходом бага Mermaid 12.x в субпиксельном расчёте.
+ * В addHtmlSpan Mermaid строго проверяет `bbox.width === width`.
+ * При дробном масштабировании экрана (DPI 125%/150%/175%) или зуме браузера
+ * `getBoundingClientRect().width` имеет дробные значения (e.g. 250.00003 != 250),
+ * из-за чего Mermaid отменяет перенос строк и замеряет высоту для 1 строки текста.
+ */
+async function renderMermaidWithSubpixelFix(
+  mermaid: any,
+  id: string,
+  text: string
+): Promise<{ svg: string }> {
+  if (typeof window === 'undefined' || !window.Element) {
+    return mermaid.render(id, text)
+  }
+
+  const origGetBoundingClientRect = Element.prototype.getBoundingClientRect
+  try {
+    Element.prototype.getBoundingClientRect = function() {
+      const rect = origGetBoundingClientRect.call(this)
+      if (
+        this.nodeName === 'DIV' &&
+        this.parentElement &&
+        this.parentElement.nodeName.toLowerCase() === 'foreignobject'
+      ) {
+        const maxWidthStr = (this as HTMLElement).style?.maxWidth
+        if (maxWidthStr && maxWidthStr.endsWith('px')) {
+          const targetW = parseFloat(maxWidthStr)
+          if (Math.abs(rect.width - targetW) < 1.5) {
+            if (typeof DOMRect !== 'undefined') {
+              return new DOMRect(rect.x, rect.y, targetW, rect.height)
+            }
+            return {
+              x: rect.x,
+              y: rect.y,
+              top: rect.top,
+              bottom: rect.bottom,
+              left: rect.left,
+              right: rect.right,
+              width: targetW,
+              height: rect.height,
+              toJSON: () => (rect.toJSON ? rect.toJSON() : {}),
+            } as DOMRect
+          }
+        }
+      }
+      return rect
+    }
+    return await mermaid.render(id, text)
+  } finally {
+    Element.prototype.getBoundingClientRect = origGetBoundingClientRect
+  }
+}
+
+/**
  * Кастомный View для блока кода (code_block).
  * Оборачивает содержимое в UI-компонент:
  * - шапка с кликабельным языком и кнопкой копирования;
@@ -330,11 +384,12 @@ export class CodeBlockView implements NodeView {
         startOnLoad: false,
         theme: isDark ? 'dark' : 'default',
         securityLevel: 'loose',
-        flowchart: { useMaxWidth: true, htmlLabels: true },
+        flowchart: { useMaxWidth: true, htmlLabels: true, wrappingWidth: 250 },
+        sequence: { useMaxWidth: true, wrap: true, wrapPadding: 10 },
       })
 
       const uniqueId = `mermaid-${Math.random().toString(36).substring(2, 9)}`
-      const { svg } = await mermaid.render(uniqueId, text)
+      const { svg } = await renderMermaidWithSubpixelFix(mermaid, uniqueId, text)
 
       if (currentRender === this.renderCounter && this.mermaidContainer) {
         this.mermaidContainer.innerHTML = svg

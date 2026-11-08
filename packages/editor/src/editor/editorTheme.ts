@@ -643,18 +643,20 @@ html[data-lang="ru"] figure[data-sug-delete]::after {
   max-width: 100%;
   height: auto;
 }
-.mermaid-render-wrapper svg .nodeLabel,
-.mermaid-render-wrapper svg .edgeLabel,
-.mermaid-render-wrapper svg .label,
-.type-club-lightbox-overlay svg .nodeLabel,
-.type-club-lightbox-overlay svg .edgeLabel,
-.type-club-lightbox-overlay svg .label,
-.type-club-lightbox-overlay .nodeLabel,
-.type-club-lightbox-overlay .edgeLabel,
-.type-club-lightbox-overlay .label {
-  white-space: normal !important;
-  word-break: break-word !important;
-  overflow-wrap: break-word !important;
+.mermaid-render-wrapper svg foreignObject,
+.type-club-lightbox-overlay svg foreignObject {
+  overflow: visible;
+}
+.mermaid-render-wrapper svg foreignObject > div,
+.type-club-lightbox-overlay svg foreignObject > div {
+  width: 100% !important;
+  display: table !important;
+  white-space: break-spaces !important;
+  text-align: center;
+}
+.mermaid-render-wrapper svg p,
+.type-club-lightbox-overlay svg p {
+  margin: 0;
 }
 /* Стили для слайдера масштабирования в лайтбоксе */
 .type-club-lightbox-overlay input[type="range"] {

@@ -571,12 +571,8 @@ Auth: JWT Bearer token, localStorage: access_token
 - **Интеграция:** Подключен в `imageView.ts` и `codeBlockView.ts` (при клике в режимах просмотра выставляется курсор `cursor: zoom-in` и вызывается `ImageLightbox.open(...)`).
 
 ### 2. Mermaid-диаграммы и перенос текста
-- **Конфигурация рендерера:** В `packages/editor/src/editor/codeBlockView.ts` Mermaid инициализирован с флагами:
-  ```ts
-  flowchart: { useMaxWidth: true, htmlLabels: true },
-  sequence: { useMaxWidth: true, wrap: true, wrapPadding: 10 }
-  ```
-- **Стилизация:** В `packages/editor/src/editor/editorTheme.ts` узлы `.nodeLabel`, `.edgeLabel`, `.label` снабжены правилами `white-space: normal !important; word-break: break-word !important; overflow-wrap: break-word !important;`. Текст автоматически переносится на новые строки и не выходит за границы блоков диаграммы.
+- **Конфигурация рендерера и субпиксельный фикс:** В `packages/editor/src/editor/codeBlockView.ts` Mermaid инициализирован с флагами `wrappingWidth: 250` для flowchart и `wrap: true` для sequence. Рендер выполняется через `renderMermaidWithSubpixelFix`: во время замера разметки Mermaid в `addHtmlSpan` перехватывается `Element.prototype.getBoundingClientRect`, компенсируя дробные значения ширины (`rect.width - targetW < 1.5px`), возникающие из-за системного DPI (125%/150%/175%) или зума браузера. Это гарантирует, что строгое условие Mermaid `bbox.width === width` выполняется, блок переключается в многострочный режим `white-space: break-spaces`, а высота контейнера и фигуры SVG рассчитываются под реальное количество строк без выпадения текста снизу.
+- **Стилизация:** В `packages/editor/src/editor/editorTheme.ts` для элементов `foreignObject` задано `overflow: visible`, а для внутренних контейнеров `foreignObject > div` задано `width: 100% !important; display: table !important; white-space: break-spaces !important; text-align: center;`. Это обеспечивает безупречное многострочное отображение и центрирование текста внутри фигур диаграмм.
 
 ### 3. Относительные ссылки (Desktop)
 - **Перехват:** В `interactivePlugin.ts` относительные ссылки (без протокола, `#` и `//`) генерируют DOM-событие `editor-open-relative-link`. В вебе относительные ссылки игнорируются.
