@@ -312,7 +312,8 @@ export function MarkdownEditor({
       return
     }
     try {
-      let file: File
+      const { articlesApi } = await import('../api')
+      let response: { url: string } | null = null
       if (src.startsWith('data:')) {
         const comma = src.indexOf(',')
         const header = src.slice(0, comma)
@@ -322,26 +323,32 @@ export function MarkdownEditor({
         const binary = atob(base64)
         const bytes = new Uint8Array(binary.length)
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-        file = new File([bytes], `image-${Date.now()}.${ext}`, { type: mime })
+        const file = new File([bytes], `image-${Date.now()}.${ext}`, { type: mime })
+        response = await articlesApi.uploadImage(articleId, file)
       } else {
         let resolvedSrc = src;
-      if (resolvedSrc.startsWith('/uploads/')) {
-        const baseUrl = window.location.origin.includes('localhost') ? 'https://type-club.ru' : window.location.origin;
-        resolvedSrc = `${baseUrl}${resolvedSrc}`;
+        if (resolvedSrc.startsWith('/uploads/')) {
+          const baseUrl = window.location.origin.includes('localhost') ? 'https://type-club.ru' : window.location.origin;
+          resolvedSrc = `${baseUrl}${resolvedSrc}`;
+        }
+        try {
+          const res = await fetch(resolvedSrc)
+          if (!res.ok) throw new Error(`HTTP error ${res.status}`)
+          const blob = await res.blob()
+          const ext = blob.type.split('/')[1] || 'png'
+          const file = new File([blob], `image-${Date.now()}.${ext}`, { type: blob.type })
+          response = await articlesApi.uploadImage(articleId, file)
+        } catch (fetchErr) {
+          console.warn('Client fetch failed (likely CORS), falling back to backend download:', fetchErr)
+          response = await articlesApi.uploadImageFromUrl(articleId, resolvedSrc)
+        }
       }
-      const res = await fetch(resolvedSrc)
-        const blob = await res.blob()
-        const ext = blob.type.split('/')[1] || 'png'
-        file = new File([blob], `image-${Date.now()}.${ext}`, { type: blob.type })
-      }
-      const { articlesApi } = await import('../api')
-      const response = await articlesApi.uploadImage(articleId, file)
       const view = viewRef.current
       if (view && response?.url) {
         const node = view.state.doc.nodeAt(pos)
         if (node) {
         const fullUrl = response.url.startsWith('/')
-          ? `${window.location.origin.includes('localhost') ? 'https://type-club.ru' : window.location.origin}${response.url}`
+          ? `${window.location.origin.replace(/\/$/, '')}${response.url}`
           : response.url;
         const tr = view.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: fullUrl })
           view.dispatch(tr)
@@ -498,10 +505,13 @@ export function MarkdownEditor({
             if (foundPos !== null) {
               const node = currentView.state.doc.nodeAt(foundPos);
               if (node) {
+                const fullUrl = response.url.startsWith('/')
+                  ? `${window.location.origin.replace(/\/$/, '')}${response.url}`
+                  : response.url;
                 currentView.dispatch(
                   currentView.state.tr.setNodeMarkup(foundPos, undefined, {
                     ...node.attrs,
-                    src: response.url,
+                    src: fullUrl,
                   })
                 );
               }
@@ -1266,6 +1276,14 @@ export function MarkdownEditor({
             </button>
           </div>
         </>
+      )}
+
+      {changeImageSrcTarget && (
+        <ChangeImageSourceModal
+          currentSrc={changeImageSrcTarget.src}
+          onClose={() => setChangeImageSrcTarget(null)}
+          onApply={handleChangeImageSource}
+        />
       )}
 
       <AddNoteModal

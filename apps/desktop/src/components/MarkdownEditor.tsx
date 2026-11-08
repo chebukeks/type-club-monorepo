@@ -328,7 +328,7 @@ export function MarkdownEditor() {
       return
     }
     try {
-      let file: File
+      let response: { url: string } | null = null
       if (src.startsWith('data:')) {
         const comma = src.indexOf(',')
         const header = src.slice(0, comma)
@@ -338,19 +338,26 @@ export function MarkdownEditor() {
         const binary = atob(base64)
         const bytes = new Uint8Array(binary.length)
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-        file = new File([bytes], `image-${Date.now()}.${ext}`, { type: mime })
+        const file = new File([bytes], `image-${Date.now()}.${ext}`, { type: mime })
+        response = await articlesApi.uploadImage(aid, file)
       } else {
         let resolvedSrc = src
-      if (resolvedSrc.startsWith('/uploads/')) {
-        const baseUrl = config.siteUrl || 'https://type-club.ru'
-        resolvedSrc = `${baseUrl.replace(/\/$/, '')}${resolvedSrc}`
+        if (resolvedSrc.startsWith('/uploads/')) {
+          const baseUrl = config.siteUrl || 'https://type-club.ru'
+          resolvedSrc = `${baseUrl.replace(/\/$/, '')}${resolvedSrc}`
+        }
+        try {
+          const res = await fetch(resolvedSrc)
+          if (!res.ok) throw new Error(`HTTP error ${res.status}`)
+          const blob = await res.blob()
+          const ext = blob.type.split('/')[1] || 'png'
+          const file = new File([blob], `image-${Date.now()}.${ext}`, { type: blob.type })
+          response = await articlesApi.uploadImage(aid, file)
+        } catch (fetchErr) {
+          console.warn('Desktop fetch failed, falling back to backend download:', fetchErr)
+          response = await articlesApi.uploadImageFromUrl(aid, resolvedSrc)
+        }
       }
-      const res = await fetch(resolvedSrc)
-        const blob = await res.blob()
-        const ext = blob.type.split('/')[1] || 'png'
-        file = new File([blob], `image-${Date.now()}.${ext}`, { type: blob.type })
-      }
-      const response = await articlesApi.uploadImage(aid, file)
       if (editorView && response?.url) {
         const node = editorView.state.doc.nodeAt(pos)
         if (node) {

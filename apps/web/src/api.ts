@@ -210,6 +210,8 @@ export const articlesApi = {
     const res = await rawRequest(`/articles/${articleId}/images`, { method: "POST", body: formData });
     return res.json() as Promise<{ url: string }>;
   },
+  uploadImageFromUrl: (articleId: number, url: string) =>
+    api.post<{ url: string }>(`/articles/${articleId}/images/from-url`, { url }),
 };
 
 // ── Comments ──

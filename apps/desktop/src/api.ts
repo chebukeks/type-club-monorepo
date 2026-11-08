@@ -179,6 +179,9 @@ export const articlesApi = {
     if (!res.ok) throw new Error("Upload failed");
     return res.json() as Promise<{ url: string }>;
   },
+  uploadImageFromUrl: async (articleId: number, url: string) => {
+    return api.post<{ url: string }>(`/articles/${articleId}/images/from-url`, { url });
+  },
 };
 
 // ── Collaboration ──

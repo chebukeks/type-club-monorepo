@@ -251,6 +251,9 @@ class UserSuggestion(BaseModel):
 
 # ── Images ──
 
+class UploadImageFromUrlRequest(BaseModel):
+    url: str
+
 class ArticleImageResponse(BaseModel):
     id: int
     url: str
