@@ -14,3 +14,8 @@ declare namespace NodeJS {
 interface Window {
   api: import('../src/types').IElectronAPI
 }
+
+declare module 'markdown-it-texmath' {
+  const texmath: any
+  export default texmath
+}

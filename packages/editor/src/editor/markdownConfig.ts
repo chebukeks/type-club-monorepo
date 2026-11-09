@@ -1177,16 +1177,38 @@ export function generateExportHtml(markdown: string, themeOrOptions: 'dark' | 'l
       margin-top: 14pt !important;
       margin-bottom: 6pt !important;
     }
+    /* Списки по ГОСТ 7.32 (п. 6.7 — маркер тире/дефис) */
+    ul, ol {
+      padding-left: 1.25cm !important;
+      margin: 6pt 0 !important;
+    }
+    ul {
+      list-style-type: "–  " !important;
+    }
+    ol {
+      list-style-type: decimal !important;
+    }
+    li {
+      line-height: 1.5 !important;
+      margin-bottom: 0 !important;
+      text-indent: 0 !important;
+      text-align: justify !important;
+    }
+
+    /* Таблицы по ГОСТ 7.32 (п. 6.8 — кегль 10-12pt, одинарный интервал) */
     table {
-      margin: 14pt auto !important;
+      margin: 12pt auto !important;
       border-collapse: collapse !important;
       width: 100% !important;
       border: 1px solid #000000 !important;
+      font-size: 12pt !important;
+      line-height: 1.15 !important;
     }
     th, td {
       border: 1px solid #000000 !important;
-      padding: 6pt 10pt !important;
+      padding: 5pt 8pt !important;
       font-size: 12pt !important;
+      line-height: 1.15 !important;
       color: #000000 !important;
       background: transparent !important;
     }
@@ -1195,6 +1217,25 @@ export function generateExportHtml(markdown: string, themeOrOptions: 'dark' | 'l
       text-align: center !important;
       background: #f8f8f8 !important;
     }
+    td {
+      text-align: left !important;
+    }
+
+    /* Цитаты по ГОСТ */
+    blockquote {
+      border-left: 2px solid #000000 !important;
+      padding-left: 1.25cm !important;
+      margin: 10pt 0 !important;
+      background: transparent !important;
+      font-style: italic !important;
+    }
+
+    /* Формулы KaTeX по центру */
+    .katex-display {
+      margin: 12pt 0 !important;
+      text-align: center !important;
+    }
+
     code, pre {
       font-family: "Consolas", "Courier New", monospace !important;
       font-size: 11pt !important;

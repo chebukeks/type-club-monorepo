@@ -1,4 +1,6 @@
 import MarkdownIt from 'markdown-it'
+import texmath from 'markdown-it-texmath'
+import katex from 'katex'
 import {
   Document,
   Packer,
@@ -13,7 +15,9 @@ import {
   TableCell,
   WidthType,
   BorderStyle,
-  } from 'docx'
+  Math as DocxMath,
+  MathRun as DocxMathRun,
+} from 'docx'
 
 export interface DocxExportOptions {
   preset?: 'standard' | 'gost'
@@ -25,10 +29,12 @@ interface InlineStyle {
   italic?: boolean
   strike?: boolean
   code?: boolean
+  size?: number
 }
 
 /**
  * Преобразует Markdown-документ в бинарный буфер .docx (Word)
+ * с поддержкой формул (OMML Math), таблиц, списков, цитат, блоков кода и профиля ГОСТ 7.32 / 2.105.
  */
 export async function markdownToDocxBuffer(
   markdown: string,
@@ -40,14 +46,14 @@ export async function markdownToDocxBuffer(
   // Настройки шрифтов и геометрии
   const bodyFont = isGost ? 'Times New Roman' : 'Calibri'
   const bodySize = isGost ? 28 : 22 // в half-points: 28 = 14pt, 22 = 11pt
-  const bodyLineSpacing = isGost ? 360 : 276 // 360 = 1.5, 276 = 1.15
+  const bodyLineSpacing = isGost ? 360 : 276 // 360 = 1.5 строки, 276 = 1.15 строки
   const bodyAlignment = isGost ? AlignmentType.JUSTIFIED : AlignmentType.LEFT
   const firstLineIndent = isGost ? 709 : undefined // 1.25 см = 709 twips
 
   // Поля страницы
   const pageMargins = isGost
     ? {
-        left: 1701, // 30 мм
+        left: 1701, // 30 мм (ГОСТ 7.32)
         right: 567, // 10 мм
         top: 1134, // 20 мм
         bottom: 1134, // 20 мм
@@ -64,6 +70,7 @@ export async function markdownToDocxBuffer(
     breaks: true,
     linkify: true,
   })
+  md.use(texmath, { engine: katex, delimiters: 'dollars' })
 
   // Очищаем специфичные расширения и фронтматтер перед парсингом
   const cleanedMarkdown = markdown
@@ -78,7 +85,6 @@ export async function markdownToDocxBuffer(
 
   let inList = false
   let listType: 'bullet' | 'ordered' = 'bullet'
-  let listIndex = 0
 
   let inTable = false
   let tableRows: TableRow[] = []
@@ -87,9 +93,12 @@ export async function markdownToDocxBuffer(
 
   let inBlockquote = false
 
-  // Преобразование токенов inline в TextRun[]
-  const parseInlineChildren = (inlineTokens: any[], baseStyle: InlineStyle = {}): TextRun[] => {
-    const runs: TextRun[] = []
+  // Преобразование токенов inline в (TextRun | DocxMath)[]
+  const parseInlineChildren = (
+    inlineTokens: any[],
+    baseStyle: InlineStyle = {}
+  ): (TextRun | DocxMath)[] => {
+    const runs: (TextRun | DocxMath)[] = []
     const styleStack: InlineStyle[] = [{ ...baseStyle }]
 
     const currentStyle = () => styleStack[styleStack.length - 1]
@@ -120,9 +129,19 @@ export async function markdownToDocxBuffer(
           runs.push(
             new TextRun({
               text: token.content,
+              style: 'Code',
               font: 'Consolas',
               size: isGost ? 24 : 20,
               shading: isGost ? undefined : { fill: 'F3F4F6' },
+            })
+          )
+          break
+        }
+        case 'math_inline':
+        case 'math_inline_double': {
+          runs.push(
+            new DocxMath({
+              children: [new DocxMathRun(token.content.trim())],
             })
           )
           break
@@ -136,7 +155,7 @@ export async function markdownToDocxBuffer(
               new TextRun({
                 text: token.content,
                 font: bodyFont,
-                size: bodySize,
+                size: st.size || bodySize,
                 bold: st.bold,
                 italics: st.italic,
                 strike: st.strike,
@@ -148,11 +167,15 @@ export async function markdownToDocxBuffer(
         }
         default:
           if (token.content) {
+            const st = currentStyle()
             runs.push(
               new TextRun({
                 text: token.content,
                 font: bodyFont,
-                size: bodySize,
+                size: st.size || bodySize,
+                bold: st.bold,
+                italics: st.italic,
+                strike: st.strike,
                 color: isGost ? '000000' : undefined,
               })
             )
@@ -174,20 +197,22 @@ export async function markdownToDocxBuffer(
         const levelNum = parseInt(token.tag.replace('h', ''), 10) || 1
         const nextToken = tokens[idx + 1]
         const inlineContent = nextToken && nextToken.type === 'inline' ? nextToken.content : ''
-        idx++ // пропускаем inline
-        idx++ // пропускаем heading_close
+        idx += 2 // пропускаем inline и heading_close
 
         let headingText = inlineContent
         if (isGost && headingText.endsWith('.')) {
-          headingText = headingText.slice(0, -1) // по ГОСТ точка в конце заголовка не ставится
+          headingText = headingText.slice(0, -1) // по ГОСТ 7.32 точка в конце заголовка не ставится
         }
 
-        let headingLevel: (typeof HeadingLevel)[keyof typeof HeadingLevel] = HeadingLevel.HEADING_1
-        if (levelNum === 2) headingLevel = HeadingLevel.HEADING_2
-        if (levelNum === 3) headingLevel = HeadingLevel.HEADING_3
-        if (levelNum === 4) headingLevel = HeadingLevel.HEADING_4
-        if (levelNum === 5) headingLevel = HeadingLevel.HEADING_5
-        if (levelNum === 6) headingLevel = HeadingLevel.HEADING_6
+        const headingLevels = [
+          HeadingLevel.HEADING_1,
+          HeadingLevel.HEADING_2,
+          HeadingLevel.HEADING_3,
+          HeadingLevel.HEADING_4,
+          HeadingLevel.HEADING_5,
+          HeadingLevel.HEADING_6,
+        ]
+        const headingLevel = headingLevels[levelNum - 1] || HeadingLevel.HEADING_1
 
         docElements.push(
           new Paragraph({
@@ -198,7 +223,7 @@ export async function markdownToDocxBuffer(
               before: isGost ? (levelNum === 1 ? 360 : 240) : 240,
               after: isGost ? (levelNum === 1 ? 240 : 180) : 120,
               line: bodyLineSpacing,
-                          },
+            },
             children: [
               new TextRun({
                 text: headingText,
@@ -218,10 +243,11 @@ export async function markdownToDocxBuffer(
       // 2. Блоки кода (```lang\n...\n```)
       case 'fence':
       case 'code_block': {
-        const codeLines = token.content.split('\n')
+        const codeLines = token.content.replace(/\r\n/g, '\n').replace(/\n$/, '').split('\n')
         for (const cLine of codeLines) {
           docElements.push(
             new Paragraph({
+              style: 'CodeBlock',
               spacing: { before: 0, after: 0, line: 240 },
               shading: isGost ? undefined : { fill: 'F4F5F7' },
               border: isGost
@@ -242,7 +268,23 @@ export async function markdownToDocxBuffer(
         break
       }
 
-      // 3. Списки
+      // 3. Блочная формула ($$\n...\n$$)
+      case 'math_block': {
+        docElements.push(
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 180, after: 180, line: 240 },
+            children: [
+              new DocxMath({
+                children: [new DocxMathRun(token.content.trim())],
+              }),
+            ],
+          })
+        )
+        break
+      }
+
+      // 4. Списки
       case 'bullet_list_open':
         inList = true
         listType = 'bullet'
@@ -253,13 +295,12 @@ export async function markdownToDocxBuffer(
       case 'ordered_list_open':
         inList = true
         listType = 'ordered'
-        listIndex = 1
         break
       case 'ordered_list_close':
         inList = false
         break
 
-      // 4. Цитаты
+      // 5. Цитаты
       case 'blockquote_open':
         inBlockquote = true
         break
@@ -267,33 +308,52 @@ export async function markdownToDocxBuffer(
         inBlockquote = false
         break
 
-      // 5. Абзацы
+      // 6. Абзацы
       case 'paragraph_open': {
         const nextToken = tokens[idx + 1]
         if (nextToken && nextToken.type === 'inline') {
+          // Проверка на обособленную блочную формулу внутри параграфа
+          const ch = nextToken.children
+          const isPureMathBlock =
+            Boolean(ch && ch.length === 1 && (ch[0].type === 'math_inline_double' || ch[0].type === 'math_block'))
+
+          if (isPureMathBlock && ch) {
+            const mathTex = ch[0].content.trim()
+            idx += 2
+            docElements.push(
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 180, after: 180, line: 240 },
+                children: [
+                  new DocxMath({
+                    children: [new DocxMathRun(mathTex)],
+                  }),
+                ],
+              })
+            )
+            break
+          }
+
           const children = parseInlineChildren(nextToken.children || [], {
             italic: inBlockquote,
           })
-          idx++ // пропускаем inline
-          idx++ // пропускаем paragraph_close
+          idx += 2 // пропускаем inline и paragraph_close
 
           if (inList) {
-            const prefix = listType === 'bullet' ? '• ' : `${listIndex++}. `
             docElements.push(
               new Paragraph({
-                spacing: { before: 60, after: 60, line: bodyLineSpacing },
-                indent: { left: 709 },
+                numbering: {
+                  reference:
+                    listType === 'bullet'
+                      ? isGost
+                        ? 'gost-bullet'
+                        : 'default-bullet'
+                      : 'default-numbering',
+                  level: 0,
+                },
+                spacing: { before: 40, after: 40, line: bodyLineSpacing },
                 alignment: bodyAlignment,
-                children: [
-                  new TextRun({
-                    text: prefix,
-                    font: bodyFont,
-                    size: bodySize,
-                    bold: true,
-                    color: isGost ? '000000' : undefined,
-                  }),
-                  ...children,
-                ],
+                children,
               })
             )
           } else if (inTable) {
@@ -303,7 +363,7 @@ export async function markdownToDocxBuffer(
                 children: [
                   new Paragraph({
                     alignment: isHeaderRow ? AlignmentType.CENTER : AlignmentType.LEFT,
-                    spacing: { before: 60, after: 60 },
+                    spacing: { before: 40, after: 40, line: 240 },
                     children,
                   }),
                 ],
@@ -312,6 +372,7 @@ export async function markdownToDocxBuffer(
           } else if (inBlockquote) {
             docElements.push(
               new Paragraph({
+                style: 'Quote',
                 spacing: { before: 120, after: 120, line: bodyLineSpacing },
                 indent: { left: 709 },
                 border: {
@@ -330,7 +391,7 @@ export async function markdownToDocxBuffer(
                   before: isGost ? 0 : 80,
                   after: isGost ? 0 : 80,
                   line: bodyLineSpacing,
-                                  },
+                },
                 children,
               })
             )
@@ -339,7 +400,7 @@ export async function markdownToDocxBuffer(
         break
       }
 
-      // 6. Таблицы
+      // 7. Таблицы
       case 'table_open':
         inTable = true
         tableRows = []
@@ -377,15 +438,18 @@ export async function markdownToDocxBuffer(
       case 'td_open': {
         const nextToken = tokens[idx + 1]
         if (nextToken && nextToken.type === 'inline') {
-          const children = parseInlineChildren(nextToken.children || [], { bold: isHeaderRow })
-          idx++ // пропускаем inline
-          idx++ // пропускаем td_close / th_close
+          const children = parseInlineChildren(nextToken.children || [], {
+            bold: isHeaderRow,
+            size: isGost ? 24 : 20, // по ГОСТ текст в таблицах 12pt (разрешён меньший кегль)
+          })
+          idx += 2 // пропускаем inline и td_close / th_close
           currentRowCells.push(
             new TableCell({
               shading: isHeaderRow ? (isGost ? undefined : { fill: 'F9FAFB' }) : undefined,
               children: [
                 new Paragraph({
                   alignment: isHeaderRow ? AlignmentType.CENTER : AlignmentType.LEFT,
+                  spacing: { before: 40, after: 40, line: 240 }, // одинарный интервал в таблицах
                   children,
                 }),
               ],
@@ -395,7 +459,7 @@ export async function markdownToDocxBuffer(
         break
       }
 
-      // 7. Горизонтальная черта
+      // 8. Горизонтальная черта
       case 'hr': {
         docElements.push(
           new Paragraph({
@@ -416,6 +480,83 @@ export async function markdownToDocxBuffer(
 
   // Создаем секцию документа Word
   const doc = new Document({
+    styles: {
+      paragraphStyles: [
+        {
+          id: 'CodeBlock',
+          name: 'CodeBlock',
+          basedOn: 'Normal',
+          next: 'Normal',
+          run: { font: 'Consolas' },
+        },
+        {
+          id: 'Quote',
+          name: 'Quote',
+          basedOn: 'Normal',
+          next: 'Normal',
+          run: { italics: true },
+        },
+      ],
+      characterStyles: [
+        {
+          id: 'Code',
+          name: 'Code',
+          run: { font: 'Consolas' },
+        },
+      ],
+    },
+    numbering: {
+      config: [
+        {
+          reference: 'default-bullet',
+          levels: [
+            {
+              level: 0,
+              format: 'bullet',
+              text: '\u2022',
+              alignment: AlignmentType.LEFT,
+              style: {
+                paragraph: {
+                  indent: { left: 709, hanging: 360 },
+                },
+              },
+            },
+          ],
+        },
+        {
+          reference: 'gost-bullet',
+          levels: [
+            {
+              level: 0,
+              format: 'bullet',
+              text: '\u2013', // en-dash тире по ГОСТ 7.32 п. 6.7
+              alignment: AlignmentType.LEFT,
+              style: {
+                paragraph: {
+                  indent: { left: 709, hanging: 360 },
+                },
+              },
+            },
+          ],
+        },
+        {
+          reference: 'default-numbering',
+          levels: [
+            {
+              level: 0,
+              format: 'decimal',
+              text: '%1.',
+              alignment: AlignmentType.LEFT,
+              style: {
+                paragraph: {
+                  indent: { left: 709, hanging: 360 },
+                },
+              },
+            },
+          ],
+        },
+      ],
+    },
     sections: [
       {
         properties: {
@@ -433,7 +574,7 @@ export async function markdownToDocxBuffer(
                       new TextRun({
                         children: [PageNumber.CURRENT],
                         font: 'Times New Roman',
-                        size: 28, // 14pt
+                        size: 28, // 14pt по центру (ГОСТ 7.32)
                         color: '000000',
                       }),
                     ],
