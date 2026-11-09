@@ -112,6 +112,23 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ),
       }
     }
+    case 'OPEN_IMPORTED_DOCUMENT': {
+      const { fileName, content } = action.payload
+      const newTab: Tab = {
+        id: `imported_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        filePath: '__draft__',
+        fileName: fileName || (state.language === 'ru' ? 'Без названия.md' : 'Untitled.md'),
+        content,
+        isModified: true,
+        refreshCounter: 0,
+        scrollTop: 0,
+      }
+      return {
+        ...state,
+        tabs: [...state.tabs, newTab],
+        activeTabId: newTab.id,
+      }
+    }
     case 'CREATE_DRAFT_TAB': {
       const { content, fileName } = action.payload
       const existingDraft = state.tabs.find((t) => t.id === 'draft')
@@ -351,6 +368,7 @@ interface EditorContextValue {
   saveActiveFile: () => Promise<void>
   openFolder: () => Promise<void>
   openFileViaDialog: () => Promise<void>
+  importFileViaDialog: () => Promise<void>
   saveActiveFileAs: () => Promise<void>
   createFile: (fileName: string, targetPath: string) => Promise<void>
   createFolder: (folderName: string, targetPath: string) => Promise<void>
@@ -735,13 +753,34 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     } catch (err) { /* ignore */ }
   }, [addRecentFolder])
 
+ 
   // --- Открыть файл через диалог ---
   const openFileViaDialog = useCallback(async () => {
     try {
       const result = await window.api.openFile()
       if (!result) return
-      const fileName = result.filePath.replace(/^.*[/]/, '') || 'untitled.md'
-      dispatch({ type: 'OPEN_FILE', payload: { filePath: result.filePath, fileName, content: result.content } })
+      if (result.isImported) {
+        dispatch({
+          type: 'OPEN_IMPORTED_DOCUMENT',
+          payload: { fileName: result.fileName, content: result.content },
+        })
+      } else {
+        const fileName = result.fileName || result.filePath.replace(/^.*[/\\]/, '') || 'untitled.md'
+        dispatch({ type: 'OPEN_FILE', payload: { filePath: result.filePath, fileName, content: result.content } })
+        addRecentFile(result.filePath)
+      }
+    } catch (err) { /* ignore */ }
+  }, [addRecentFile])
+
+  // --- Импортировать файл через диалог ---
+  const importFileViaDialog = useCallback(async () => {
+    try {
+      const result = await window.api.importFile()
+      if (!result) return
+      dispatch({
+        type: 'OPEN_IMPORTED_DOCUMENT',
+        payload: { fileName: result.fileName, content: result.content },
+      })
     } catch (err) { /* ignore */ }
   }, [])
 
@@ -1424,7 +1463,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     <EditorContext.Provider value={{
       state, dispatch,
       openFile, saveActiveFile, openFolder,
-      openFileViaDialog, saveActiveFileAs,
+      openFileViaDialog, importFileViaDialog, saveActiveFileAs,
       createFile, createFolder, refreshFileTree,
       startCreating, setActiveExplorerPath,
       renameItem, deleteItem, showInExplorer, startRenaming, moveItem,

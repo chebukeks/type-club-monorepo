@@ -1,7 +1,8 @@
+import { ExportModal } from './ExportModal'
 import { useState, useRef, useEffect } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { useEditor } from '../context/EditorContext'
-import { generateExportHtml, Locale } from '@type-club/editor'
+import { Locale } from '@type-club/editor'
 import type { Tab, ThemeMode, FocusMode } from '../types'
 
 function RadioIcon({ active }: { active: boolean }) {
@@ -69,7 +70,7 @@ export function MenuBar() {
   const {
     state, dispatch,
     saveActiveFile, openFolder, openFile,
-    openFileViaDialog, saveActiveFileAs,
+    openFileViaDialog, importFileViaDialog, saveActiveFileAs,
     startCreating, startRenaming,
     setTheme, setLanguage, t, refreshTab, setFocusMode,
     getRecentFiles, getRecentFolders, clearRecentFiles, clearRecentFolders,
@@ -78,6 +79,7 @@ export function MenuBar() {
   } = useEditor()
   const { activeTabId, tabs, folderPath, theme, language, focusMode } = state
   const [openMenu, setOpenMenu] = useState<string | null>(null)
+  const [showExportModal, setShowExportModal] = useState(false)
   const [submenu, setSubmenu] = useState<string | null>(null)
   const [recentFiles, setRecentFiles] = useState<string[]>([])
   const [recentFolders, setRecentFolders] = useState<string[]>([])
@@ -161,23 +163,10 @@ export function MenuBar() {
   }
 
   // Обработчики File
-  const resolveTheme = (): 'dark' | 'light' => {
-    if (state.theme === 'system') {
-      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-    }
-    return state.theme as 'dark' | 'light'
-  }
-  const handleExportHtml = async () => {
+  const handleOpenExportModal = () => {
     closeMenu()
     if (!activeTab) return
-    const html = generateExportHtml(activeTab.content, resolveTheme())
-    await window.api.exportHtml(html, activeTab.fileName.replace(/\.md$/i, '.html'))
-  }
-  const handleExportPdf = async () => {
-    closeMenu()
-    if (!activeTab) return
-    const html = generateExportHtml(activeTab.content, resolveTheme())
-    await window.api.exportPdf(html, activeTab.fileName.replace(/\.md$/i, '.pdf'))
+    setShowExportModal(true)
   }
   const handleCreateFile = () => {
     closeMenu()
@@ -195,6 +184,7 @@ export function MenuBar() {
   }
   const handleCreateFolder = () => { closeMenu(); if (folderPath) startCreating('folder') }
   const handleOpenFile = () => { closeMenu(); openFileViaDialog() }
+  const handleImport = () => { closeMenu(); importFileViaDialog() }
   const handleOpenFolder = () => { closeMenu(); openFolder() }
   const handleSave = () => { closeMenu(); saveActiveFile() }
   const handleSaveAs = () => { closeMenu(); saveActiveFileAs() }
@@ -262,6 +252,9 @@ export function MenuBar() {
           {sep}
           <div className={itemCls(true)} onClick={handleOpenFile}>
             <span>{t('menu.file.openFile')}</span><span className="text-[11px] text-[var(--text-dim)]">Ctrl+O</span>
+          </div>
+          <div className={itemCls(true)} onClick={handleImport}>
+            <span>{t('menu.file.import')}</span>
           </div>
           <div className={itemCls(true)} onClick={handleOpenFolder}>
             <span>{t('menu.file.openFolder')}</span><span className="text-[11px] text-[var(--text-dim)]">Ctrl+Shift+O</span>
@@ -349,11 +342,8 @@ export function MenuBar() {
             <span>{t('menu.file.saveAs')}</span><span className="text-[11px] text-[var(--text-dim)]">Ctrl+Shift+S</span>
           </div>
           {sep}
-          <div className={itemCls(!!activeTabId)} onClick={activeTabId ? handleExportHtml : undefined}>
-            <span>{t('menu.file.exportHtml')}</span>
-          </div>
-          <div className={itemCls(!!activeTabId)} onClick={activeTabId ? handleExportPdf : undefined}>
-            <span>{t('menu.file.exportPdf')}</span>
+          <div className={itemCls(!!activeTabId)} onClick={activeTabId ? handleOpenExportModal : undefined}>
+            <span>{t('menu.file.export')}</span>
           </div>
         </AnimatedMenu>
       </div>
@@ -527,7 +517,7 @@ export function MenuBar() {
           </div>
         </AnimatedMenu>
       </div>
+      {showExportModal && <ExportModal onClose={() => setShowExportModal(false)} />}
     </div>
   )
 }
-

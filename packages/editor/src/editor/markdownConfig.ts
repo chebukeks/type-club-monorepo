@@ -797,8 +797,30 @@ export function serializeMarkdown(doc: PMNode): string {
   }
 }
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+export interface ExportHtmlOptions {
+  theme?: 'dark' | 'light';
+  preset?: 'standard' | 'gost';
+  title?: string;
+}
+
 /** Markdown string → HTML string (for Export) */
-export function generateExportHtml(markdown: string, theme: 'dark' | 'light' = 'dark'): string {
+export function generateExportHtml(markdown: string, themeOrOptions: 'dark' | 'light' | ExportHtmlOptions = 'dark'): string {
+  const opts: ExportHtmlOptions = typeof themeOrOptions === 'string'
+    ? { theme: themeOrOptions }
+    : (themeOrOptions || {})
+  const theme = opts.preset === 'gost' ? 'light' : (opts.theme || 'dark')
+  const preset = opts.preset || 'standard'
+  const title = escapeHtml(opts.title || 'Export')
+
   // --- Инициализируем чистый парсер специально для экспорта ---
   // Нам не нужны костыли для ProseMirror (texmathFixPlugin, кастомные чекбоксы),
   // нам нужен родной, стандартный рендер HTML.
@@ -851,7 +873,7 @@ export function generateExportHtml(markdown: string, theme: 'dark' | 'light' = '
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Export</title>
+  <title>${title}</title>
   
   <!-- Шрифты, идентичные редактору -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1109,6 +1131,78 @@ export function generateExportHtml(markdown: string, theme: 'dark' | 'light' = '
     .suggestion-delete { color: inherit !important; text-decoration: none !important; background: transparent !important; opacity: 1 !important; padding: 0 !important; }
     .suggestion-note { display: none !important; }
     figure[data-sug-delete] { display: none !important; }
+
+    ${preset === 'gost' ? `
+    /* === Профиль ГОСТ 7.32 / 2.105 (НИР) === */
+    @page {
+      size: A4 portrait;
+      margin: 20mm 10mm 20mm 30mm;
+    }
+    html, body {
+      background: #ffffff !important;
+      color: #000000 !important;
+    }
+    body {
+      font-family: "Times New Roman", "Liberation Serif", serif !important;
+      font-size: 14pt !important;
+      line-height: 1.5 !important;
+      color: #000000 !important;
+      text-align: justify !important;
+      padding: 0 !important;
+      max-width: none !important;
+    }
+    p {
+      text-indent: 1.25cm !important;
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+      line-height: 1.5 !important;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      font-family: "Times New Roman", "Liberation Serif", serif !important;
+      color: #000000 !important;
+      font-weight: bold !important;
+      page-break-after: avoid !important;
+    }
+    h1 {
+      font-size: 16pt !important;
+      text-align: center !important;
+      margin-top: 24pt !important;
+      margin-bottom: 12pt !important;
+      text-indent: 0 !important;
+    }
+    h2, h3, h4, h5, h6 {
+      font-size: 14pt !important;
+      text-align: left !important;
+      text-indent: 1.25cm !important;
+      margin-top: 14pt !important;
+      margin-bottom: 6pt !important;
+    }
+    table {
+      margin: 14pt auto !important;
+      border-collapse: collapse !important;
+      width: 100% !important;
+      border: 1px solid #000000 !important;
+    }
+    th, td {
+      border: 1px solid #000000 !important;
+      padding: 6pt 10pt !important;
+      font-size: 12pt !important;
+      color: #000000 !important;
+      background: transparent !important;
+    }
+    th {
+      font-weight: bold !important;
+      text-align: center !important;
+      background: #f8f8f8 !important;
+    }
+    code, pre {
+      font-family: "Consolas", "Courier New", monospace !important;
+      font-size: 11pt !important;
+      background: #f5f5f5 !important;
+      color: #000000 !important;
+      border: 1px solid #cccccc !important;
+    }
+    ` : ''}
   </style>
 </head>
 <body>

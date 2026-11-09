@@ -157,9 +157,14 @@ contextBridge.exposeInMainWorld('api', {
     return ipcRenderer.invoke('dialog:openFolder')
   },
 
-  /** Открыть диалог выбора .md файла */
+  /** Открыть диалог выбора файла (md, txt, docx, pdf) */
   openFile: () => {
     return ipcRenderer.invoke('dialog:openFile')
+  },
+
+  /** Открыть диалог импорта файла (txt, docx, pdf) */
+  importFile: () => {
+    return ipcRenderer.invoke('dialog:importFile')
   },
 
   /** Сохранить как... (диалог + запись) */
@@ -172,14 +177,24 @@ contextBridge.exposeInMainWorld('api', {
     return ipcRenderer.invoke('dialog:confirmDelete', itemName)
   },
 
+  /** Экспорт в TXT */
+  exportTxt: (textContent: string, defaultName: string) => {
+    return ipcRenderer.invoke('export:txt', textContent, defaultName)
+  },
+
+  /** Экспорт в DOCX (Word) */
+  exportDocx: (markdownContent: string, defaultName: string, options?: any) => {
+    return ipcRenderer.invoke('export:docx', markdownContent, defaultName, options)
+  },
+
   /** Экспорт в HTML (откроет диалог сохранения) */
   exportHtml: (content: string, defaultName: string) => {
     return ipcRenderer.invoke('export:html', content, defaultName)
   },
 
   /** Экспорт в PDF (откроет диалог сохранения) */
-  exportPdf: (htmlContent: string, defaultName: string) => {
-    return ipcRenderer.invoke('export:pdf', htmlContent, defaultName)
+  exportPdf: (htmlContent: string, defaultName: string, options?: any) => {
+    return ipcRenderer.invoke('export:pdf', htmlContent, defaultName, options)
   },
 
   // ==========================================

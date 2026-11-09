@@ -4,7 +4,8 @@ import {
   parseMarkdown,
   serializeMarkdown,
   generateExportHtml,
-} from '../editor/markdownConfig.ts'
+} from '../editor/markdownConfig'
+import { stripMarkdown } from '../editor/stripMarkdown'
 import katex from 'katex'
 
 describe('Editor Markdown & KaTeX integration', () => {
@@ -68,5 +69,56 @@ describe('Editor Markdown & KaTeX integration', () => {
     assert.ok(html.includes('<style>'))
     assert.ok(html.includes('katex'))
     assert.ok(html.includes('Title'))
+  })
+
+  it('should generate HTML with GOST preset styling', () => {
+    const md = '# Отчет о НИР\n\nТекст отчета.'
+    const html = generateExportHtml(md, { preset: 'gost', title: 'Отчет' })
+
+    assert.ok(html.includes('Times New Roman'))
+    assert.ok(html.includes('1.25cm'))
+    assert.ok(html.includes('Отчет'))
+  })
+
+  it('should strip markdown formatting cleanly for TXT export', () => {
+    const md = `# Заголовок статьи
+
+Введение с **жирным** и *курсивным* текстом, а также [ссылкой](https://example.com) и \`кодом\`.
+
+![Схема архитектуры](https://example.com/img.png)
+
+> Важная цитата
+
+- [x] Задача выполнена
+- [ ] Задача в процессе
+* Обычный пункт
+
+| Колонка 1 | Колонка 2 |
+| --- | --- |
+| Значение 1 | Значение 2 |
+
+\`\`\`typescript
+const a = 1;
+\`\`\`
+`
+    const txt = stripMarkdown(md)
+
+    assert.ok(!txt.includes('# Заголовок'))
+    assert.ok(txt.includes('Заголовок статьи'))
+    assert.ok(!txt.includes('**жирным**'))
+    assert.ok(txt.includes('жирным'))
+    assert.ok(!txt.includes('*курсивным*'))
+    assert.ok(txt.includes('курсивным'))
+    assert.ok(txt.includes('ссылкой (https://example.com)'))
+    assert.ok(!txt.includes('`кодом`'))
+    assert.ok(txt.includes('кодом'))
+    assert.ok(txt.includes('[Схема архитектуры]'))
+    assert.ok(txt.includes('Важная цитата'))
+    assert.ok(txt.includes('[x] Задача выполнена'))
+    assert.ok(txt.includes('[ ] Задача в процессе'))
+    assert.ok(txt.includes('• Обычный пункт'))
+    assert.ok(txt.includes('Колонка 1\tКолонка 2'))
+    assert.ok(txt.includes('Значение 1\tЗначение 2'))
+    assert.ok(txt.includes('const a = 1;'))
   })
 })

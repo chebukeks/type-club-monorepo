@@ -2,7 +2,9 @@ export { EditorCore, injectEditorStyles } from "./EditorCore";
 
 export { schema } from "./editor/schema";
 export { parseMarkdown, serializeMarkdown, generateExportHtml } from "./editor/markdownConfig";
+export type { ExportHtmlOptions } from "./editor/markdownConfig";
 export { htmlToMarkdown, isMeaningfulHtml } from "./editor/htmlToMarkdown";
+export { stripMarkdown } from "./editor/stripMarkdown";
 export { getEditorStyles } from "./editor/editorTheme";
 export {
   getKeymapPlugins,

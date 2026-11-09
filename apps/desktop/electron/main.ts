@@ -8,6 +8,8 @@ import crypto from 'node:crypto'
 import { spawn } from 'node:child_process'
 import os from 'node:os'
 import Store from 'electron-store'
+import { importFileFromPath } from './importers'
+import { markdownToDocxBuffer, DocxExportOptions } from './docxExporter'
 
 // Используем встроенный оффлайн Hunspell вместо Windows Native Spellchecker.
 if (process.platform === 'win32') {
@@ -874,17 +876,64 @@ ipcMain.handle('dialog:openFolder', async (): Promise<string | null> => {
 })
 
 // --- Диалог: открыть файл ---
-ipcMain.handle('dialog:openFile', async (): Promise<{ filePath: string; content: string } | null> => {
+ipcMain.handle('dialog:openFile', async (): Promise<{ filePath: string; fileName: string; content: string; isImported: boolean } | null> => {
   const result = await dialog.showOpenDialog({
     properties: ['openFile'],
-    filters: [{ name: 'Markdown', extensions: ['md'] }],
-    title: 'Открыть Markdown-файл',
+    filters: [
+      { name: 'Все поддерживаемые файлы (*.md, *.txt, *.docx, *.pdf)', extensions: ['md', 'txt', 'docx', 'pdf'] },
+      { name: 'Markdown (*.md)', extensions: ['md'] },
+      { name: 'Текстовые файлы (*.txt)', extensions: ['txt'] },
+      { name: 'Документы Word (*.docx)', extensions: ['docx'] },
+      { name: 'Документы PDF (*.pdf)', extensions: ['pdf'] },
+      { name: 'Все файлы (*.*)', extensions: ['*'] },
+    ],
+    title: 'Открыть файл',
   })
   if (result.canceled || result.filePaths.length === 0) return null
   const filePath = result.filePaths[0]
   addAllowedRoot(filePath)
+  const ext = path.extname(filePath).toLowerCase()
+  if (ext === '.docx' || ext === '.pdf' || ext === '.txt') {
+    const imported = await importFileFromPath(filePath)
+    return {
+      filePath,
+      fileName: imported.fileName,
+      content: imported.content,
+      isImported: true,
+    }
+  }
   const content = fs.readFileSync(filePath, 'utf-8')
-  return { filePath, content }
+  return {
+    filePath,
+    fileName: path.basename(filePath),
+    content,
+    isImported: false,
+  }
+})
+
+// --- Диалог: импортировать файл (txt, docx, pdf) ---
+ipcMain.handle('dialog:importFile', async (): Promise<{ filePath: string; fileName: string; content: string; isImported: boolean } | null> => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openFile'],
+    filters: [
+      { name: 'Файлы для импорта (*.txt, *.docx, *.pdf)', extensions: ['txt', 'docx', 'pdf'] },
+      { name: 'Документы Word (*.docx)', extensions: ['docx'] },
+      { name: 'Документы PDF (*.pdf)', extensions: ['pdf'] },
+      { name: 'Текстовые файлы (*.txt)', extensions: ['txt'] },
+      { name: 'Все файлы (*.*)', extensions: ['*'] },
+    ],
+    title: 'Импортировать файл',
+  })
+  if (result.canceled || result.filePaths.length === 0) return null
+  const filePath = result.filePaths[0]
+  addAllowedRoot(filePath)
+  const imported = await importFileFromPath(filePath)
+  return {
+    filePath,
+    fileName: imported.fileName,
+    content: imported.content,
+    isImported: true,
+  }
 })
 
 // --- Диалог: сохранить как... ---
@@ -920,12 +969,49 @@ ipcMain.handle('dialog:confirmDelete', async (_event, itemName: string): Promise
   return result.response === 0
 })
 
+// --- Экспорт в TXT ---
+ipcMain.handle('export:txt', async (_event, textContent: string, defaultName: string): Promise<boolean> => {
+  const result = await dialog.showSaveDialog(win!, {
+    title: 'Экспорт в обычный текст (TXT)',
+    defaultPath: defaultName.replace(/\.(md|markdown)$/i, '.txt'),
+    filters: [{ name: 'Текстовый документ (*.txt)', extensions: ['txt'] }]
+  })
+  if (result.canceled || !result.filePath) return false
+
+  try {
+    fs.writeFileSync(result.filePath, textContent, 'utf-8')
+    return true
+  } catch (err) {
+    console.error('Ошибка экспорта TXT:', err)
+    return false
+  }
+})
+
+// --- Экспорт в DOCX (Word) ---
+ipcMain.handle('export:docx', async (_event, markdownContent: string, defaultName: string, options: DocxExportOptions = {}): Promise<boolean> => {
+  const result = await dialog.showSaveDialog(win!, {
+    title: 'Экспорт в Word (DOCX)',
+    defaultPath: defaultName.replace(/\.(md|markdown)$/i, '.docx'),
+    filters: [{ name: 'Документ Word (*.docx)', extensions: ['docx'] }]
+  })
+  if (result.canceled || !result.filePath) return false
+
+  try {
+    const buffer = await markdownToDocxBuffer(markdownContent, options)
+    fs.writeFileSync(result.filePath, buffer)
+    return true
+  } catch (err) {
+    console.error('Ошибка экспорта DOCX:', err)
+    return false
+  }
+})
+
 // --- Экспорт в HTML ---
 ipcMain.handle('export:html', async (_event, htmlContent: string, defaultName: string): Promise<boolean> => {
   const result = await dialog.showSaveDialog(win!, {
     title: 'Экспорт в HTML',
-    defaultPath: defaultName,
-    filters: [{ name: 'HTML Document', extensions: ['html'] }]
+    defaultPath: defaultName.replace(/\.(md|markdown)$/i, '.html'),
+    filters: [{ name: 'HTML Document (*.html)', extensions: ['html'] }]
   })
   
   if (result.canceled || !result.filePath) return false
@@ -940,11 +1026,11 @@ ipcMain.handle('export:html', async (_event, htmlContent: string, defaultName: s
 })
 
 // --- Экспорт в PDF ---
-ipcMain.handle('export:pdf', async (_event, htmlContent: string, defaultName: string): Promise<boolean> => {
+ipcMain.handle('export:pdf', async (_event, htmlContent: string, defaultName: string, options: { pageSize?: 'A4' | 'Letter'; landscape?: boolean; pageNumbers?: boolean } = {}): Promise<boolean> => {
   const result = await dialog.showSaveDialog(win!, {
     title: 'Экспорт в PDF',
-    defaultPath: defaultName,
-    filters: [{ name: 'PDF Document', extensions: ['pdf'] }]
+    defaultPath: defaultName.replace(/\.(md|markdown)$/i, '.pdf'),
+    filters: [{ name: 'PDF Document (*.pdf)', extensions: ['pdf'] }]
   })
   
   if (result.canceled || !result.filePath) return false
@@ -959,25 +1045,40 @@ ipcMain.handle('export:pdf', async (_event, htmlContent: string, defaultName: st
       }
     })
     // Создаем временный файл, чтобы Chromium мог корректно загрузить внешние ресурсы (CSS/Fonts)
-    // Data URI блокирует загрузку шрифтов из-за строгой политики безопасности (CORS/Opaque Origin)
     const tempHtmlPath = path.join(os.tmpdir(), `type_club_export_${Date.now()}.html`)
     fs.writeFileSync(tempHtmlPath, htmlContent, 'utf-8')
     
     // Загружаем сохраненный HTML файл с диска
     await printWin.loadURL(`file://${tempHtmlPath}`)
     
-    // ДОЖИДАЕМСЯ загрузки всех веб-шрифтов KaTeX (чтобы формулы не были "скукоженными")
+    // ДОЖИДАЕМСЯ загрузки всех веб-шрифтов KaTeX
     await printWin.webContents.executeJavaScript('document.fonts.ready')
     // Небольшая доп. пауза на всякий случай для применения CSS
     await new Promise(resolve => setTimeout(resolve, 500))
     
-    // Генерация PDF (Chromium может подождать небольшой таймаут для загрузки шрифтов)
-    const pdfBuffer = await printWin.webContents.printToPDF({
+    const printOpts: any = {
       printBackground: true,
-      pageSize: 'A4',
-      margins: { top: 0, bottom: 0, left: 0, right: 0 },
+      pageSize: options.pageSize || 'A4',
+      landscape: Boolean(options.landscape),
       generateDocumentOutline: true
-    })
+    }
+
+    if (options.pageNumbers) {
+      printOpts.displayHeaderFooter = true
+      printOpts.headerTemplate = '<div></div>'
+      printOpts.footerTemplate = '<div style="width: 100%; font-size: 10pt; text-align: center; color: #444; padding-bottom: 8mm;"><span class="pageNumber"></span></div>'
+      printOpts.margins = {
+        top: 0.4,
+        bottom: 0.8,
+        left: 0.4,
+        right: 0.4,
+      }
+    } else {
+      printOpts.margins = { top: 0, bottom: 0, left: 0, right: 0 }
+    }
+
+    // Генерация PDF
+    const pdfBuffer = await printWin.webContents.printToPDF(printOpts)
     
     // Сохраняем финальный PDF в выбранное пользователем место и чистим временный файл
     fs.writeFileSync(result.filePath, pdfBuffer)

@@ -221,6 +221,7 @@ export type AppAction =
   | { type: 'SET_ACTIVE_TAB'; payload: { tabId: string } }
   | { type: 'UPDATE_CONTENT'; payload: { tabId: string; content: string } }
   | { type: 'CREATE_DRAFT_TAB'; payload: { content: string; fileName?: string } }
+  | { type: 'OPEN_IMPORTED_DOCUMENT'; payload: { fileName: string; content: string } }
   | { type: 'SAVE_DRAFT_SUCCESS'; payload: { tabId: string; filePath: string; fileName: string } }
   | { type: 'SET_FILE_TREE'; payload: { folderPath: string; fileTree: FileEntry[] } }
   | { type: 'MARK_SAVED'; payload: { tabId: string } }
@@ -267,6 +268,24 @@ export type AppAction =
   | { type: 'SET_COLLAB_STATUS'; payload: { status: 'connected' | 'connecting' | 'disconnected' | 'idle' } };
 
 
+export interface DocxExportOptions {
+  preset?: 'standard' | 'gost';
+  title?: string;
+}
+
+export interface PdfExportParams {
+  pageSize?: 'A4' | 'Letter';
+  landscape?: boolean;
+  pageNumbers?: boolean;
+}
+
+export interface OpenFileResult {
+  filePath: string;
+  fileName: string;
+  content: string;
+  isImported?: boolean;
+}
+
 /** API, доступный из Renderer-процесса через contextBridge */
 export interface IElectronAPI {
   platform: string;
@@ -285,14 +304,17 @@ export interface IElectronAPI {
   saveLocalImage: (filePath: string, filename: string, base64: string) => Promise<string | null>;
   confirmDelete: (itemName: string) => Promise<boolean>;
   openFolder: () => Promise<string | null>;
-  openFile: () => Promise<{ filePath: string; content: string } | null>;
+  openFile: () => Promise<OpenFileResult | null>;
+  importFile: () => Promise<OpenFileResult | null>;
   saveFileAs: (content: string, defaultName: string) => Promise<{ filePath: string } | null>;
   minimizeWindow: () => void;
   maximizeWindow: () => void;
   closeWindow: () => void;
   openExternal: (url: string) => void;
+  exportTxt: (textContent: string, defaultName: string) => Promise<boolean>;
+  exportDocx: (markdownContent: string, defaultName: string, options?: DocxExportOptions) => Promise<boolean>;
   exportHtml: (content: string, defaultName: string) => Promise<boolean>;
-  exportPdf: (content: string, defaultName: string) => Promise<boolean>;
+  exportPdf: (content: string, defaultName: string, options?: PdfExportParams) => Promise<boolean>;
   /** Чтение всех настроек из electron-store за один вызов */
   storeGetAll: () => Promise<Record<string, unknown>>;
   /** Чтение настроек из electron-store */
