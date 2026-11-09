@@ -276,7 +276,7 @@ export function MenuBar() {
               className="absolute left-full top-0 ml-0.5 w-72 py-1 bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-50"
             >
               {recentFiles.length === 0 ? (
-                <div className="px-4 py-2 text-[12px] text-[var(--text-dim)] italic">{t('menu.file.empty')}</div>
+                <div className="text-[12px] text-[var(--text-dim)] italic" style={{ padding: "8px 14px" }}>{t('menu.file.empty')}</div>
               ) : (
                 <>
                   {recentFiles.map((fp) => (
@@ -313,7 +313,7 @@ export function MenuBar() {
               className="absolute left-full top-0 ml-0.5 w-72 py-1 bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-50"
             >
               {recentFolders.length === 0 ? (
-                <div className="px-4 py-2 text-[12px] text-[var(--text-dim)] italic">{t('menu.file.empty')}</div>
+                <div className="text-[12px] text-[var(--text-dim)] italic" style={{ padding: "8px 14px" }}>{t('menu.file.empty')}</div>
               ) : (
                 <>
                   {recentFolders.map((fp) => (
@@ -352,7 +352,7 @@ export function MenuBar() {
       <div className="relative">
         <button onClick={() => toggleMenu('edit')} className={menuBtnCls('edit')} style={{ padding: '2px 12px' }}>{t('menu.edit')}</button>
         <AnimatedMenu isOpen={openMenu === 'edit'} className="absolute top-full left-0 mt-1 w-48 py-1 bg-[var(--bg-elevated)] backdrop-blur-xl border border-[var(--border-strong)] rounded-xl shadow-2xl z-50">
-          <div className="px-4 py-3 text-[12px] text-[var(--text-dim)] text-center italic">{t('menu.edit.empty')}</div>
+          <div className="text-[12px] text-[var(--text-dim)] text-center italic" style={{ padding: "12px 16px" }}>{t('menu.edit.empty')}</div>
         </AnimatedMenu>
       </div>
 
