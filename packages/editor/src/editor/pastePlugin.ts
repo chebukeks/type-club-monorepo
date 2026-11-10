@@ -20,6 +20,7 @@ import type { EditorView } from 'prosemirror-view'
 import { parseMarkdown } from './markdownConfig'
 import { isVideoUrl } from './videoUtils'
 import { htmlToMarkdown, isMeaningfulHtml } from './htmlToMarkdown'
+import { PASTE_IMAGE_FILES_EVENT } from './imageInsert'
 
 export const pastePluginKey = new PluginKey('smartPaste')
 
@@ -51,6 +52,38 @@ function isImageUrl(url: string): boolean {
     const parsed = new URL(url)
     const pathname = parsed.pathname.toLowerCase()
     return /\.(png|jpe?g|gif|webp|svg|avif|bmp|ico)$/i.test(pathname)
+  } catch {
+    return false
+  }
+}
+
+/** Картинки-файлы из буфера обмена (копирование файла в проводнике, «Копировать изображение» и т.п.) */
+function getClipboardImageFiles(event: ClipboardEvent): File[] {
+  const cd = event.clipboardData
+  if (!cd) return []
+  const files = Array.from(cd.files ?? []).filter((f) => f.type.startsWith('image/'))
+  if (files.length > 0) return files
+  const result: File[] = []
+  for (const item of Array.from(cd.items ?? [])) {
+    if (item.kind === 'file' && item.type.startsWith('image/')) {
+      const f = item.getAsFile()
+      if (f) result.push(f)
+    }
+  }
+  return result
+}
+
+/** HTML состоит только из <img> с нерезолвимым src (например, Discord кладёт src="image.png") */
+function hasOnlyUnresolvableImages(html: string): boolean {
+  if (!html) return false
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    const imgs = Array.from(doc.querySelectorAll('img'))
+    if (imgs.length === 0) return false
+    return imgs.every((img) => {
+      const src = (img.getAttribute('src') || '').trim()
+      return !/^(https?:|data:|blob:|\/)/i.test(src)
+    })
   } catch {
     return false
   }
@@ -192,6 +225,24 @@ export function pastePlugin(): Plugin {
         const plainText = event.clipboardData?.getData('text/plain') ?? ''
         const trimmedText = plainText.trim()
         const htmlText = event.clipboardData?.getData('text/html') ?? ''
+
+        // ─────────────────────────────────────────────────────────────
+        // -1. Картинка-файл в буфере (без осмысленного текста): отдаём приложению.
+        //     Приложение само загрузит файл на сервер (онлайн-статья) или встроит base64.
+        // ─────────────────────────────────────────────────────────────
+        const imageFiles = getClipboardImageFiles(event)
+        if (imageFiles.length > 0 && (!trimmedText || !htmlText || !isMeaningfulHtml(htmlText))) {
+          event.preventDefault()
+          window.dispatchEvent(
+            new CustomEvent(PASTE_IMAGE_FILES_EVENT, { detail: { files: imageFiles } }),
+          )
+          return true
+        }
+
+        // Битая картинка без файла (src="image.png"): не вставляем «сломанную» ноду
+        if (!trimmedText && hasOnlyUnresolvableImages(htmlText)) {
+          return true
+        }
 
         if (!trimmedText) {
           if (isBlockSlice(slice)) {

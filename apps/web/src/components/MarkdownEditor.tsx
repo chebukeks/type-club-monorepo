@@ -14,8 +14,8 @@ import {
 } from "prosemirror-tables";
 import type { EditorView } from "prosemirror-view";
 
-import { EditorCore, schema, tableEditPluginKey, universalExitCommand } from "@type-club/editor";
-import type { EditorMode, CollaborationConfig, TocItem, SuggestionItem } from "@type-club/editor";
+import { EditorCore, schema, tableEditPluginKey, universalExitCommand, insertImageNode, PASTE_IMAGE_FILES_EVENT } from "@type-club/editor";
+import type { EditorMode, CollaborationConfig, TocItem, SuggestionItem, PasteImageFilesDetail } from "@type-club/editor";
 import { useLanguage } from "../context/LanguageContext";
 import AddNoteModal from "./AddNoteModal";
 import MobileToolbar from "./MobileToolbar";
@@ -391,139 +391,56 @@ export function MarkdownEditor({
     if (!view) return;
 
     if (typeof fileOrUrl === "string") {
-      const src = fileOrUrl;
-      const { state, dispatch } = view;
-      const imageType = state.schema.nodes.image;
-      if (!imageType) return;
-
-      const { $head } = state.selection;
-      let blockDepth = -1;
-      for (let d = $head.depth; d >= 1; d--) {
-        const name = $head.node(d).type.name;
-        if (name === "paragraph" || name === "heading" || name === "code_block" || name === "math_block") {
-          blockDepth = d;
-          break;
-        }
-      }
-
-      const imageNode = imageType.create({ src, alt: "image" });
-      let targetPos = state.selection.from;
-      const tr = state.tr;
-
-      if (blockDepth !== -1) {
-        const isEmpty = $head.node(blockDepth).textContent.trim() === "";
-        const blockStart = $head.before(blockDepth);
-        const blockEnd = $head.after(blockDepth);
-        if (isEmpty) {
-          tr.replaceWith(blockStart, blockEnd, imageNode);
-          targetPos = blockStart;
-        } else {
-          tr.insert(blockEnd, imageNode);
-          targetPos = blockEnd;
-        }
-        const newPos = targetPos + imageNode.nodeSize;
-        const p = state.schema.nodes.paragraph.createAndFill()!;
-        tr.insert(newPos, p);
-        tr.setSelection(TextSelection.near(tr.doc.resolve(newPos + 1)));
-      } else {
-        tr.insert(targetPos, imageNode);
-        const newPos = targetPos + imageNode.nodeSize;
-        const p = state.schema.nodes.paragraph.createAndFill()!;
-        tr.insert(newPos, p);
-        tr.setSelection(TextSelection.near(tr.doc.resolve(newPos + 1)));
-      }
-
-      dispatch(tr.scrollIntoView());
-      view.focus();
+      insertImageNode(view, fileOrUrl, "image");
       return;
     }
 
     const file = fileOrUrl;
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const dataUri = reader.result as string;
-      const { state, dispatch } = view;
-      const imageType = state.schema.nodes.image;
-      if (!imageType) return;
 
-      const { $head } = state.selection;
-      let blockDepth = -1;
-      for (let d = $head.depth; d >= 1; d--) {
-        const name = $head.node(d).type.name;
-        if (name === "paragraph" || name === "heading" || name === "code_block" || name === "math_block") {
-          blockDepth = d;
-          break;
-        }
+    // Онлайн-статья: сначала загружаем файл на сервер и вставляем только URL.
+    // base64 в Yjs-документе превышает лимит сообщения коллаб-сервера (1 МБ),
+    // сокет рвётся, а изображение не синхронизируется.
+    if (articleId && userId) {
+      try {
+        const { articlesApi } = await import("../api");
+        const response = await articlesApi.uploadImage(articleId, file);
+        const fullUrl = response.url.startsWith("/")
+          ? `${window.location.origin.replace(/\/$/, "")}${response.url}`
+          : response.url;
+        const currentView = viewRef.current;
+        if (currentView) insertImageNode(currentView, fullUrl, file.name || "image");
+      } catch (err) {
+        console.error("Image upload failed", err);
+        alert(t("image.contextMenu.uploadFailed") || "Upload failed");
       }
+      return;
+    }
 
-      const tempAlt = file.name || `photo-${Date.now()}`;
-      const imageNode = imageType.create({ src: dataUri, alt: tempAlt });
-
-      let targetPos = state.selection.from;
-      const tr = state.tr;
-
-      if (blockDepth !== -1) {
-        const isEmpty = $head.node(blockDepth).textContent.trim() === "";
-        const blockStart = $head.before(blockDepth);
-        const blockEnd = $head.after(blockDepth);
-        if (isEmpty) {
-          tr.replaceWith(blockStart, blockEnd, imageNode);
-          targetPos = blockStart;
-        } else {
-          tr.insert(blockEnd, imageNode);
-          targetPos = blockEnd;
-        }
-        const newPos = targetPos + imageNode.nodeSize;
-        const p = state.schema.nodes.paragraph.createAndFill()!;
-        tr.insert(newPos, p);
-        tr.setSelection(TextSelection.near(tr.doc.resolve(newPos + 1)));
-      } else {
-        tr.insert(targetPos, imageNode);
-        const newPos = targetPos + imageNode.nodeSize;
-        const p = state.schema.nodes.paragraph.createAndFill()!;
-        tr.insert(newPos, p);
-        tr.setSelection(TextSelection.near(tr.doc.resolve(newPos + 1)));
-      }
-
-      dispatch(tr.scrollIntoView());
-      view.focus();
-
-      // If online article, upload in background to save space and replace base64 with server URL
-      if (articleId && userId) {
-        try {
-          const { articlesApi } = await import("../api");
-          const response = await articlesApi.uploadImage(articleId, file);
-          if (response?.url && viewRef.current) {
-            const currentView = viewRef.current;
-            let foundPos: number | null = null;
-            currentView.state.doc.descendants((node, pos) => {
-              if (node.type.name === "image" && (node.attrs.src === dataUri || node.attrs.alt === tempAlt)) {
-                foundPos = pos;
-                return false;
-              }
-            });
-            if (foundPos !== null) {
-              const node = currentView.state.doc.nodeAt(foundPos);
-              if (node) {
-                const fullUrl = response.url.startsWith('/')
-                  ? `${window.location.origin.replace(/\/$/, '')}${response.url}`
-                  : response.url;
-                currentView.dispatch(
-                  currentView.state.tr.setNodeMarkup(foundPos, undefined, {
-                    ...node.attrs,
-                    src: fullUrl,
-                  })
-                );
-              }
-            }
-          }
-        } catch (err) {
-          console.warn("Background image upload failed, keeping base64 dataUri", err);
-        }
-      }
-    };
-    reader.readAsDataURL(file);
+    // Локальный документ без коллаборации: встраиваем как data: URI
+    const dataUri = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+    const currentView = viewRef.current;
+    if (currentView) insertImageNode(currentView, dataUri, file.name || `photo-${Date.now()}`);
   };
+
+  const handleInsertImageFileRef = useRef(handleInsertImageFile);
+  handleInsertImageFileRef.current = handleInsertImageFile;
+
+  // Картинки-файлы из буфера обмена (Ctrl+V): событие диспатчит pastePlugin
+  useEffect(() => {
+    const onPasteImageFiles = (e: Event) => {
+      const files = (e as CustomEvent<PasteImageFilesDetail>).detail?.files ?? [];
+      void (async () => {
+        for (const file of files) await handleInsertImageFileRef.current(file);
+      })();
+    };
+    window.addEventListener(PASTE_IMAGE_FILES_EVENT, onPasteImageFiles);
+    return () => window.removeEventListener(PASTE_IMAGE_FILES_EVENT, onPasteImageFiles);
+  }, []);
 
   const ctxMenuStyle = useMemo((): React.CSSProperties | null => {
     if (!ctxMenu) return null;

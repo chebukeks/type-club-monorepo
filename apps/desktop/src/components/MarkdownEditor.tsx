@@ -8,7 +8,7 @@ import { toggleMark } from 'prosemirror-commands'
 import { Plugin, TextSelection, NodeSelection, Selection } from 'prosemirror-state'
 import { deleteTable } from 'prosemirror-tables'
 import type { EditorView } from 'prosemirror-view'
-import { EditorCore, injectEditorStyles, schema, tableEditPluginKey, spellcheckService, serializeMarkdown } from '@type-club/editor'
+import { EditorCore, injectEditorStyles, schema, tableEditPluginKey, spellcheckService, serializeMarkdown, insertImageNode, PASTE_IMAGE_FILES_EVENT } from '@type-club/editor'
 import { ChangeImageSourceModal } from './ChangeImageSourceModal'
 import { useEditor } from '../context/EditorContext'
 import { useAuth } from '../context/AuthContext'
@@ -20,7 +20,7 @@ import { SearchBar, RawSearchBar, searchPlugin } from './SearchBar'
 import { AddNoteModal } from './AddNoteModal'
 import TableOfContents from './TableOfContents'
 import { StatsToast } from './StatsToast'
-import type { SuggestionItem } from '@type-club/editor'
+import type { SuggestionItem, PasteImageFilesDetail } from '@type-club/editor'
 
 import { Monitor, Type, FileText } from 'lucide-react'
 
@@ -373,6 +373,52 @@ export function MarkdownEditor() {
       alert(t('image.contextMenu.uploadFailed') || 'Failed to upload image')
     }
   }
+
+  const handleInsertImageFile = async (file: File) => {
+    if (!editorView) return
+    const aid = articleId || activeTab?.articleId
+
+    // Онлайн-статья: сначала загружаем на сервер и вставляем только URL.
+    // base64 в Yjs-документе превышает лимит сообщения коллаб-сервера (1 МБ),
+    // сокет рвётся, а изображение не синхронизируется.
+    if (aid && user) {
+      try {
+        const response = await articlesApi.uploadImage(aid, file)
+        const fullUrl = response.url.startsWith('/')
+          ? `${(config.siteUrl || 'https://type-club.ru').replace(/\/$/, '')}${response.url}`
+          : response.url
+        insertImageNode(editorView, fullUrl, file.name || 'image')
+      } catch (e) {
+        console.error('Failed to upload pasted image', e)
+        alert(t('image.contextMenu.uploadFailed') || 'Failed to upload image')
+      }
+      return
+    }
+
+    // Локальный файл без коллаборации: встраиваем как data: URI
+    const dataUri = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = () => reject(reader.error)
+      reader.readAsDataURL(file)
+    })
+    insertImageNode(editorView, dataUri, file.name || `photo-${Date.now()}`)
+  }
+
+  const handleInsertImageFileRef = useRef(handleInsertImageFile)
+  handleInsertImageFileRef.current = handleInsertImageFile
+
+  // Картинки-файлы из буфера обмена (Ctrl+V): событие диспатчит pastePlugin
+  useEffect(() => {
+    const onPasteImageFiles = (e: Event) => {
+      const files = (e as CustomEvent<PasteImageFilesDetail>).detail?.files ?? []
+      void (async () => {
+        for (const file of files) await handleInsertImageFileRef.current(file)
+      })()
+    }
+    window.addEventListener(PASTE_IMAGE_FILES_EVENT, onPasteImageFiles)
+    return () => window.removeEventListener(PASTE_IMAGE_FILES_EVENT, onPasteImageFiles)
+  }, [])
 
   const handleChangeImageSource = (newSrc: string) => {
     if (!changeImageSrcTarget || !editorView) return
