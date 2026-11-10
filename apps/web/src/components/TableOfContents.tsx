@@ -23,6 +23,17 @@ export default function TableOfContents({
   const [activePos, setActivePos] = useState<number | null>(null);
   const [mounted, setMounted] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [toolbarPopupOpen, setToolbarPopupOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isEditor) return;
+    const handlePopup = (e: Event) => {
+      const custom = e as CustomEvent<{ open: boolean }>;
+      setToolbarPopupOpen(custom.detail?.open ?? false);
+    };
+    window.addEventListener("mobile-toolbar-popup", handlePopup);
+    return () => window.removeEventListener("mobile-toolbar-popup", handlePopup);
+  }, [isEditor]);
 
   useEffect(() => {
     if (!isEditor) return;
@@ -186,8 +197,8 @@ export default function TableOfContents({
       {/* Floating Action Button */}
       <div
         className={`fixed z-40 transition-all duration-200 ${
-          isEditor ? "bottom-20 sm:bottom-6 right-4 sm:right-6" : "bottom-6 right-6"
-        } ${keyboardOpen ? "opacity-0 pointer-events-none translate-y-2" : "opacity-100"} ${className}`}
+          isEditor ? "bottom-24 sm:bottom-6 right-4 sm:right-6" : "bottom-6 right-6"
+        } ${keyboardOpen || toolbarPopupOpen ? "opacity-0 pointer-events-none translate-y-2" : "opacity-100"} ${className}`}
       >
         <button
           onClick={() => setOpen(!open)}

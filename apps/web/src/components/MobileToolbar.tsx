@@ -89,7 +89,7 @@ export default function MobileToolbar({
   onInsertMathBlock,
   onInsertImageFile,
 }: MobileToolbarProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [bottomOffset, setBottomOffset] = useState(0);
   const [activePopup, setActivePopup] = useState<ActivePopup>(null);
   const [insertSubmenu, setInsertSubmenu] = useState<"image" | null>(null);
@@ -97,6 +97,14 @@ export default function MobileToolbar({
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("mobile-toolbar-popup", {
+        detail: { open: activePopup !== null },
+      })
+    );
+  }, [activePopup]);
 
   // Sync toolbar position with virtual keyboard via visualViewport
   useEffect(() => {
@@ -336,7 +344,7 @@ export default function MobileToolbar({
       {/* Upward Flyout Menus */}
       {!inMath && activePopup && (
         <div
-          className="md:hidden fixed left-2 right-2 z-40 flex justify-center pointer-events-none transition-all duration-75"
+          className="md:hidden fixed left-2 right-2 z-50 flex justify-center pointer-events-none transition-all duration-75"
           style={{ bottom: `${bottomOffset + 48}px` }}
         >
           <div
@@ -522,45 +530,51 @@ export default function MobileToolbar({
                     <button
                       type="button"
                       onClick={() => setInsertSubmenu(null)}
-                      className={`${popupBtnBase} px-2`}
+                      className={`${popupBtnBase} px-2 shrink-0`}
                       title={t("common.back")}
                       aria-label={t("common.back")}
                     >
-                      <ChevronLeft size={18} />
+                      <ChevronLeft size={16} />
                     </button>
                     <button
                       type="button"
                       onClick={() => {
                         cameraInputRef.current?.click();
                       }}
-                      className={`${popupBtnBase} flex items-center gap-1.5 px-3 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-medium`}
+                      className={`${popupBtnBase} flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-medium shrink-0`}
                       title={t("toolbar.takePhoto")}
                       aria-label={t("toolbar.takePhoto")}
                     >
-                      <Camera size={17} />
-                      <span className="text-xs font-semibold">{t("toolbar.takePhoto")}</span>
+                      <Camera size={16} />
+                      <span className="text-[11px] font-semibold whitespace-nowrap">
+                        {language === "ru" ? "Камера" : "Camera"}
+                      </span>
                     </button>
                     <button
                       type="button"
                       onClick={() => {
                         galleryInputRef.current?.click();
                       }}
-                      className={`${popupBtnBase} flex items-center gap-1.5 px-3`}
+                      className={`${popupBtnBase} flex items-center gap-1 px-2.5 py-1.5 shrink-0`}
                       title={t("toolbar.choosePhoto")}
                       aria-label={t("toolbar.choosePhoto")}
                     >
-                      <ImageIcon size={17} />
-                      <span className="text-xs font-medium">{t("toolbar.choosePhoto")}</span>
+                      <ImageIcon size={16} />
+                      <span className="text-[11px] font-medium whitespace-nowrap">
+                        {language === "ru" ? "Галерея" : "Gallery"}
+                      </span>
                     </button>
                     <button
                       type="button"
                       onClick={handlePasteImageFromClipboard}
-                      className={`${popupBtnBase} flex items-center gap-1.5 px-3`}
+                      className={`${popupBtnBase} flex items-center gap-1 px-2.5 py-1.5 shrink-0`}
                       title={t("toolbar.fromClipboard")}
                       aria-label={t("toolbar.fromClipboard")}
                     >
-                      <Clipboard size={17} />
-                      <span className="text-xs font-medium">{t("toolbar.fromClipboard")}</span>
+                      <Clipboard size={16} />
+                      <span className="text-[11px] font-medium whitespace-nowrap">
+                        {language === "ru" ? "Буфер" : "Clipboard"}
+                      </span>
                     </button>
                   </>
                 ) : (
@@ -575,12 +589,14 @@ export default function MobileToolbar({
                           onInsertTable();
                         }
                       }}
-                      className={`${popupBtnBase} flex items-center gap-1.5 px-3`}
+                      className={`${popupBtnBase} flex items-center gap-1 px-2.5 py-1.5 shrink-0`}
                       title={t("toolbar.table")}
                       aria-label={t("toolbar.table")}
                     >
-                      <TableIcon size={17} />
-                      <span className="text-xs font-medium">{t("toolbar.table")}</span>
+                      <TableIcon size={16} />
+                      <span className="text-[11px] font-medium whitespace-nowrap">
+                        {language === "ru" ? "Таблица" : "Table"}
+                      </span>
                     </button>
                     <button
                       type="button"
@@ -588,12 +604,14 @@ export default function MobileToolbar({
                         setActivePopup(null);
                         onInsertCodeBlock();
                       }}
-                      className={`${popupBtnBase} flex items-center gap-1.5 px-3`}
+                      className={`${popupBtnBase} flex items-center gap-1 px-2.5 py-1.5 shrink-0`}
                       title={t("toolbar.codeBlock")}
                       aria-label={t("toolbar.codeBlock")}
                     >
-                      <FileCode size={17} />
-                      <span className="text-xs font-medium">{t("toolbar.codeBlock")}</span>
+                      <FileCode size={16} />
+                      <span className="text-[11px] font-medium whitespace-nowrap">
+                        {language === "ru" ? "Код" : "Code"}
+                      </span>
                     </button>
                     <button
                       type="button"
@@ -601,22 +619,26 @@ export default function MobileToolbar({
                         setActivePopup(null);
                         onInsertMathBlock();
                       }}
-                      className={`${popupBtnBase} flex items-center gap-1.5 px-3`}
+                      className={`${popupBtnBase} flex items-center gap-1 px-2.5 py-1.5 shrink-0`}
                       title={t("toolbar.math")}
                       aria-label={t("toolbar.math")}
                     >
-                      <Sigma size={17} />
-                      <span className="text-xs font-medium">{t("toolbar.math")}</span>
+                      <Sigma size={16} />
+                      <span className="text-[11px] font-medium whitespace-nowrap">
+                        {language === "ru" ? "Формула" : "Formula"}
+                      </span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setInsertSubmenu("image")}
-                      className={`${popupBtnBase} flex items-center gap-1.5 px-3`}
+                      className={`${popupBtnBase} flex items-center gap-1 px-2.5 py-1.5 shrink-0`}
                       title={t("toolbar.image")}
                       aria-label={t("toolbar.image")}
                     >
-                      <ImageIcon size={17} />
-                      <span className="text-xs font-medium">{t("toolbar.image")}</span>
+                      <ImageIcon size={16} />
+                      <span className="text-[11px] font-medium whitespace-nowrap">
+                        {language === "ru" ? "Фото" : "Image"}
+                      </span>
                     </button>
                   </>
                 )}

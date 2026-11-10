@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Globe, RefreshCw, Menu, X, Cloud, Lightbulb, ChevronLeft } from "lucide-react";
 import { EditorMode } from "./MarkdownEditor";
@@ -42,6 +42,14 @@ export default function EditorHeader({
   const { t } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
   const [showRawWarning, setShowRawWarning] = useState(false);
+
+  useEffect(() => {
+    const handleTyping = () => {
+      setMenuOpen(false);
+    };
+    window.addEventListener('editor-typing', handleTyping);
+    return () => window.removeEventListener('editor-typing', handleTyping);
+  }, []);
 
   const isAuthor = userRole === "author" || isNew || !userRole;
   const isSuggestionActive = userRole === "editor" || (suggestionModeActive ?? false);
@@ -138,56 +146,96 @@ export default function EditorHeader({
   );
 
   return (
-    <header className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 shrink-0">
-      {/* Main row */}
-      <div className="flex items-center px-3 sm:px-4 gap-2 sm:gap-3 h-12 sm:h-14">
-        <div className="flex items-center gap-1.5 shrink-0">
+    <>
+      {/* Mobile: floating toggle button when header is collapsed */}
+      <button
+        type="button"
+        className={`sm:hidden fixed top-2 right-3 z-30 p-1.5 rounded-lg bg-white/90 dark:bg-gray-900/90 backdrop-blur-md shadow-md border border-gray-200/80 dark:border-gray-800/80 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-90 transition-all duration-250 ease-out flex items-center justify-center cursor-pointer ${
+          menuOpen
+            ? "opacity-0 scale-75 rotate-90 pointer-events-none"
+            : "opacity-100 scale-100 rotate-0 pointer-events-auto"
+        }`}
+        onClick={() => setMenuOpen(true)}
+        aria-label="Open menu"
+      >
+        <Menu size={20} />
+      </button>
+
+      {/* Mobile: backdrop overlay when header is expanded */}
+      <div
+        className={`sm:hidden fixed inset-0 z-40 bg-black/25 dark:bg-black/50 backdrop-blur-[2px] transition-opacity duration-250 ease-out ${
+          menuOpen
+            ? "opacity-100 pointer-events-auto"
+            : "opacity-0 pointer-events-none"
+        }`}
+        onClick={() => setMenuOpen(false)}
+      />
+
+      <header
+        className={`bg-white/95 dark:bg-gray-950/95 backdrop-blur-xl border-b border-gray-200/90 dark:border-gray-800/90
+          fixed top-0 inset-x-0 z-50 rounded-b-2xl shadow-2xl
+          transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]
+          sm:relative sm:top-auto sm:inset-x-auto sm:z-auto sm:shrink-0 sm:rounded-none sm:shadow-none sm:translate-y-0 sm:opacity-100 sm:pointer-events-auto sm:transition-none sm:bg-white dark:sm:bg-gray-950
+          ${
+            menuOpen
+              ? "translate-y-0 opacity-100 pointer-events-auto"
+              : "-translate-y-full opacity-0 pointer-events-none sm:translate-y-0 sm:opacity-100 sm:pointer-events-auto"
+          }`}
+      >
+        {/* Main row */}
+        <div className="flex items-center px-3 sm:px-4 gap-2 sm:gap-3 h-12 sm:h-14">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={() => {
+                if (articleId && authorNickname && slug) {
+                  navigate(`/${authorNickname}/${slug}`);
+                } else {
+                  navigate(-1);
+                }
+              }}
+              className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+              title={t('common.back')}
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <Link to="/" className="shrink-0 hover:opacity-80 flex items-center" title="Type Club">
+              <img src="/icons/icon_48x48.png" alt="Type Club" className="h-7 w-7 sm:h-8 sm:w-8" />
+            </Link>
+          </div>
+
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder={t('common.untitled')}
+            className="flex-1 bg-transparent text-sm sm:text-lg font-semibold outline-none placeholder-gray-300 dark:placeholder-gray-600 min-w-0"
+          />
+
+          {/* Desktop: buttons inline */}
+          <div className="hidden sm:flex items-center gap-2 sm:gap-3">
+            <SuggestionBadge />
+            <ModeSwitcher />
+            <ActionButtons />
+          </div>
+
+          {/* Mobile: close button when expanded */}
           <button
-            onClick={() => {
-              if (articleId && authorNickname && slug) {
-                navigate(`/${authorNickname}/${slug}`);
-              } else {
-                navigate(-1);
-              }
-            }}
-            className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
-            title={t('common.back')}
+            type="button"
+            className="sm:hidden p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 active:scale-90 transition-all duration-150 shrink-0 cursor-pointer"
+            onClick={() => setMenuOpen(false)}
+            aria-label="Close menu"
           >
-            <ChevronLeft size={20} />
+            <X
+              size={20}
+              className={`transition-transform duration-300 ease-out ${
+                menuOpen ? "rotate-0 scale-100" : "-rotate-90 scale-75"
+              }`}
+            />
           </button>
-          <Link to="/" className="shrink-0 hover:opacity-80 flex items-center" title="Type Club">
-            <img src="/icons/icon_48x48.png" alt="Type Club" className="h-7 w-7 sm:h-8 sm:w-8" />
-          </Link>
         </div>
 
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder={t('common.untitled')}
-          className="flex-1 bg-transparent text-sm sm:text-lg font-semibold outline-none placeholder-gray-300 dark:placeholder-gray-600 min-w-0"
-        />
-
-        {/* Desktop: buttons inline */}
-        <div className="hidden sm:flex items-center gap-2 sm:gap-3">
-          <SuggestionBadge />
-          <ModeSwitcher />
-          <ActionButtons />
-        </div>
-
-        {/* Mobile: menu toggle */}
-        <button
-          className="sm:hidden p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors shrink-0"
-          onClick={() => setMenuOpen(!menuOpen)}
-          aria-label="Menu"
-        >
-          {menuOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
-      </div>
-
-      {/* Mobile: expandable menu */}
-      {menuOpen && (
-        <div className="sm:hidden border-t border-gray-200 dark:border-gray-800 px-3 py-2 space-y-1.5 bg-white dark:bg-gray-950 shadow-md animate-in slide-in-from-top-1 fade-in duration-150 ease-out">
+        {/* Mobile: expandable menu - seamless without horizontal dividing border */}
+        <div className="sm:hidden px-3 pb-2.5 pt-0.5 space-y-1.5">
           {/* Mode Switcher - full width segmented control */}
           {!isSuggestionActive && (
             <div>
@@ -273,7 +321,6 @@ export default function EditorHeader({
             )}
           </div>
         </div>
-      )}
 
       {showRawWarning && (
         <RawModeWarningModal
@@ -285,5 +332,6 @@ export default function EditorHeader({
         />
       )}
     </header>
+    </>
   );
 }

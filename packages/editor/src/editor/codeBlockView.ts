@@ -1,6 +1,5 @@
 import { Node as PMNode } from 'prosemirror-model'
 import { EditorView, NodeView } from 'prosemirror-view'
-import { TextSelection } from 'prosemirror-state'
 import { suggestionPluginKey } from './suggestionPlugin'
 
 import { ImageLightbox } from './ImageLightbox'
@@ -251,21 +250,9 @@ export class CodeBlockView implements NodeView {
       this.mermaidContainer.contentEditable = 'false'
 
       this.mermaidContainer.addEventListener('click', () => {
-        if (!this.isPreview()) {
-          this.switchTab('code')
-          const pos = this.getPos()
-          if (pos !== undefined) {
-            const tr = this.view.state.tr.setSelection(
-              TextSelection.near(this.view.state.doc.resolve(pos + 1))
-            )
-            this.view.dispatch(tr)
-            this.view.focus()
-          }
-        } else {
-          const svgEl = this.mermaidContainer?.querySelector('svg')
-          if (svgEl) {
-            ImageLightbox.open({ svgContent: svgEl.outerHTML, alt: 'Mermaid Diagram' })
-          }
+        const svgEl = this.mermaidContainer?.querySelector('svg')
+        if (svgEl) {
+          ImageLightbox.open({ svgContent: svgEl.outerHTML, alt: 'Mermaid Diagram' })
         }
       })
 
@@ -311,7 +298,7 @@ export class CodeBlockView implements NodeView {
       this.mermaidContainer.style.display = 'flex'
       this.mermaidContainer.style.cursor = 'zoom-in'
     } else {
-      if (this.mermaidContainer) this.mermaidContainer.style.cursor = 'pointer'
+      if (this.mermaidContainer) this.mermaidContainer.style.cursor = 'zoom-in'
       this.updateViewMode()
     }
 

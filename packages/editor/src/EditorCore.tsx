@@ -38,6 +38,7 @@ import { createSuggestionPlugin } from "./editor/suggestionPlugin";
 import { createSuggestionActionPlugin } from "./editor/suggestionActionPlugin";
 import { SuggestionNoteView } from "./editor/suggestionNoteView";
 import { spellcheckPlugin } from "./editor/spellcheckPlugin";
+import { createMobileTypewriterPlugin } from "./editor/mobileTypewriterPlugin";
 
 import type { EditorProps } from "./types";
 
@@ -295,6 +296,7 @@ export function EditorCore({
           tableEditPlugin(),
           focusModePlugin(() => focusModeRef.current || 'none'),
           tocPlugin((toc, sug) => onTocUpdateRef.current?.(toc, sug)),
+          createMobileTypewriterPlugin(),
           ...collabPlugins,
           ...(extraPlugins || []),
         ];

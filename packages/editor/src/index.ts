@@ -36,6 +36,7 @@ export { focusModePlugin } from "./editor/focusModePlugin";
 export { syntaxHighlightPlugin } from "./editor/syntaxHighlightPlugin";
 export { tocPlugin } from "./editor/tocPlugin";
 export { typographyPlugin } from "./editor/typographyPlugin";
+export { createMobileTypewriterPlugin, mobileTypewriterPluginKey } from "./editor/mobileTypewriterPlugin";
 
 export { CodeBlockView } from "./editor/codeBlockView";
 export { HeadingView, headingToSlug } from "./editor/headingView";

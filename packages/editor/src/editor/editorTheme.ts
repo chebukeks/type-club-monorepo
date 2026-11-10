@@ -1263,10 +1263,10 @@ html[data-lang="ru"] figure[data-sug-delete]::after {
 /* ==========================================
    Мобильная адаптивность редактора
    ========================================== */
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .ProseMirror {
     padding: 16px 14px;
-    padding-bottom: 35vh;
+    padding-bottom: 50vh !important;
     box-shadow: none;
   }
   .image-action-btn {
