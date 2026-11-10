@@ -388,9 +388,10 @@ export function MarkdownEditor() {
           ? `${(config.siteUrl || 'https://type-club.ru').replace(/\/$/, '')}${response.url}`
           : response.url
         insertImageNode(editorView, fullUrl, file.name || 'image')
-      } catch (e) {
+      } catch (e: unknown) {
         console.error('Failed to upload pasted image', e)
-        alert(t('image.contextMenu.uploadFailed') || 'Failed to upload image')
+        const detail = (e as any)?.detail || (e as any)?.message
+        alert(`${t('image.contextMenu.uploadFailed') || 'Failed to upload image'}${detail ? `: ${detail}` : ''}`)
       }
       return
     }

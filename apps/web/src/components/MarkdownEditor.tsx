@@ -409,9 +409,10 @@ export function MarkdownEditor({
           : response.url;
         const currentView = viewRef.current;
         if (currentView) insertImageNode(currentView, fullUrl, file.name || "image");
-      } catch (err) {
+      } catch (err: unknown) {
         console.error("Image upload failed", err);
-        alert(t("image.contextMenu.uploadFailed") || "Upload failed");
+        const detail = (err as any)?.detail || (err as any)?.message;
+        alert(`${t("image.contextMenu.uploadFailed") || "Upload failed"}${detail ? `: ${detail}` : ""}`);
       }
       return;
     }

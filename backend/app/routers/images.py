@@ -173,10 +173,16 @@ async def save_image_record(
     secure_filename = str(uuid.uuid4()) + ext
     rel_path = f"articles/{article_id}/{secure_filename}"
     target_path = Path(settings.uploads_dir) / "articles" / str(article_id) / secure_filename
-    target_path.parent.mkdir(parents=True, exist_ok=True)
-    target_path.write_bytes(content)
+    try:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.write_bytes(content)
+    except OSError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Storage write error: {str(e)}",
+        )
     abs_path = str(target_path)
-    url = f"{settings.site_url.rstrip('/')}/uploads/{rel_path}"
+    url = f"/uploads/{rel_path}"
 
     image = ArticleImage(
         article_id=article_id,
@@ -204,11 +210,14 @@ async def upload_image(
 ):
     await check_article_edit_permission(article_id, current_user.id, db)
     content = await file.read()
+    detected_mime = detect_mime_type(content, file.content_type)
+    if not detected_mime:
+        raise HTTPException(status_code=400, detail="Unsupported file type")
     return await save_image_record(
         article_id=article_id,
         user_id=current_user.id,
         filename_hint=file.filename or "image",
-        mime_type=file.content_type or "",
+        mime_type=detected_mime,
         content=content,
         db=db,
     )
@@ -249,6 +258,8 @@ async def upload_image_from_url(
     parsed = urlparse(data.url)
     raw_name = Path(parsed.path).name or "image"
     mime_type = detect_mime_type(content, resp.headers.get("Content-Type"))
+    if not mime_type:
+        raise HTTPException(status_code=400, detail="Could not determine a supported image format")
 
     return await save_image_record(
         article_id=article_id,
