@@ -8,7 +8,7 @@ import { toggleMark } from 'prosemirror-commands'
 import { Plugin, TextSelection, NodeSelection, Selection } from 'prosemirror-state'
 import { deleteTable } from 'prosemirror-tables'
 import type { EditorView } from 'prosemirror-view'
-import { EditorCore, injectEditorStyles, schema, tableEditPluginKey, spellcheckService, serializeMarkdown, insertImageNode, PASTE_IMAGE_FILES_EVENT } from '@type-club/editor'
+import { EditorCore, injectEditorStyles, schema, tableEditPluginKey, spellcheckService, insertImageNode, PASTE_IMAGE_FILES_EVENT } from '@type-club/editor'
 import { ChangeImageSourceModal } from './ChangeImageSourceModal'
 import { useEditor } from '../context/EditorContext'
 import { useAuth } from '../context/AuthContext'
@@ -612,24 +612,11 @@ export function MarkdownEditor() {
     const handleFlushSync = () => {
       if (state.editorMode === 'raw') {
         flushRawContentRef.current?.()
-      } else if (editorView && !editorView.isDestroyed) {
-        const md = serializeMarkdown(editorView.state.doc)
-        if (!activeTabId && md.length > 0) {
-          dispatch({
-            type: 'CREATE_DRAFT_TAB',
-            payload: {
-              content: md,
-              fileName: state.language === 'ru' ? 'Без названия' : 'Untitled',
-            },
-          })
-        } else if (activeTabId) {
-          dispatch({ type: 'UPDATE_CONTENT', payload: { tabId: activeTabId, content: md } })
-        }
       }
     }
     window.addEventListener('editor-flush-sync', handleFlushSync)
     return () => window.removeEventListener('editor-flush-sync', handleFlushSync)
-  }, [editorView, activeTabId, dispatch, state.editorMode, state.language])
+  }, [state.editorMode])
 
   // ── Typewriter plugin ──
   const isTypewriterModeRef = useRef(state.typewriterMode)

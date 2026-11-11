@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import "katex/dist/katex.min.css";
 import katex from "katex";
-import { EditorState, Plugin } from "prosemirror-state";
+import { EditorState, Plugin, PluginKey } from "prosemirror-state";
 import { EditorView, NodeView } from "prosemirror-view";
 import { Node as PMNode } from "prosemirror-model";
 import { history } from "prosemirror-history";
@@ -40,7 +40,16 @@ import { SuggestionNoteView } from "./editor/suggestionNoteView";
 import { spellcheckPlugin } from "./editor/spellcheckPlugin";
 import { createMobileTypewriterPlugin } from "./editor/mobileTypewriterPlugin";
 
+import {
+  EXTERNAL_SYNC_META,
+  createSyncTracker,
+  resetSyncTracker,
+  recordEmittedMarkdown,
+  resolveExternalContentSync,
+} from "./editor/contentSync";
 import type { EditorProps } from "./types";
+
+const syncPluginKey = new PluginKey<number>("editorCoreSync");
 
 let styleInjected = false;
 
@@ -117,7 +126,10 @@ export function EditorCore({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
-  const lastEmittedRef = useRef(content);
+  const contentRef = useRef(content);
+  contentRef.current = content;
+  const syncTrackerRef = useRef(createSyncTracker(content));
+  const flushSyncRef = useRef<(() => void) | null>(null);
   const onTocUpdateRef = useRef(onTocUpdate);
   onTocUpdateRef.current = onTocUpdate;
   const focusModeRef = useRef(focusMode);
@@ -185,6 +197,7 @@ export function EditorCore({
       }
     } else {
       doc = parseMarkdown(content);
+      resetSyncTracker(syncTrackerRef.current, content);
     }
     const isPreview = editorMode === "preview" || readOnly;
 
@@ -215,21 +228,49 @@ export function EditorCore({
       suggestionPlugins.push(createSuggestionActionPlugin({ userRole }));
     }
 
-    const syncPlugin = new Plugin({
-      view() {
+    const syncPlugin = new Plugin<number>({
+      key: syncPluginKey,
+      state: {
+        init: () => 0,
+        apply(tr, seq) {
+          return tr.getMeta(EXTERNAL_SYNC_META) ? seq + 1 : seq;
+        },
+      },
+      view(editorView) {
         let syncTimer: ReturnType<typeof setTimeout> | null = null;
         let lastDoc = doc;
 
         const flush = (currentDoc: PMNode) => {
           if (isUnmounted) return;
           const md = serializeMarkdown(currentDoc);
-          lastEmittedRef.current = md;
+          recordEmittedMarkdown(syncTrackerRef.current, md, contentRef.current);
           onChangeRef.current(md);
         };
+
+        const flushPending = () => {
+          if (isUnmounted || editorView.isDestroyed) return;
+          if (syncTimer) {
+            clearTimeout(syncTimer);
+            syncTimer = null;
+            lastDoc = editorView.state.doc;
+            flush(lastDoc);
+          }
+        };
+        flushSyncRef.current = flushPending;
 
         return {
           update(view, prevState) {
             if (isUnmounted) return;
+            const prevExternalSeq = syncPluginKey.getState(prevState) ?? 0;
+            const nextExternalSeq = syncPluginKey.getState(view.state) ?? 0;
+            if (nextExternalSeq !== prevExternalSeq) {
+              if (syncTimer) {
+                clearTimeout(syncTimer);
+                syncTimer = null;
+              }
+              lastDoc = view.state.doc;
+              return;
+            }
             if (!view.state.doc.eq(prevState.doc)) {
               lastDoc = view.state.doc;
               if (syncTimer) clearTimeout(syncTimer);
@@ -240,8 +281,12 @@ export function EditorCore({
             }
           },
           destroy() {
+            if (flushSyncRef.current === flushPending) {
+              flushSyncRef.current = null;
+            }
             if (syncTimer) {
               clearTimeout(syncTimer);
+              syncTimer = null;
               if (!collaboration || lastDoc.content.size > 0) {
                 flush(lastDoc);
               }
@@ -337,6 +382,7 @@ export function EditorCore({
 
     return () => {
       isUnmounted = true;
+      flushSyncRef.current = null;
       view.dispatch = () => {};
       view.destroy();
       viewRef.current = null;
@@ -344,14 +390,24 @@ export function EditorCore({
   }, [editorMode, readOnly, collaboration, userRole, userId, userNickname, suggestionModeActive]);
 
   useEffect(() => {
+    const handleFlushSync = () => {
+      flushSyncRef.current?.();
+    };
+    window.addEventListener("editor-flush-sync", handleFlushSync);
+    return () => window.removeEventListener("editor-flush-sync", handleFlushSync);
+  }, []);
+
+  useEffect(() => {
     if (!viewRef.current || editorMode === "raw" || collaboration) return;
-    if (content === lastEmittedRef.current) return;
-    const newDoc = parseMarkdown(content);
-    if (!viewRef.current.state.doc.eq(newDoc)) {
-      lastEmittedRef.current = content;
-      viewRef.current.dispatch(
-        viewRef.current.state.tr.replaceWith(0, viewRef.current.state.doc.content.size, newDoc.content)
-      );
+    const tr = resolveExternalContentSync({
+      state: viewRef.current.state,
+      incomingContent: content,
+      tracker: syncTrackerRef.current,
+      parseMarkdown,
+      serializeMarkdown,
+    });
+    if (tr) {
+      viewRef.current.dispatch(tr);
     }
   }, [content, editorMode, collaboration]);
 
@@ -386,7 +442,7 @@ export function EditorCore({
       const doc = schema.nodeFromJSON(json);
       const md = serializeMarkdown(doc);
       rawBufferRef.current = md;
-      lastEmittedRef.current = md;
+      recordEmittedMarkdown(syncTrackerRef.current, md, contentRef.current);
       onChangeRef.current(md);
     }
 
