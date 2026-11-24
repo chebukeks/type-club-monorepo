@@ -1,4 +1,4 @@
-import { ipcRenderer, contextBridge, webFrame } from 'electron'
+import { ipcRenderer, contextBridge, webFrame, webUtils } from 'electron'
 
 function normalizePathSeparators(p: string): string {
   return p.replace(/[/\\]+/g, '/')
@@ -142,6 +142,8 @@ contextBridge.exposeInMainWorld('api', {
   copyFileToClipboard: (filePath: string): Promise<boolean> => {
     return ipcRenderer.invoke('clipboard:copyFile', filePath)
   },
+  startFileDrag: (filePath: string): Promise<boolean> => ipcRenderer.invoke('fs:startFileDrag', filePath),
+  getPathForFile: (file: File): string => webUtils.getPathForFile(file),
 
   /** Сохранить локальное изображение из base64 */
   saveLocalImage: (filePath: string, filename: string, base64: string): Promise<string | null> => {

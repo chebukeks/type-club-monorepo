@@ -108,7 +108,8 @@ export function UpdateModal({
   const handleApplyUpdate = async () => {
     if (!downloadedFilePath || !info?.installType) return;
     try {
-      await window.api.installUpdate(downloadedFilePath, info.installType);
+      const result = await window.api.installUpdate(downloadedFilePath, info.installType);
+      if (!result.success) throw new Error(result.error || t("update.failed"));
     } catch (err: any) {
       setStatus("error");
       setErrorMessage(err.message || t("update.failed"));

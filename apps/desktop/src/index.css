@@ -230,6 +230,14 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.theme-panel-background {
+  background-image: var(--theme-panel-image, none);
+}
+
+.theme-editor-background {
+  background-image: var(--theme-editor-image, none);
+}
+
 ::selection {
   background-color: var(--editor-selection);
 }

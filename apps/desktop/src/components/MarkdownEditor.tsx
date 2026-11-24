@@ -23,6 +23,7 @@ import { StatsToast } from './StatsToast'
 import type { SuggestionItem, PasteImageFilesDetail } from '@type-club/editor'
 
 import { Monitor, Type, FileText } from 'lucide-react'
+import { resolveDesktopImageSrc } from '../utils/fileUtils'
 
 export function MarkdownEditor() {
   const { state, dispatch, setTextZoom, setDocumentZoom, t } = useEditor()
@@ -262,7 +263,11 @@ export function MarkdownEditor() {
   }, [editorView, codeLangPicker])
 
   const isOnlineArticle = Boolean(articleId != null || (activeTab?.filePath && activeTab.filePath.startsWith('__online__')))
-  const isLocalFile = Boolean(window.api && activeTab?.filePath && !activeTab.filePath.startsWith('__online__'))
+  const localDocumentPath = window.api && !isOnlineArticle && activeTab?.filePath !== '__draft__' ? activeTab?.filePath : undefined
+  const isLocalFile = Boolean(localDocumentPath)
+  const resolveImageSrc = useMemo(() => localDocumentPath
+    ? (src: string) => resolveDesktopImageSrc(src, localDocumentPath, window.location.protocol)
+    : undefined, [localDocumentPath])
 
   const handleCopyImage = async (src: string) => {
     try {
@@ -437,8 +442,7 @@ export function MarkdownEditor() {
 
   const handleSaveLocally = async (src: string, pos: number) => {
     if (!window.api) return
-    const filePath = activeTab?.filePath
-    if (!filePath || filePath.startsWith('__online__')) {
+    if (!localDocumentPath) {
       alert(t('image.contextMenu.saveFileFirst') || 'Save file first')
       return
     }
@@ -464,7 +468,7 @@ export function MarkdownEditor() {
       }
       const ext = mime.split('/')[1] || 'png'
       const filename = `image-${Date.now()}.${ext}`
-      const savedPath = await window.api.saveLocalImage(filePath, filename, base64)
+      const savedPath = await window.api.saveLocalImage(localDocumentPath, filename, base64)
       if (savedPath && editorView) {
         const node = editorView.state.doc.nodeAt(pos)
         if (node) {
@@ -732,8 +736,9 @@ export function MarkdownEditor() {
 
   // ── Focus mask-image style ──
   const containerStyle = useMemo((): React.CSSProperties => {
-    if (state.focusMode !== 'lines') return {}
+    if (state.focusMode !== 'lines') return { backgroundColor: 'transparent' }
     return {
+      backgroundColor: 'transparent',
       maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.3) calc(var(--focus-mask-y, 50%) - calc(50px * var(--doc-scale, 1))), black calc(var(--focus-mask-y, 50%) - calc(30px * var(--doc-scale, 1))), black calc(var(--focus-mask-y, 50%) + calc(30px * var(--doc-scale, 1))), rgba(0,0,0,0.3) calc(var(--focus-mask-y, 50%) + calc(50px * var(--doc-scale, 1))))',
       WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.3) calc(var(--focus-mask-y, 50%) - calc(50px * var(--doc-scale, 1))), black calc(var(--focus-mask-y, 50%) - calc(30px * var(--doc-scale, 1))), black calc(var(--focus-mask-y, 50%) + calc(30px * var(--doc-scale, 1))), rgba(0,0,0,0.3) calc(var(--focus-mask-y, 50%) + calc(50px * var(--doc-scale, 1))))',
     }
@@ -1332,7 +1337,7 @@ export function MarkdownEditor() {
   return (
     <div
       ref={containerRef}
-      className="flex-1 flex flex-col overflow-hidden bg-[var(--bg-base)] rounded-[inherit] relative"
+      className="theme-editor-background flex-1 flex flex-col overflow-hidden bg-[var(--bg-base)] rounded-[inherit] relative"
       onContextMenu={handleContextMenu}
       onClick={() => closeCtxMenu()}
     >
@@ -1373,6 +1378,7 @@ export function MarkdownEditor() {
           if (sugItems) setSuggestions(sugItems)
         }}
         extraPlugins={[typewriterPlugin, searchPlugin]}
+        resolveImageSrc={resolveImageSrc}
         containerStyle={containerStyle}
         scrollTop={activeTab?.scrollTop}
         onScroll={handleScroll}

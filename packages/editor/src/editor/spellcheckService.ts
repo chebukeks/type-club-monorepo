@@ -11,6 +11,7 @@ class SpellcheckService {
   private wordCache = new Map<string, boolean>() // true = correct, false = misspelled
   private provider: SpellcheckProvider | null = null
   private listeners = new Set<() => void>()
+  private revision = 0
 
   public init(initialCustomWords: string[] = [], initialLangs: string[] = ['ru-RU', 'en-US'], enabled: boolean = true) {
     this.setCustomWords(initialCustomWords)
@@ -118,7 +119,9 @@ class SpellcheckService {
 
     if (this.provider?.isWordMisspelled) {
       try {
+        const revision = this.revision
         const misspelled = await this.provider.isWordMisspelled(rawWord.trim())
+        if (revision !== this.revision) return false
         this.wordCache.set(clean, !misspelled)
         return misspelled
       } catch {
@@ -164,7 +167,9 @@ class SpellcheckService {
     if (toCheck.length > 0 && this.provider?.checkWords) {
       try {
         const unique = Array.from(new Set(toCheck))
+        const revision = this.revision
         const foundMisspelled = await this.provider.checkWords(unique)
+        if (revision !== this.revision) return []
         const misspelledSet = new Set(foundMisspelled.map((w) => w.toLowerCase()))
         for (const w of unique) {
           const lower = w.toLowerCase()
@@ -186,6 +191,7 @@ class SpellcheckService {
   }
 
   private notify() {
+    this.revision++
     this.listeners.forEach((l) => l())
   }
 }

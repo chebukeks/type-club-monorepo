@@ -3,7 +3,9 @@ import assert from 'node:assert/strict'
 import {
   DARK_THEME,
   LIGHT_THEME,
+  BUILTIN_THEMES,
   generateCssVariables,
+  getThemeBackgroundImage,
   validateThemeJson,
   parseSingleTheme,
   DARK_COLORS,
@@ -11,7 +13,55 @@ import {
   DEFAULT_TYPOGRAPHY,
 } from '../themePresets.ts'
 
+function contrastRatio(first: string, second: string): number {
+  const luminance = (hex: string) => [0.2126, 0.7152, 0.0722].reduce((sum, weight, i) => {
+    const channel = parseInt(hex.slice(1 + 2 * i, 3 + 2 * i), 16) / 255
+    const linear = channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
+    return sum + weight * linear
+  }, 0)
+  const lighter = Math.max(luminance(first), luminance(second))
+  const darker = Math.min(luminance(first), luminance(second))
+  return (lighter + 0.05) / (darker + 0.05)
+}
+
 describe('Theme Presets & Utilities', () => {
+  it('keeps text readable in new palettes and on gradient color stops', () => {
+    const ids = ['brick-box', 'rubber-duck', 'bubblegum', 'marbles', 'toy-rocket', 'tin-robot',
+      'walnut', 'sherbet', 'lagoon', 'aurora']
+    for (const id of ids) {
+      const theme = BUILTIN_THEMES.find(theme => theme.id === id)
+      assert.ok(theme, id)
+      const c = theme.colors
+      const panelStops = theme.backgrounds?.panels?.match(/#[\da-f]{6}\b/gi) ?? []
+      const editorStops = theme.backgrounds?.editor?.match(/#[\da-f]{6}\b/gi) ?? []
+      const pairs = [
+        ...[c.bgSurface, c.bgHover, c.bgActive, ...panelStops].map(bg => [c.textMuted, bg]),
+        ...[c.bgBase, ...editorStops].flatMap(bg => [[c.editorText, bg], [c.editorLink, bg]]),
+        ...[c.codeblockText, c.codeblockLang, c.hljsKeyword, c.hljsString, c.hljsTitle, c.hljsNumber, c.hljsComment]
+          .map(fg => [fg, c.codeblockBg]),
+        ['#ffffff', c.accent],
+        ['#ffffff', c.accentHover],
+      ]
+      for (const [fg, bg] of pairs) assert.ok(contrastRatio(fg, bg) >= 4.5, `${id}: ${fg} on ${bg}`)
+    }
+  })
+
+  it('renders gradients separately from solid colors and preserves them in theme JSON', () => {
+    const theme = BUILTIN_THEMES.find(theme => theme.id === 'sherbet')
+    assert.ok(theme?.backgrounds?.editor)
+    const parsed = parseSingleTheme(JSON.parse(JSON.stringify(theme)))
+    assert.deepEqual(parsed?.backgrounds, theme.backgrounds)
+    const css = generateCssVariables(theme)
+    assert.ok(css.includes(`--bg-base: ${theme.colors.bgBase}`))
+    assert.ok(css.includes(`--theme-editor-image: ${theme.backgrounds.editor}`))
+    assert.equal(getThemeBackgroundImage(LIGHT_THEME, 'editor'), 'none')
+
+    const gradient = 'linear-gradient(135deg, #e2f5f2, #eaf1fd)'
+    const legacy = { ...LIGHT_THEME, colors: { ...LIGHT_COLORS, bgBase: gradient } }
+    assert.equal(getThemeBackgroundImage(legacy, 'editor'), gradient)
+    assert.ok(generateCssVariables(legacy).includes(`--bg-base: ${LIGHT_COLORS.bgBase}`))
+  })
+
   it('should have properly structured built-in dark and light themes', () => {
     assert.equal(DARK_THEME.id, 'dark')
     assert.equal(DARK_THEME.isBuiltin, true)

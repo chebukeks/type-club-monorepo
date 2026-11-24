@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { suggestFileName } from '../fileUtils.ts'
+import { resolveDesktopImageSrc, resolveDocumentImageSrc, suggestFileName } from '../fileUtils.ts'
 
 describe('fileUtils — suggestFileName', () => {
   it('should extract filename from first H1 heading', () => {
@@ -52,4 +52,33 @@ describe('fileUtils — suggestFileName', () => {
     const name = suggestFileName(content, 'Untitled.md')
     assert.strictEqual(name, 'Readme.md')
   })
+})
+
+describe('resolveDocumentImageSrc', () => {
+  it('resolves the path saved by Save locally beside the Markdown document', () => {
+    const src = './image-123.jpeg'
+    assert.equal(resolveDocumentImageSrc(src, '/notes/My draft #2/post.md'), 'file:///notes/My%20draft%20%232/image-123.jpeg')
+    assert.equal(resolveDocumentImageSrc(src, 'C:\\notes\\My draft #2\\post.md'), 'file:///C:/notes/My%20draft%20%232/image-123.jpeg')
+  })
+
+  it('resolves nested paths and leaves absolute and remote sources alone', () => {
+    const documentPath = '/notes/section/post.md'
+    assert.equal(resolveDocumentImageSrc('../images/a%20b.png', documentPath), 'file:///notes/images/a%20b.png')
+    assert.equal(resolveDocumentImageSrc('.\\a.png', '\\\\server\\notes\\post.md'), 'file://server/notes/a.png')
+    for (const src of ['https://example.com/image.png', '/uploads/image.png', '/tmp/image.png', 'C:/image.png', 'data:image/png;base64,AA==']) {
+      assert.equal(resolveDocumentImageSrc(src, documentPath), src)
+    }
+  })
+})
+
+it('uses the Electron image protocol for relative paths on the Vite page', () => {
+  const documentPath = 'C:\\Заметки и фото #1\\черновик.md'
+  const source = './image-123.png'
+  const fileUrl = resolveDocumentImageSrc(source, documentPath)
+  const devUrl = new URL(resolveDesktopImageSrc(source, documentPath, 'http:'))
+
+  assert.equal(devUrl.protocol, 'typeclub-image:')
+  assert.equal(devUrl.searchParams.get('file'), fileUrl)
+  assert.equal(resolveDesktopImageSrc(source, documentPath, 'file:'), fileUrl)
+  assert.equal(resolveDesktopImageSrc('/uploads/image.png', documentPath, 'http:'), '/uploads/image.png')
 })

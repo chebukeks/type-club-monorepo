@@ -35,6 +35,7 @@ export interface EditorProps {
   focusMode?: FocusMode
   onTocUpdate?: (toc: TocItem[], suggestions?: SuggestionItem[]) => void
   extraPlugins?: Plugin[]
+  resolveImageSrc?: (src: string) => string
   containerStyle?: React.CSSProperties
   collaboration?: CollaborationConfig
   userRole?: 'author' | 'co_author' | 'editor' | null

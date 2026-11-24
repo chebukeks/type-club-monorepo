@@ -14,17 +14,22 @@ echo "==> Building Type Club v${VERSION}..."
 npm run build
 
 echo "==> Copying artifacts to ${DOWNLOAD_DIR}..."
-cp -v "${RELEASE_DIR}/"* "${DOWNLOAD_DIR}/" 2>/dev/null || true
+mkdir -p "$DOWNLOAD_DIR"
+for artifact in "${RELEASE_DIR}/"*; do
+    if [[ -f "$artifact" ]]; then
+        cp -v "$artifact" "${DOWNLOAD_DIR}/"
+    fi
+done
 
 echo "==> Generating latest.json..."
 
-# Build JSON manually with jq or python
-python3 - <<PYEOF
-import json, os, sys
+python3 - "$DOWNLOAD_DIR" "$RELEASE_DIR" "$VERSION" "$DATE" <<'PYEOF'
+import hashlib
+import json
+import os
+import sys
 
-downloads = "$DOWNLOAD_DIR"
-version = "$VERSION"
-date = "$DATE"
+downloads, release_dir, version, date = sys.argv[1:]
 
 manifest = {
     "version": version,
@@ -36,14 +41,18 @@ manifest = {
     }
 }
 
-for f in sorted(os.listdir(downloads)):
-    if f.startswith(".") or f == "latest.json":
+for f in sorted(os.listdir(release_dir)):
+    if not f.startswith((f"TypeClub-Windows-{version}.", f"TypeClub-Linux-{version}.", f"TypeClub-Mac-{version}-")):
         continue
     path = os.path.join(downloads, f)
     if not os.path.isfile(path):
         continue
     size = os.path.getsize(path)
-    entry = {"file": f, "size": size}
+    with open(path, "rb") as artifact:
+        digest = hashlib.sha256()
+        for chunk in iter(lambda: artifact.read(1024 * 1024), b""):
+            digest.update(chunk)
+    entry = {"file": f, "size": size, "sha256": digest.hexdigest()}
 
     lower = f.lower()
     if "linux" in lower and f.endswith(".AppImage"):
@@ -58,14 +67,13 @@ for f in sorted(os.listdir(downloads)):
     elif "mac" in lower and f.endswith(".dmg"):
         manifest["platforms"]["macos"] = {"dmg": entry}
 
-# Remove None platforms
-if not manifest["platforms"]["windows"]:
-    manifest["platforms"]["windows"] = None
 if not manifest["platforms"]["linux"]:
-    manifest["platforms"]["linux"] = None
+    raise SystemExit("The current Linux AppImage is missing from the release")
 
-with open(os.path.join(downloads, "latest.json"), "w") as fp:
+manifest_path = os.path.join(downloads, "latest.json")
+with open(manifest_path + ".tmp", "w") as fp:
     json.dump(manifest, fp, indent=2)
+os.replace(manifest_path + ".tmp", manifest_path)
 
 print(json.dumps(manifest, indent=2))
 PYEOF

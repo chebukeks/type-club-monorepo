@@ -6,6 +6,46 @@ import type { FileEntry, TocItem } from '../types'
 import type { ArticleListItem } from '../api'
 import { Search, X, Pin } from 'lucide-react'
 
+const SIDEBAR_MOVE_TYPE = 'application/x-type-club-sidebar-move'
+const PINNED_LOCAL_TYPE = 'application/x-type-club-pinned-local'
+let sidebarFileDrag: { path: string } | null = null
+
+function startSidebarFileDrag(e: React.DragEvent, path: string) {
+  e.preventDefault()
+  e.stopPropagation()
+  const drag = { path }
+  sidebarFileDrag = drag
+
+  const clear = () => {
+    if (sidebarFileDrag === drag) sidebarFileDrag = null
+  }
+  void window.api.startFileDrag(path).then(started => {
+    if (!started) clear()
+    // On Windows and Linux startDrag returns after the native drag loop.
+    else if (window.api.platform !== 'darwin') setTimeout(clear, 150)
+  }).catch(clear)
+}
+
+function getSidebarDropEffect(data: DataTransfer): 'move' | 'copy' | null {
+  if (data.types.includes(SIDEBAR_MOVE_TYPE)) return 'move'
+  if (sidebarFileDrag && data.types.includes('Files')) return 'copy'
+  return null
+}
+
+function getSidebarFileDropPath(data: DataTransfer): string | null {
+  if (!sidebarFileDrag || data.files.length !== 1) return null
+  const normalize = (path: string) => {
+    const portable = path.replace(/\\/g, '/')
+    return window.api.platform === 'win32' ? portable.toLowerCase() : portable
+  }
+  const droppedPath = window.api.getPathForFile(data.files[0])
+  return normalize(droppedPath) === normalize(sidebarFileDrag.path) ? sidebarFileDrag.path : null
+}
+
+function getSidebarDropPath(data: DataTransfer): string | null {
+  return data.getData(SIDEBAR_MOVE_TYPE) || getSidebarFileDropPath(data)
+}
+
 export function Sidebar({ width }: { width: number }) {
   const { user } = useAuth()
   const {
@@ -134,6 +174,14 @@ export function Sidebar({ width }: { width: number }) {
   })
 
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null)
+  const copyFile = useCallback(async (filePath: string) => {
+    try {
+      if (!await window.api.copyFileToClipboard(filePath)) throw new Error('Clipboard write failed')
+    } catch (err) {
+      console.error('Failed to copy file:', err)
+      window.alert(t('sidebar.copyFileError'))
+    }
+  }, [t])
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, path: string, type: 'file' | 'folder', name: string } | null>(null)
   const [onlineMenu, setOnlineMenu] = useState<{ x: number, y: number, article: ArticleListItem } | null>(null)
 
@@ -186,6 +234,28 @@ export function Sidebar({ width }: { width: number }) {
     return () => window.removeEventListener('mousedown', handleGlobalMouseDown)
   }, [])
 
+  useEffect(() => {
+    const clearFileDrag = () => { sidebarFileDrag = null }
+    const clearAfterDrop = () => {
+      const drag = sidebarFileDrag
+      setTimeout(() => {
+        if (sidebarFileDrag === drag) clearFileDrag()
+      }, 0)
+    }
+    const clearAfterPointerReturn = (e: MouseEvent) => {
+      if (e.buttons === 0) clearFileDrag()
+    }
+    window.addEventListener('pointerdown', clearFileDrag, true)
+    window.addEventListener('mousemove', clearAfterPointerReturn, true)
+    window.addEventListener('drop', clearAfterDrop, true)
+    return () => {
+      window.removeEventListener('pointerdown', clearFileDrag, true)
+      window.removeEventListener('mousemove', clearAfterPointerReturn, true)
+      window.removeEventListener('drop', clearAfterDrop, true)
+      clearFileDrag()
+    }
+  }, [])
+
   // Копирование файла целиком по Ctrl+C, если после выбора файла не было других кликов
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
@@ -198,22 +268,13 @@ export function Sidebar({ width }: { width: number }) {
 
         if (selectedFilePath) {
           e.preventDefault()
-          try {
-            if (window.api?.copyFileToClipboard) {
-              await window.api.copyFileToClipboard(selectedFilePath)
-            } else {
-              const content = await window.api.readFile(selectedFilePath)
-              await navigator.clipboard.writeText(content)
-            }
-          } catch (err) {
-            console.error('Ошибка копирования файла в буфер обмена:', err)
-          }
+          await copyFile(selectedFilePath)
         }
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedFilePath])
+  }, [selectedFilePath, copyFile])
 
   const handleContextMenu = (e: React.MouseEvent, path: string, type: 'file' | 'folder', name: string) => {
     e.preventDefault()
@@ -250,7 +311,7 @@ export function Sidebar({ width }: { width: number }) {
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
   const onlineUsername = user?.nickname || 'username'
   return (
-    <div style={{ width: `${width}px`, minWidth: '140px', maxWidth: '500px' }} className="bg-[var(--bg-surface)] flex flex-col h-full flex-shrink-0 select-none">
+    <div style={{ width: `${width}px`, minWidth: '140px', maxWidth: '500px' }} className="flex flex-col h-full flex-shrink-0 select-none">
       <div
         className="flex items-center justify-between"
         style={{ height: '36px', paddingLeft: '16px', paddingRight: '12px' }}
@@ -412,10 +473,15 @@ export function Sidebar({ width }: { width: number }) {
             }
           }
         }}
-        onDragOver={isOnline ? undefined : (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+        onDragOver={isOnline ? undefined : (e) => {
+          const effect = getSidebarDropEffect(e.dataTransfer)
+          if (!effect) return
+          e.preventDefault()
+          e.dataTransfer.dropEffect = effect
+        }}
         onDrop={isOnline ? undefined : (e) => {
           e.preventDefault()
-          const sourcePath = e.dataTransfer.getData('text/plain')
+          const sourcePath = getSidebarDropPath(e.dataTransfer)
           if (sourcePath && state.folderPath) moveItem(sourcePath, state.folderPath)
         }}
       >
@@ -575,6 +641,8 @@ export function Sidebar({ width }: { width: number }) {
                     <div
                       key={file.path}
                       data-sidebar-file={file.path}
+                      draggable
+                      onDragStart={(e) => startSidebarFileDrag(e, file.path)}
                       onClick={() => {
                         setSelectedFilePath(file.path)
                         openFile(file.path, file.name)
@@ -671,29 +739,35 @@ export function Sidebar({ width }: { width: number }) {
                               key={`pinned-local-${pinnedPath}`}
                               draggable
                               onDragStart={(e) => {
+                                if (!entry.isDirectory) {
+                                  startSidebarFileDrag(e, entry.path)
+                                  return
+                                }
                                 e.stopPropagation()
-                                e.dataTransfer.setData('application/x-type-club-pinned-local', String(idx))
+                                e.dataTransfer.setData(PINNED_LOCAL_TYPE, String(idx))
                                 e.dataTransfer.effectAllowed = 'move'
                               }}
                               onDragOver={(e) => {
-                                if (e.dataTransfer.types.includes('application/x-type-club-pinned-local')) {
+                                const isPinnedMove = e.dataTransfer.types.includes(PINNED_LOCAL_TYPE)
+                                const isFileDrag = sidebarFileDrag && state.pinnedLocalPaths.includes(sidebarFileDrag.path) && e.dataTransfer.types.includes('Files')
+                                if (isPinnedMove || isFileDrag) {
                                   e.preventDefault()
                                   e.stopPropagation()
-                                  e.dataTransfer.dropEffect = 'move'
+                                  e.dataTransfer.dropEffect = isPinnedMove ? 'move' : 'copy'
                                 }
                               }}
                               onDrop={(e) => {
-                                if (e.dataTransfer.types.includes('application/x-type-club-pinned-local')) {
-                                  e.preventDefault()
-                                  e.stopPropagation()
-                                  const fromIdx = Number(e.dataTransfer.getData('application/x-type-club-pinned-local'))
-                                  if (!isNaN(fromIdx) && fromIdx !== idx) {
-                                    const next = [...state.pinnedLocalPaths]
-                                    const [item] = next.splice(fromIdx, 1)
-                                    next.splice(idx, 0, item)
-                                    reorderPinnedLocalPaths(next)
-                                  }
-                                }
+                                const fromIdx = e.dataTransfer.types.includes(PINNED_LOCAL_TYPE)
+                                  ? Number(e.dataTransfer.getData(PINNED_LOCAL_TYPE))
+                                  : state.pinnedLocalPaths.indexOf(getSidebarFileDropPath(e.dataTransfer) || '')
+                                if (!Number.isInteger(fromIdx) || fromIdx < 0 || fromIdx >= state.pinnedLocalPaths.length) return
+                                e.preventDefault()
+                                e.stopPropagation()
+                                if (fromIdx === idx) return
+                                const next = [...state.pinnedLocalPaths]
+                                const [item] = next.splice(fromIdx, 1)
+                                next.splice(idx, 0, item)
+                                reorderPinnedLocalPaths(next)
                               }}
                             >
                               <FileTreeItem
@@ -819,15 +893,8 @@ export function Sidebar({ width }: { width: number }) {
             ) : (
               <>
                 <button className="menu-item enabled" onClick={async () => {
-                  try {
-                    if (window.api?.copyFileToClipboard) {
-                      await window.api.copyFileToClipboard(menu.path)
-                    } else {
-                      const content = await window.api.readFile(menu.path)
-                      await navigator.clipboard.writeText(content)
-                    }
-                  } catch (err) { console.error('Ошибка копирования файла:', err) }
                   setContextMenu(null)
+                  await copyFile(menu.path)
                 }}>
                   {t('sidebar.copyContent')}
                 </button>
@@ -1320,17 +1387,24 @@ function FileTreeItem({ entry, depth, onFileClick, onContextMenu, activeFilePath
   const isFolderActive = entry.isDirectory && entry.path === state.activeExplorerPath
 
   const handleDragStart = (e: React.DragEvent) => {
+    if (!entry.isDirectory) {
+      startSidebarFileDrag(e, entry.path)
+      return
+    }
     e.stopPropagation()
-    e.dataTransfer.setData('text/plain', entry.path)
+    e.dataTransfer.setData(SIDEBAR_MOVE_TYPE, entry.path)
     e.dataTransfer.effectAllowed = 'move'
   }
 
   const handleDragOver = (e: React.DragEvent) => {
+    const effect = getSidebarDropEffect(e.dataTransfer)
+    if (!effect) return
     e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
+    e.dataTransfer.dropEffect = effect
   }
 
   const handleDragEnter = (e: React.DragEvent) => {
+    if (!getSidebarDropEffect(e.dataTransfer)) return
     e.preventDefault()
     setIsDragOver(true)
   }
@@ -1344,7 +1418,7 @@ function FileTreeItem({ entry, depth, onFileClick, onContextMenu, activeFilePath
     e.preventDefault()
     e.stopPropagation()
     setIsDragOver(false)
-    const sourcePath = e.dataTransfer.getData('text/plain')
+    const sourcePath = getSidebarDropPath(e.dataTransfer)
     if (sourcePath && sourcePath !== entry.path) {
       if (entry.isDirectory) {
         moveItem(sourcePath, entry.path)

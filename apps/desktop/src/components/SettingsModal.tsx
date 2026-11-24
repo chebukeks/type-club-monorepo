@@ -25,9 +25,9 @@ import {
   Minimize2,
   GripHorizontal,
 } from "lucide-react";
-import { type Locale, spellcheckService } from "@type-club/editor";
+import { type Locale, type TranslationKey, spellcheckService } from "@type-club/editor";
 import type { AppTheme, ThemeColors, ThemeTypography } from "../types";
-import { DARK_THEME, LIGHT_THEME, BUILTIN_THEMES } from "../utils/themePresets";
+import { DARK_THEME, LIGHT_THEME, BUILTIN_THEMES, getThemeBackgroundImage } from "../utils/themePresets";
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -35,6 +35,34 @@ interface SettingsModalProps {
 
 type SettingsTab = "theme" | "language" | "shortcuts";
 type ThemeCategory = "ui" | "editor" | "code" | "tables" | "typography";
+
+const builtinThemeNames: Partial<Record<string, TranslationKey>> = {
+  dark: "theme.dark",
+  light: "theme.light",
+  peachy: "settings.theme.peachy",
+  dissonance: "settings.theme.dissonance",
+  parchment: "settings.theme.parchment",
+  sage: "settings.theme.sage",
+  lavender: "settings.theme.lavender",
+  midnight: "settings.theme.midnight",
+  pine: "settings.theme.pine",
+  ember: "settings.theme.ember",
+  "brick-box": "settings.theme.brickBox",
+  "rubber-duck": "settings.theme.rubberDuck",
+  bubblegum: "settings.theme.bubblegum",
+  marbles: "settings.theme.marbles",
+  "toy-rocket": "settings.theme.toyRocket",
+  "tin-robot": "settings.theme.tinRobot",
+  walnut: "settings.theme.walnut",
+  sherbet: "settings.theme.sherbet",
+  lagoon: "settings.theme.lagoon",
+  aurora: "settings.theme.aurora",
+};
+
+function localizeTheme(theme: AppTheme, t: (key: TranslationKey) => string): AppTheme {
+  const nameKey = theme.isBuiltin ? builtinThemeNames[theme.id] : undefined;
+  return { ...theme, name: nameKey ? t(nameKey) : theme.name };
+}
 
 export function SettingsModal({ onClose }: SettingsModalProps) {
   const {
@@ -215,16 +243,16 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
   // --- Theme Editor State ---
   const [activeThemeCategory, setActiveThemeCategory] = useState<ThemeCategory>("ui");
   const [draftTheme, setDraftTheme] = useState<AppTheme>(() => {
-    return state.activeTheme || (state.theme === "light" ? LIGHT_THEME : DARK_THEME);
+    return localizeTheme(state.activeTheme || (state.theme === "light" ? LIGHT_THEME : DARK_THEME), t);
   });
   const [themeStatusMessage, setThemeStatusMessage] = useState<string | null>(null);
 
   // Sync draftTheme whenever state.activeTheme changes externally
   useEffect(() => {
     if (state.activeTheme) {
-      setDraftTheme({ ...state.activeTheme });
+      setDraftTheme(localizeTheme(state.activeTheme, t));
     }
-  }, [state.activeTheme]);
+  }, [state.activeTheme, t]);
 
   // Load initial spellchecker languages and custom words
   useEffect(() => {
@@ -376,7 +404,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
 
   const handleResetTheme = () => {
     const original = state.activeTheme || (state.theme === "light" ? LIGHT_THEME : DARK_THEME);
-    setDraftTheme({ ...original });
+    setDraftTheme(localizeTheme(original, t));
     applyLiveTheme(original);
   };
 
@@ -627,7 +655,8 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                       className="flex flex-col rounded-xl bg-[var(--bg-surface)] overflow-hidden"
                       style={{ padding: "4px" }}
                     >
-                      {BUILTIN_THEMES.map((bTheme) => {
+                      {BUILTIN_THEMES.map((theme) => {
+                        const bTheme = localizeTheme(theme, t);
                         const isDay = state.lightThemeId === bTheme.id;
                         const isNight = state.darkThemeId === bTheme.id;
                         const isEditing = draftTheme.id === bTheme.id;
@@ -635,7 +664,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                           <div
                             key={bTheme.id}
                             onClick={() => {
-                              setDraftTheme({ ...bTheme });
+                              setDraftTheme(bTheme);
                               if (bTheme.baseTheme === 'light') {
                                 setLightThemeId(bTheme.id);
                               } else {
@@ -650,7 +679,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                             <div className="flex items-center gap-2.5 min-w-0">
                               <div
                                 className="w-3.5 h-3.5 rounded-full border border-black/10 shadow-xs flex-shrink-0"
-                                style={{ backgroundColor: bTheme.colors.bgBase }}
+                                style={{ backgroundColor: bTheme.colors.bgBase, backgroundImage: getThemeBackgroundImage(bTheme, 'editor') }}
                               />
                               <span className="text-[13px] text-[var(--text-primary)] font-medium truncate">
                                 {bTheme.name}
@@ -661,7 +690,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setLightThemeId(bTheme.id);
-                                  setDraftTheme({ ...bTheme });
+                                  setDraftTheme(bTheme);
                                 }}
                                 title={t("settings.theme.selectDay")}
                                 className={`flex items-center justify-center w-7 h-7 rounded-lg transition-all cursor-pointer ${
@@ -676,7 +705,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setDarkThemeId(bTheme.id);
-                                  setDraftTheme({ ...bTheme });
+                                  setDraftTheme(bTheme);
                                 }}
                                 title={t("settings.theme.selectNight")}
                                 className={`flex items-center justify-center w-7 h-7 rounded-lg transition-all cursor-pointer ${
@@ -747,7 +776,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                               <div className="flex items-center gap-2.5 flex-1 min-w-0">
                                 <div
                                   className="w-3.5 h-3.5 rounded-full border border-black/10 shadow-xs shrink-0"
-                                  style={{ backgroundColor: cTheme.colors.bgBase }}
+                                  style={{ backgroundColor: cTheme.colors.bgBase, backgroundImage: getThemeBackgroundImage(cTheme, 'editor') }}
                                 />
                                 <span className="text-[13px] text-[var(--text-primary)] font-medium truncate">
                                   {cTheme.name}
@@ -896,6 +925,26 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                               value={draftTheme.colors[c.key]}
                               onChange={(val) => handleUpdateDraftColor(c.key, val)}
                             />
+                          ))}
+                          {([
+                            ['editor', 'settings.theme.editorGradient'],
+                            ['panels', 'settings.theme.panelGradient'],
+                          ] as const).map(([key, label]) => (
+                            <label key={key} className="col-span-2 flex flex-col gap-1 text-[11.5px] text-[var(--text-secondary)]">
+                              {t(label)}
+                              <input
+                                type="text"
+                                value={draftTheme.backgrounds?.[key] ?? ''}
+                                placeholder="linear-gradient(…)"
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  const next = { ...draftTheme, backgrounds: { ...draftTheme.backgrounds, [key]: value } };
+                                  setDraftTheme(next);
+                                  applyLiveTheme(next);
+                                }}
+                                className="w-full rounded-md bg-[var(--bg-base)] border border-[var(--border-default)] px-2 py-1 font-mono text-[11px] text-[var(--text-primary)]"
+                              />
+                            </label>
                           ))}
                         </div>
                       )}

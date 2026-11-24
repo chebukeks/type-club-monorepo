@@ -254,17 +254,211 @@ export const DISSONANCE_THEME: AppTheme = {
   typography: { ...DEFAULT_TYPOGRAPHY },
 }
 
-export const BUILTIN_THEMES: AppTheme[] = [DARK_THEME, LIGHT_THEME, PEACHY_THEME, DISSONANCE_THEME]
+type PresetPalette = Pick<ThemeColors,
+  'bgBase' | 'bgSurface' | 'bgElevated' | 'bgHover' | 'bgActive' | 'borderDefault' |
+  'borderStrong' | 'textPrimary' | 'textSecondary' | 'textMuted' | 'accent' | 'accentHover'> &
+  Partial<Pick<ThemeColors, 'editorLink'>>
+
+function createBuiltinTheme(id: string, name: string, baseTheme: AppTheme['baseTheme'], palette: PresetPalette): AppTheme {
+  const { bgBase, bgSurface, bgElevated, bgHover, bgActive, borderDefault, borderStrong, textPrimary, textSecondary, textMuted, accent } = palette
+  const editorAccent = palette.editorLink ?? accent
+  return {
+    id, name, baseTheme, isBuiltin: true,
+    colors: {
+      ...(baseTheme === 'light' ? LIGHT_COLORS : DARK_COLORS),
+      ...palette,
+      bgInput: bgElevated,
+      textDim: textMuted,
+      menuHoverBg: bgHover,
+      editorText: textPrimary,
+      editorHeading: textPrimary,
+      editorSyntax: textMuted,
+      editorHr: borderStrong,
+      editorStrike: textMuted,
+      editorCaret: editorAccent,
+      editorSelection: `${editorAccent}40`,
+      editorLink: editorAccent,
+      editorCodeBg: bgSurface,
+      editorCodeText: editorAccent,
+      editorBlockquoteBg: bgSurface,
+      editorBlockquoteBorder: editorAccent,
+      editorBlockquoteText: textSecondary,
+      codeblockBg: bgSurface,
+      codeblockBorder: borderDefault,
+      codeblockText: textPrimary,
+      codeblockLang: editorAccent,
+      hljsComment: textMuted,
+      tableBorder: borderStrong,
+      tableHeaderBg: bgHover,
+      tableHeaderText: textPrimary,
+      tableCellBg: bgBase,
+      tableCellText: textSecondary,
+      tableEvenBg: bgSurface,
+      tableSelected: bgActive,
+    },
+    typography: { ...DEFAULT_TYPOGRAPHY },
+  }
+}
+
+function createColorfulTheme(
+  id: string,
+  name: string,
+  baseTheme: AppTheme['baseTheme'],
+  palette: PresetPalette,
+  backgrounds?: AppTheme['backgrounds'],
+): AppTheme {
+  const theme = createBuiltinTheme(id, name, baseTheme, palette)
+  const lightSyntax = {
+    hljsKeyword: '#762981',
+    hljsString: '#28603a',
+    hljsTitle: '#9f3139',
+    hljsNumber: '#794b13',
+  }
+  const darkSyntax = {
+    hljsKeyword: '#e5b2fa',
+    hljsString: '#b6e28c',
+    hljsTitle: '#ffadba',
+    hljsNumber: '#f5bc86',
+  }
+  return {
+    ...theme,
+    backgrounds,
+    colors: {
+      ...theme.colors,
+      ...(baseTheme === 'light' ? lightSyntax : darkSyntax),
+      codeblockBg: palette.bgElevated,
+    },
+  }
+}
+
+export const BUILTIN_THEMES: AppTheme[] = [
+  DARK_THEME, LIGHT_THEME, PEACHY_THEME, DISSONANCE_THEME,
+  createBuiltinTheme('parchment', 'Parchment', 'light', {
+    bgBase: '#fbf5e8', bgSurface: '#f1e7d3', bgElevated: '#fff9ed', bgHover: '#eee0c5', bgActive: '#e6d4b5',
+    borderDefault: '#e3d3b7', borderStrong: '#cbb691', textPrimary: '#3a2b1d', textSecondary: '#59422c',
+    textMuted: '#735b43', accent: '#88461f', accentHover: '#6b3315',
+  }),
+  createBuiltinTheme('sage', 'Sage', 'light', {
+    bgBase: '#f4f8f1', bgSurface: '#e6eee2', bgElevated: '#fbfdf8', bgHover: '#dce9d9', bgActive: '#cbdcc8',
+    borderDefault: '#d1decf', borderStrong: '#a8bfa9', textPrimary: '#23372b', textSecondary: '#395342',
+    textMuted: '#4b6554', accent: '#276847', accentHover: '#1b5237',
+  }),
+  createBuiltinTheme('lavender', 'Lavender', 'light', {
+    bgBase: '#faf7ff', bgSurface: '#eee7f8', bgElevated: '#fdfaff', bgHover: '#e9def5', bgActive: '#ded0ef',
+    borderDefault: '#dfd4ed', borderStrong: '#bba8d1', textPrimary: '#352746', textSecondary: '#514164',
+    textMuted: '#685578', accent: '#6b4399', accentHover: '#54327b',
+  }),
+  createBuiltinTheme('midnight', 'Midnight', 'dark', {
+    bgBase: '#121b2e', bgSurface: '#17243b', bgElevated: '#1e2d48', bgHover: '#263853', bgActive: '#344967',
+    borderDefault: '#293c59', borderStrong: '#435b7c', textPrimary: '#e5efff', textSecondary: '#c3d2eb',
+    textMuted: '#a0b4d4', accent: '#3564aa', accentHover: '#3a6cb1', editorLink: '#83bdff',
+  }),
+  createBuiltinTheme('pine', 'Pine', 'dark', {
+    bgBase: '#14211d', bgSurface: '#192b24', bgElevated: '#21352d', bgHover: '#2a4338', bgActive: '#345044',
+    borderDefault: '#2d473b', borderStrong: '#4c6a5c', textPrimary: '#e1f3e9', textSecondary: '#c0d8ca',
+    textMuted: '#a0beaf', accent: '#2e6c54', accentHover: '#33745a', editorLink: '#82d9af',
+  }),
+  createBuiltinTheme('ember', 'Ember', 'dark', {
+    bgBase: '#271c1a', bgSurface: '#30221f', bgElevated: '#3a2a26', bgHover: '#4b342d', bgActive: '#5a3f34',
+    borderDefault: '#4b362d', borderStrong: '#755748', textPrimary: '#fbede1', textSecondary: '#e1c5b4',
+    textMuted: '#c5a89a', accent: '#9c492f', accentHover: '#a85033', editorLink: '#f4ad80',
+  }),
+  createColorfulTheme('brick-box', 'Brick Box', 'light', {
+    bgBase: '#fff4e3', bgSurface: '#edc989', bgElevated: '#fff9ef', bgHover: '#f7dbaa', bgActive: '#f2c17e',
+    borderDefault: '#d4a56c', borderStrong: '#a36a48', textPrimary: '#3e241f', textSecondary: '#54332b',
+    textMuted: '#624239', accent: '#a62d3c', accentHover: '#87232f', editorLink: '#284990',
+  }),
+  createColorfulTheme('rubber-duck', 'Rubber Duck', 'light', {
+    bgBase: '#fff8da', bgSurface: '#efd36e', bgElevated: '#fffbed', bgHover: '#f7e197', bgActive: '#e6bf55',
+    borderDefault: '#c9a648', borderStrong: '#917335', textPrimary: '#382a16', textSecondary: '#493819',
+    textMuted: '#5b471e', accent: '#175c7f', accentHover: '#124761', editorLink: '#175c7f',
+  }),
+  createColorfulTheme('bubblegum', 'Bubblegum', 'light', {
+    bgBase: '#fff0f5', bgSurface: '#efbfd9', bgElevated: '#fff7fb', bgHover: '#f7cfe4', bgActive: '#e8acd1',
+    borderDefault: '#d997bc', borderStrong: '#aa6794', textPrimary: '#3d1834', textSecondary: '#553047',
+    textMuted: '#693851', accent: '#a13072', accentHover: '#87265f', editorLink: '#4d4189',
+  }),
+  createColorfulTheme('marbles', 'Marbles', 'light', {
+    bgBase: '#effaed', bgSurface: '#addbc2', bgElevated: '#f7fcf4', bgHover: '#c1e7ce', bgActive: '#9bceb2',
+    borderDefault: '#91baa1', borderStrong: '#598a70', textPrimary: '#18352a', textSecondary: '#2c4938',
+    textMuted: '#345740', accent: '#19654c', accentHover: '#15533e', editorLink: '#913e28',
+  }),
+  createColorfulTheme('toy-rocket', 'Toy Rocket', 'dark', {
+    bgBase: '#27213d', bgSurface: '#352750', bgElevated: '#3d2f58', bgHover: '#4b3769', bgActive: '#58417c',
+    borderDefault: '#534169', borderStrong: '#785a91', textPrimary: '#fff1fc', textSecondary: '#e8d8f2',
+    textMuted: '#d8c4e9', accent: '#9b3d69', accentHover: '#a64472', editorLink: '#85e0cc',
+  }),
+  createColorfulTheme('tin-robot', 'Tin Robot', 'dark', {
+    bgBase: '#222b40', bgSurface: '#2e3e57', bgElevated: '#35465f', bgHover: '#3d5272', bgActive: '#465f81',
+    borderDefault: '#495c77', borderStrong: '#6a81a0', textPrimary: '#f4f7ff', textSecondary: '#dde8f7',
+    textMuted: '#d0dcef', accent: '#9f4628', accentHover: '#aa4c2b', editorLink: '#ffbd89',
+  }),
+  createColorfulTheme('walnut', 'Walnut', 'light', {
+    bgBase: '#f8ecda', bgSurface: '#d3a777', bgElevated: '#fff5e6', bgHover: '#eed0a9', bgActive: '#e2b986',
+    borderDefault: '#bc8b61', borderStrong: '#966442', textPrimary: '#392318', textSecondary: '#472e20',
+    textMuted: '#432b1d', accent: '#754328', accentHover: '#62351f', editorLink: '#305e4e',
+  }, {
+    editor: 'repeating-linear-gradient(3deg, transparent 0 12px, #72401307 13px 14px, transparent 15px 23px), linear-gradient(110deg, #fcf2e2, #f3e1c7)',
+    panels: 'repeating-radial-gradient(ellipse at -24% 38%, #58321616 0 1px, transparent 2px 8px, #fff5db28 9px 10px, transparent 12px 16px), linear-gradient(102deg, #e0b98f, #c99667 58%, #dfb68c)',
+  }),
+  createColorfulTheme('sherbet', 'Sherbet', 'light', {
+    bgBase: '#fff4ed', bgSurface: '#edc6d3', bgElevated: '#fff8f3', bgHover: '#f5d7e2', bgActive: '#eabdd1',
+    borderDefault: '#dca7b7', borderStrong: '#ad758f', textPrimary: '#3b2440', textSecondary: '#57384f',
+    textMuted: '#66435e', accent: '#97386b', accentHover: '#812d5b', editorLink: '#734488',
+  }, {
+    editor: 'linear-gradient(135deg, #fff8e9 0%, #fbeaf0 52%, #f1edf9 100%)',
+    panels: 'linear-gradient(120deg, #f3c2a9 0%, #eec7da 48%, #d7c4ee 100%)',
+  }),
+  createColorfulTheme('lagoon', 'Lagoon', 'light', {
+    bgBase: '#edf9f6', bgSurface: '#b6dcd9', bgElevated: '#f7fffd', bgHover: '#c6ece7', bgActive: '#a6d4cf',
+    borderDefault: '#8dbdb9', borderStrong: '#598b87', textPrimary: '#19353e', textSecondary: '#294951',
+    textMuted: '#375760', accent: '#126773', accentHover: '#0c535e', editorLink: '#28508d',
+  }, {
+    editor: 'linear-gradient(145deg, #f3fcf4 0%, #e2f5f2 54%, #eaf1fd 100%)',
+    panels: 'linear-gradient(145deg, #c8e7ce 0%, #acd8d6 50%, #adcce8 100%)',
+  }),
+  createColorfulTheme('aurora', 'Aurora', 'dark', {
+    bgBase: '#25243d', bgSurface: '#30294c', bgElevated: '#3a3454', bgHover: '#43395f', bgActive: '#52436b',
+    borderDefault: '#4c4867', borderStrong: '#78668d', textPrimary: '#f6f2ff', textSecondary: '#e4def5',
+    textMuted: '#ccc6e4', accent: '#71499a', accentHover: '#7b50a3', editorLink: '#92e4db',
+  }, {
+    editor: 'linear-gradient(140deg, #20233a 0%, #2e2445 57%, #223844 100%)',
+    panels: 'linear-gradient(115deg, #282444 0%, #392953 51%, #23474e 100%)',
+  }),
+]
+
+function readGradient(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const gradient = value.trim()
+  if (!/^(?:repeating-)?(?:linear|radial|conic)-gradient\(/i.test(gradient)) return undefined
+  if (/[;{}\\@]|url\s*\(/i.test(gradient)) return undefined
+  if (typeof CSS !== 'undefined' && !CSS.supports('background-image', gradient)) return undefined
+  return gradient
+}
+
+export function getThemeBackgroundImage(theme: AppTheme, area: 'editor' | 'panels'): string {
+  const color = area === 'editor' ? theme.colors.bgBase : theme.colors.bgSurface
+  return readGradient(theme.backgrounds?.[area]) ?? readGradient(color) ?? 'none'
+}
+
+function getBackgroundColor(value: string, fallback: string): string {
+  if (typeof value !== 'string' || /[;{}]/.test(value) || readGradient(value)) return fallback
+  if (typeof CSS !== 'undefined' && !CSS.supports('background-color', value)) return fallback
+  return value
+}
 
 /** Генерация CSS переменных для темы */
 export function generateCssVariables(theme: AppTheme): string {
   const { colors, typography } = theme
   const isDark = theme.baseTheme === 'dark'
+  const fallback = isDark ? DARK_COLORS : LIGHT_COLORS
 
   return `
     :root, [data-theme="${theme.baseTheme}"] {
-      --bg-base: ${colors.bgBase} !important;
-      --bg-surface: ${colors.bgSurface} !important;
+      --bg-base: ${getBackgroundColor(colors.bgBase, fallback.bgBase)} !important;
+      --bg-surface: ${getBackgroundColor(colors.bgSurface, fallback.bgSurface)} !important;
+      --theme-editor-image: ${getThemeBackgroundImage(theme, 'editor')} !important;
+      --theme-panel-image: ${getThemeBackgroundImage(theme, 'panels')} !important;
       --bg-elevated: ${colors.bgElevated} !important;
       --bg-hover: ${colors.bgHover} !important;
       --bg-active: ${colors.bgActive} !important;
@@ -328,7 +522,7 @@ export function generateCssVariables(theme: AppTheme): string {
       --hljs-number: ${colors.hljsNumber} !important;
       --hljs-comment: ${colors.hljsComment} !important;
       --hljs-attr: ${colors.hljsNumber} !important;
-      --hljs-symbol: ${colors.accent} !important;
+      --hljs-symbol: ${colors.codeblockLang} !important;
       --hljs-deletion: ${colors.hljsTitle} !important;
 
       --table-border: ${colors.tableBorder} !important;
@@ -407,6 +601,8 @@ export function parseSingleTheme(data: any): AppTheme | null {
     ...DEFAULT_TYPOGRAPHY,
     ...(data.typography && typeof data.typography === 'object' ? data.typography : {}),
   }
+  const editor = readGradient(data.backgrounds?.editor)
+  const panels = readGradient(data.backgrounds?.panels)
 
   return {
     id: typeof data.id === 'string' && data.id ? data.id : `custom_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -414,6 +610,7 @@ export function parseSingleTheme(data: any): AppTheme | null {
     isBuiltin: false,
     baseTheme,
     colors,
+    ...(editor || panels ? { backgrounds: { editor, panels } } : {}),
     typography,
   }
 }

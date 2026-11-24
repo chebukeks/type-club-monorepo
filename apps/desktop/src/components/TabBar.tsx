@@ -47,7 +47,7 @@ export function TabBar() {
   }
 
   return (
-    <div className="flex items-center h-[36px] bg-[var(--bg-surface)] overflow-x-auto select-none" style={{ paddingLeft: '10px', paddingRight: '10px', gap: '6px' }}>
+    <div className="flex items-center h-[36px] overflow-x-auto select-none" style={{ paddingLeft: '10px', paddingRight: '10px', gap: '6px' }}>
       {state.tabs.map((tab, index) => {
         const isActive = tab.id === state.activeTabId
         const isDropTarget = dropIndex === index && dragIndex !== null && dragIndex !== index

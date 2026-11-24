@@ -209,7 +209,7 @@ export function TitleBar() {
   return (
     <>
       <div
-        className="relative flex items-center h-9 bg-[var(--bg-surface)] select-none"
+        className="relative flex items-center h-9 select-none"
         style={{ paddingLeft: isMac ? '78px' : '8px', paddingRight: '0' }}
       >
         {/* Область перетаскивания окна — левая часть */}

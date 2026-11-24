@@ -1,11 +1,37 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
+import { promises as fs } from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { replaceAppImage } from '../../../electron/appImageUpdate.ts'
 import {
   isNewerVersion,
   validateUpdateUrl,
   sanitizeUpdateFileName,
   verifySha256Checksum,
 } from '../updaterSecurity.ts'
+
+it('stages an AppImage before replacing the installed file', async (t) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'typeclub-update-test-'))
+  const target = path.join(directory, 'Type Club.AppImage')
+  const download = path.join(directory, 'download.AppImage')
+  t.after(async () => {
+    await fs.unlink(target)
+    await fs.unlink(download).catch(() => {})
+    await fs.rmdir(directory)
+  })
+
+  await fs.writeFile(target, 'old release')
+  await assert.rejects(replaceAppImage(download, target), { code: 'ENOENT' })
+  assert.strictEqual(await fs.readFile(target, 'utf8'), 'old release')
+  assert.deepStrictEqual(await fs.readdir(directory), ['Type Club.AppImage'])
+
+  await fs.writeFile(download, 'new release')
+  await replaceAppImage(download, target)
+  assert.strictEqual(await fs.readFile(target, 'utf8'), 'new release')
+  assert.strictEqual(await fs.readFile(download, 'utf8'), 'new release')
+  if (process.platform !== 'win32') assert.strictEqual((await fs.stat(target)).mode & 0o777, 0o755)
+})
 
 describe('OWASP ASVS V10.3 & Top 10 (A08:2021) — Software Updater Security', () => {
   describe('Downgrade & Rollback Attack Protection (ASVS V10.3.3)', () => {

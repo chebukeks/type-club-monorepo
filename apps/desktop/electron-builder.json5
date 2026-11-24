@@ -25,6 +25,10 @@
     {
       "from": "resources/dictionaries",
       "to": "resources/dictionaries"
+    },
+    {
+      "from": "build/icons/icon.png",
+      "to": "file-drag.png"
     }
   ],
   "mac": {

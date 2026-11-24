@@ -111,6 +111,7 @@ export function EditorCore({
   focusMode,
   onTocUpdate,
   extraPlugins,
+  resolveImageSrc,
   containerStyle,
   collaboration,
   userRole,
@@ -361,7 +362,7 @@ export function EditorCore({
         heading: (node, view, getPos) => new HeadingView(node, view, getPos),
         code_block: (node, view, getPos) => new CodeBlockView(node, view, getPos),
         math_block: (node, view, getPos) => new MathBlockView(node, view, getPos),
-        image: (node, view, getPos) => new ImageView(node, view, getPos),
+        image: (node, view, getPos) => new ImageView(node, view, getPos, resolveImageSrc),
         suggestion_note: (node, view, getPos) => new SuggestionNoteView(node, view, getPos),
         math_inline: isPreview
           ? (node: PMNode) => new MathInlinePreviewView(node)
@@ -387,7 +388,7 @@ export function EditorCore({
       view.destroy();
       viewRef.current = null;
     };
-  }, [editorMode, readOnly, collaboration, userRole, userId, userNickname, suggestionModeActive]);
+  }, [editorMode, readOnly, collaboration, userRole, userId, userNickname, suggestionModeActive, resolveImageSrc]);
 
   useEffect(() => {
     const handleFlushSync = () => {

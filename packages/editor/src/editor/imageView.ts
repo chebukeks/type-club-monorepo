@@ -55,7 +55,12 @@ export class ImageView implements NodeView {
   private captionInput: HTMLInputElement | null = null
   private currentSrc: string = ''
 
-  constructor(node: PMNode, view: EditorView, getPos: () => number | undefined) {
+  constructor(
+    node: PMNode,
+    view: EditorView,
+    getPos: () => number | undefined,
+    private readonly resolveImageSrc?: (src: string) => string,
+  ) {
     this.node = node
     this.view = view
     this.getPos = getPos
@@ -127,7 +132,7 @@ export class ImageView implements NodeView {
         const siteUrl = (typeof window !== 'undefined' && (window as any).__TYPE_CLUB_SITE_URL__) || 'https://type-club.ru'
         img.src = `${siteUrl.replace(/\/$/, '')}${this.currentSrc}`
       } else {
-        img.src = this.currentSrc
+        img.src = this.resolveImageSrc?.(this.currentSrc) ?? this.currentSrc
       }
       if (this.node.attrs.alt) img.alt = this.node.attrs.alt
       if (this.node.attrs.title) img.title = this.node.attrs.title

@@ -1,20 +1,16 @@
 import { Plugin, PluginKey } from 'prosemirror-state'
 import { Decoration, DecorationSet } from 'prosemirror-view'
 import { Node as PMNode } from 'prosemirror-model'
-import type { EditorView } from 'prosemirror-view'
 import { spellcheckService } from './spellcheckService'
 
 export const spellcheckPluginKey = new PluginKey('spellcheck')
 
-let checkDebounceTimer: ReturnType<typeof setTimeout> | null = null
-
-function getSpellcheckDecorations(doc: PMNode, view?: EditorView): DecorationSet {
+function getSpellcheckDecorations(doc: PMNode, uncachedWords?: Set<string>): DecorationSet {
   if (!spellcheckService.getEnabled()) {
     return DecorationSet.empty
   }
 
   const decorations: Decoration[] = []
-  const uncachedWords: string[] = []
   const wordRegex = /[\p{L}\p{N}'_-]+/gu
 
   doc.descendants((node, pos) => {
@@ -51,23 +47,11 @@ function getSpellcheckDecorations(doc: PMNode, view?: EditorView): DecorationSet
             })
           )
         } else if (cachedStatus === undefined) {
-          uncachedWords.push(clean)
+          uncachedWords?.add(clean)
         }
       }
     }
   })
-
-  // Асинхронная фоновая пакетная проверка неизвестных слов
-  if (uncachedWords.length > 0 && view) {
-    if (checkDebounceTimer) clearTimeout(checkDebounceTimer)
-    checkDebounceTimer = setTimeout(async () => {
-      const unique = Array.from(new Set(uncachedWords))
-      await spellcheckService.checkWords(unique)
-      if (view && !view.isDestroyed) {
-        view.dispatch(view.state.tr.setMeta('spellcheckRefresh', true))
-      }
-    }, 40)
-  }
 
   return DecorationSet.create(doc, decorations)
 }
@@ -93,30 +77,32 @@ export const spellcheckPlugin = new Plugin({
   view(editorView) {
     let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
-    // Подписываемся на изменения словарей для мгновенного обновления
+    const scheduleCheck = (delay: number) => {
+      if (debounceTimer) clearTimeout(debounceTimer)
+      if (!spellcheckService.getProvider()) return
+      debounceTimer = setTimeout(async () => {
+        const uncachedWords = new Set<string>()
+        getSpellcheckDecorations(editorView.state.doc, uncachedWords)
+        await spellcheckService.checkWords([...uncachedWords])
+        if (!editorView.isDestroyed) {
+          editorView.dispatch(editorView.state.tr.setMeta('spellcheckRefresh', true))
+        }
+      }, delay)
+    }
+
     const unsubscribe = spellcheckService.subscribe(() => {
-      if (editorView && !editorView.isDestroyed) {
+      if (!editorView.isDestroyed) {
         editorView.dispatch(editorView.state.tr.setMeta('spellcheckRefresh', true))
+        scheduleCheck(40)
       }
     })
 
-    // Первичная фоновая проверка при монтировании
-    setTimeout(() => {
-      if (editorView && !editorView.isDestroyed) {
-        getSpellcheckDecorations(editorView.state.doc, editorView)
-      }
-    }, 50)
+    scheduleCheck(40)
 
     return {
       update(view, prevState) {
         if (!view.state.doc.eq(prevState.doc)) {
-          if (debounceTimer) clearTimeout(debounceTimer)
-          debounceTimer = setTimeout(() => {
-            if (view && !view.isDestroyed) {
-              getSpellcheckDecorations(view.state.doc, view)
-              view.dispatch(view.state.tr.setMeta('spellcheckRefresh', true))
-            }
-          }, 350)
+          scheduleCheck(350)
         }
       },
       destroy() {

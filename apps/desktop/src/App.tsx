@@ -76,12 +76,12 @@ function AppLayout() {
   }, [sidebarWidth, saveWidth])
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[var(--bg-surface)] text-[var(--text-primary)]">
+    <div className="theme-panel-background flex flex-col h-screen w-screen overflow-hidden bg-[var(--bg-surface)] text-[var(--text-primary)]">
       {/* Шапка окна */}
       <TitleBar />
 
       {/* Основная область: сайдбар + ручка ресайза + редактор */}
-      <div className="flex flex-1 overflow-hidden bg-[var(--bg-surface)] relative">
+      <div className="flex flex-1 overflow-hidden relative">
         {/* Левая панель — файловый проводник */}
         {state.sidebarOpen && <Sidebar width={sidebarWidth} />}
 
@@ -95,7 +95,7 @@ function AppLayout() {
         )}
 
         {/* Правая панель — вкладки + редактор */}
-        <div className="relative flex flex-col flex-1 overflow-hidden p-2 pt-0 bg-[var(--bg-surface)]">
+        <div className="relative flex flex-col flex-1 overflow-hidden p-2 pt-0">
           {state.tabBarOpen && <TabBar />}
           <div className="flex-1 overflow-hidden rounded-xl border border-[var(--border-default)] shadow-xs bg-[var(--bg-base)] flex flex-col relative isolate" style={{ backgroundClip: 'padding-box' }}>
             <MarkdownEditor />

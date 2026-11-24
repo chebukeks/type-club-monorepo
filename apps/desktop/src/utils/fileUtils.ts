@@ -53,3 +53,27 @@ export function suggestFileName(content: string, fallback: string = 'Untitled.md
 
   return clean.toLowerCase().endsWith('.md') ? clean : `${clean}.md`
 }
+
+export function resolveDocumentImageSrc(src: string, documentPath: string): string {
+  if (!src || /^(?:[a-z][\w+.-]*:|[/\\]|[?#])/i.test(src)) return src
+
+  const normalizedPath = documentPath.replace(/\\/g, '/')
+  const encodedPath = normalizedPath.split('/').map(encodeURIComponent).join('/')
+  const documentUrl = normalizedPath.startsWith('//')
+    ? `file:${encodedPath}`
+    : `file:///${encodedPath.replace(/^\//, '').replace(/^([a-z])%3A\//i, '$1:/')}`
+
+  return new URL(src.replace(/\\/g, '/'), documentUrl).href
+}
+
+export const LOCAL_IMAGE_SCHEME = 'typeclub-image'
+
+export function resolveDesktopImageSrc(src: string, documentPath: string, pageProtocol: string): string {
+  const fileUrl = resolveDocumentImageSrc(src, documentPath)
+  if (fileUrl === src || pageProtocol === 'file:') return fileUrl
+
+  const url = new URL(fileUrl)
+  const fragment = url.hash
+  url.hash = ''
+  return `${LOCAL_IMAGE_SCHEME}://local/?file=${encodeURIComponent(url.href)}${fragment}`
+}

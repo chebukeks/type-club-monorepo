@@ -1,15 +1,18 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, screen, clipboard } from 'electron'
-import { fileURLToPath } from 'node:url'
+import { app, BrowserWindow, ipcMain, dialog, shell, screen, clipboard, nativeImage, net, protocol } from 'electron'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
 import http from 'node:http'
 import https from 'node:https'
 import crypto from 'node:crypto'
 import { spawn } from 'node:child_process'
+import { createRequire } from 'node:module'
 import os from 'node:os'
 import Store from 'electron-store'
 import { importFileFromPath } from './importers'
 import { markdownToDocxBuffer, DocxExportOptions } from './docxExporter'
+import { relaunchAppImage, replaceAppImage } from './appImageUpdate'
+import { LOCAL_IMAGE_SCHEME } from '../src/utils/fileUtils'
 
 // Используем встроенный оффлайн Hunspell вместо Windows Native Spellchecker.
 if (process.platform === 'win32') {
@@ -19,11 +22,9 @@ if (process.platform === 'win32') {
 app.commandLine.appendSwitch('disable-background-timer-throttling', 'false')
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const require = createRequire(import.meta.url)
 
-import { createRequire } from 'node:module'
 import { MODERN_WORDS, RUSSIAN_PRODUCTIVE_PREFIXES, RUSSIAN_NOUN_SUFFIXES } from './modernWords'
-
-const esmRequire = createRequire(import.meta.url)
 
 // Локальный спеллчекер (0ms latency, оффлайн) с отложенной фоновой инициализацией
 let spellRu: any = null
@@ -40,13 +41,14 @@ async function ensureSpellcheckerReady(): Promise<void> {
 
   spellcheckInitPromise = (async () => {
     try {
-      const nspellModule = esmRequire('nspell')
-      const dictRuModule = esmRequire('dictionary-ru')
-      const dictEnModule = esmRequire('dictionary-en')
-      const nspellFn = nspellModule.default || nspellModule
+      const [{ default: nspell }, { default: dictRu }, { default: dictEn }] = await Promise.all([
+        import('nspell'),
+        import('dictionary-ru'),
+        import('dictionary-en'),
+      ])
 
-      spellRu = nspellFn(dictRuModule.default || dictRuModule)
-      spellEn = nspellFn(dictEnModule.default || dictEnModule)
+      spellRu = nspell(dictRu)
+      spellEn = nspell(dictEn)
       customWordsSet.clear()
 
       // Добавляем расширенный словарь терминов
@@ -66,7 +68,7 @@ async function ensureSpellcheckerReady(): Promise<void> {
       }
 
       try {
-        const englishArray = esmRequire('an-array-of-english-words')
+        const englishArray = require('an-array-of-english-words')
         if (Array.isArray(englishArray)) {
           englishWordsSet = new Set(englishArray)
         } else {
@@ -80,6 +82,7 @@ async function ensureSpellcheckerReady(): Promise<void> {
       spellcheckInitialized = true
     } catch (err) {
       console.error('[SPELLCHECK] Error initializing spellchecker in main:', err)
+      throw err
     } finally {
       spellcheckInitPromise = null
     }
@@ -317,7 +320,7 @@ const allowedRoots = new Set<string>()
 function addAllowedRoot(targetPath?: string): void {
   if (!targetPath) return
   try {
-    const resolved = path.resolve(targetPath).toLowerCase()
+    const resolved = path.resolve(targetPath)
     try {
       const stat = fs.statSync(resolved)
       allowedRoots.add(stat.isDirectory() ? resolved : path.dirname(resolved))
@@ -330,30 +333,15 @@ function addAllowedRoot(targetPath?: string): void {
 function isPathAllowed(filePath: string): boolean {
   if (!filePath) return false
   try {
-    const resolved = path.resolve(filePath).toLowerCase()
-    // Разрешаем стандартные системные папки пользователя
-    try {
-      const docsDir = path.resolve(app.getPath('documents')).toLowerCase()
-      if (resolved.startsWith(docsDir)) return true
-    } catch { /* ignore */ }
-    try {
-      const desktopDir = path.resolve(app.getPath('desktop')).toLowerCase()
-      if (resolved.startsWith(desktopDir)) return true
-    } catch { /* ignore */ }
-    try {
-      const downloadsDir = path.resolve(app.getPath('downloads')).toLowerCase()
-      if (resolved.startsWith(downloadsDir)) return true
-    } catch { /* ignore */ }
-    try {
-      const userDataDir = path.resolve(app.getPath('userData')).toLowerCase()
-      if (resolved.startsWith(userDataDir)) return true
-    } catch { /* ignore */ }
-
-    // Проверяем открытые пользователем папки/файлы
-    for (const root of allowedRoots) {
-      if (resolved.startsWith(root)) return true
+    const resolved = path.resolve(filePath)
+    const roots = [...allowedRoots]
+    for (const name of ['documents', 'desktop', 'downloads', 'userData'] as const) {
+      try { roots.push(app.getPath(name)) } catch { /* ignore */ }
     }
-    return false
+    return roots.some(root => {
+      const relative = path.relative(root, resolved)
+      return !path.isAbsolute(relative) && relative !== '..' && !relative.startsWith(`..${path.sep}`)
+    })
   } catch {
     return false
   }
@@ -464,6 +452,11 @@ if (!gotTheLock) {
 process.env.APP_ROOT = path.join(__dirname, '..')
 
 export const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
+if (VITE_DEV_SERVER_URL) {
+  protocol.registerSchemesAsPrivileged([
+    { scheme: LOCAL_IMAGE_SCHEME, privileges: { standard: true, secure: true } },
+  ])
+}
 export const MAIN_DIST = path.join(process.env.APP_ROOT, 'dist-electron')
 export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 
@@ -817,49 +810,45 @@ ipcMain.on('shell:showItemInFolder', (_event, filePath: string) => {
   } catch { /* ignore */ }
 })
 
-// --- Копирование файла в системный буфер обмена как файла ---
+function getTransferFilePath(filePath: string): string {
+  if (typeof filePath !== 'string' || !path.isAbsolute(filePath)) {
+    throw new Error('An absolute file path is required')
+  }
+  const normalizedPath = path.normalize(filePath)
+  assertPathAllowed(normalizedPath)
+  if (!fs.statSync(normalizedPath).isFile()) throw new Error('The path does not point to a file')
+  return normalizedPath
+}
+
 ipcMain.handle('clipboard:copyFile', async (_event, filePath: string): Promise<boolean> => {
   try {
-    assertPathAllowed(filePath)
-    const normalizedPath = path.resolve(filePath)
-    if (!fs.existsSync(normalizedPath)) {
-      return false
-    }
-
-    if (process.platform === 'win32') {
-      // DROPFILES struct для Windows (CF_HDROP):
-      // DWORD pFiles = 20 (смещение до списка файлов)
-      // POINT pt = {0, 0} (8 байт)
-      // BOOL fNC = 0 (4 байта)
-      // BOOL fWide = 1 (4 байта, признак UTF-16LE)
-      const header = Buffer.alloc(20)
-      header.writeUInt32LE(20, 0) // pFiles
-      header.writeUInt32LE(0, 4)  // pt.x
-      header.writeUInt32LE(0, 8)  // pt.y
-      header.writeUInt32LE(0, 12) // fNC
-      header.writeUInt32LE(1, 16) // fWide
-
-      // Список файлов в формате двойного null-terminator UTF-16LE: "path\0\0"
-      const fileListBuffer = Buffer.from(normalizedPath + '\0\0', 'ucs2')
-      const hDropBuffer = Buffer.concat([header, fileListBuffer])
-
-      clipboard.writeBuffer('CF_HDROP', hDropBuffer)
-      clipboard.writeBuffer('FileNameW', Buffer.from(normalizedPath + '\0', 'ucs2'))
-      clipboard.writeText(normalizedPath)
-    } else if (process.platform === 'darwin') {
-      const plist = `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><array><string>${normalizedPath}</string></array></plist>`
-      clipboard.writeBuffer('NSFilenamesPboardType', Buffer.from(plist, 'utf8'))
-      clipboard.writeText(normalizedPath)
-    } else {
-      // Linux
-      const uri = `file://${encodeURI(normalizedPath)}`
-      clipboard.writeBuffer('text/uri-list', Buffer.from(`${uri}\r\n`, 'utf8'))
-      clipboard.writeBuffer('x-special/gnome-copied-files', Buffer.from(`copy\n${uri}\r\n`, 'utf8'))
-      clipboard.writeText(normalizedPath)
-    }
+    const file = getTransferFilePath(filePath)
+    // Electron 42 exposes Chromium's native file clipboard writer through this binding.
+    // Migrate to clipboard.write(ClipboardItem[]) with text/uri-list when upgrading to Electron 44.
+    const fileClipboard = clipboard as typeof clipboard & { _writeFilesForTesting?: (files: string[]) => void }
+    if (!fileClipboard._writeFilesForTesting) throw new Error('Native file clipboard is unavailable')
+    fileClipboard._writeFilesForTesting([file])
     return true
   } catch (err) {
     console.error('Ошибка копирования файла в буфер обмена:', err)
+    return false
+  }
+})
+
+let fileDragIcon: Electron.NativeImage | undefined
+
+ipcMain.handle('fs:startFileDrag', (event, filePath: string): boolean => {
+  try {
+    const file = getTransferFilePath(filePath)
+    const iconPath = app.isPackaged
+      ? path.join(process.resourcesPath, 'file-drag.png')
+      : path.join(process.env.APP_ROOT, 'build', 'icons', 'icon.png')
+    fileDragIcon ??= nativeImage.createFromPath(iconPath).resize({ width: 32 })
+    if (fileDragIcon.isEmpty()) throw new Error('File drag icon is unavailable')
+    event.sender.startDrag({ file, icon: fileDragIcon })
+    return true
+  } catch (err) {
+    console.error('Failed to start file drag:', err)
     return false
   }
 })
@@ -1736,22 +1725,12 @@ del "%~f0"
   }
 
   if (installType === 'appimage' && process.platform === 'linux') {
-    fs.chmodSync(resolvedPath, 0o755)
-    const targetAppImage = process.env.APPIMAGE || resolvedPath
-    const shPath = path.join(tempDir, 'apply-update.sh')
-    const shContent = `#!/bin/sh
-sleep 1
-cp -f "${resolvedPath}" "${targetAppImage}"
-chmod +x "${targetAppImage}"
-exec "${targetAppImage}" &
-rm -f "$0"
-`
-    await fs.promises.writeFile(shPath, shContent, { mode: 0o755 })
-    const child = spawn('/bin/sh', [shPath], {
-      detached: true,
-      stdio: 'ignore',
-    })
-    child.unref()
+    const targetAppImage = process.env.APPIMAGE
+    if (!targetAppImage || !path.isAbsolute(targetAppImage)) {
+      throw new Error('The running AppImage path could not be determined')
+    }
+    await replaceAppImage(resolvedPath, targetAppImage)
+    await relaunchAppImage(targetAppImage)
     allowClose = true
     app.quit()
     return { success: true }
@@ -1784,4 +1763,38 @@ app.on('activate', () => {
   }
 })
 
-app.whenReady().then(createWindow)
+app.whenReady().then(() => {
+  if (VITE_DEV_SERVER_URL) {
+    protocol.handle(LOCAL_IMAGE_SCHEME, async request => {
+      const url = new URL(request.url)
+      const file = url.searchParams.get('file')
+      if (request.method !== 'GET' || url.host !== 'local' || !file) {
+        return new Response(null, { status: 400 })
+      }
+
+      try {
+        const filePath = fileURLToPath(file)
+        if (!isPathAllowed(filePath)) return new Response(null, { status: 403 })
+        const realPath = await fs.promises.realpath(filePath)
+        if (!isPathAllowed(realPath)) return new Response(null, { status: 403 })
+
+        const response = await net.fetch(pathToFileURL(realPath).href)
+        const contentType = response.headers.get('content-type')
+        if (!response.ok || !contentType?.startsWith('image/')) {
+          await response.body?.cancel()
+          return new Response(null, { status: 415 })
+        }
+        return new Response(response.body, {
+          headers: {
+            'Content-Type': contentType,
+            'Content-Security-Policy': "default-src 'none'; sandbox",
+            'X-Content-Type-Options': 'nosniff',
+          },
+        })
+      } catch {
+        return new Response(null, { status: 404 })
+      }
+    })
+  }
+  createWindow()
+})

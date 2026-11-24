@@ -94,6 +94,7 @@ export interface AppTheme {
   isBuiltin?: boolean;
   baseTheme: 'dark' | 'light';
   colors: ThemeColors;
+  backgrounds?: { editor?: string; panels?: string };
   typography: ThemeTypography;
 }
 
@@ -301,6 +302,8 @@ export interface IElectronAPI {
   deleteItem: (filePath: string) => Promise<void>;
   showItemInFolder: (filePath: string) => void;
   copyFileToClipboard: (filePath: string) => Promise<boolean>;
+  startFileDrag: (filePath: string) => Promise<boolean>;
+  getPathForFile: (file: File) => string;
   saveLocalImage: (filePath: string, filename: string, base64: string) => Promise<string | null>;
   confirmDelete: (itemName: string) => Promise<boolean>;
   openFolder: () => Promise<string | null>;
