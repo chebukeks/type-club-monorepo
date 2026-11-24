@@ -1,5 +1,7 @@
 import { Plugin, PluginKey, TextSelection } from 'prosemirror-state'
 import type { EditorView } from 'prosemirror-view'
+import { getTranslation, type TranslationKey } from '../i18n'
+import { tableEnterNav } from './keymap'
 import {
   addColumnAfter,
   addColumnBefore,
@@ -18,16 +20,23 @@ let currentOverlay: HTMLElement | null = null
 let doneBtn: HTMLElement | null = null
 let scrollListener: (() => void) | null = null
 let resizeListener: (() => void) | null = null
-let dragColIdx = -1
-let dragRowIdx = -1
+
+function makeControl(className: string, text: string, label: string): HTMLButtonElement {
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.className = className
+  button.textContent = text
+  button.title = label
+  button.setAttribute('aria-label', label)
+  button.addEventListener('pointerdown', event => event.preventDefault())
+  return button
+}
 
 function hideAll() {
   if (currentOverlay) { currentOverlay.remove(); currentOverlay = null }
   if (doneBtn) { doneBtn.remove(); doneBtn = null }
   if (scrollListener) { window.removeEventListener('scroll', scrollListener, true); scrollListener = null }
   if (resizeListener) { window.removeEventListener('resize', resizeListener); resizeListener = null }
-  dragColIdx = -1
-  dragRowIdx = -1
 }
 
 function updateOverlayPosition(view: EditorView, pos: number) {
@@ -41,8 +50,8 @@ function updateOverlayPosition(view: EditorView, pos: number) {
   const rect = table.getBoundingClientRect()
   const viewRect = view.dom.getBoundingClientRect()
 
-  // If table is completely outside the visible editor area, hide overlay
-  if (rect.bottom < viewRect.top || rect.top > viewRect.bottom || rect.right < viewRect.left || rect.left > viewRect.right) {
+  if (rect.bottom <= Math.max(viewRect.top, 0) || rect.top >= Math.min(viewRect.bottom, window.innerHeight) ||
+      rect.right <= Math.max(viewRect.left, 0) || rect.left >= Math.min(viewRect.right, window.innerWidth)) {
     currentOverlay.style.display = 'none'
     if (doneBtn) doneBtn.style.display = 'none'
     return
@@ -56,9 +65,63 @@ function updateOverlayPosition(view: EditorView, pos: number) {
 
   if (doneBtn) {
     doneBtn.style.display = 'block'
-    doneBtn.style.left = `${rect.left}px`
-    doneBtn.style.top = `${rect.bottom + 6}px`
+    const margin = 8
+    const left = Math.max(margin, Math.min(rect.right, window.innerWidth - margin) - doneBtn.offsetWidth)
+    const gap = left > rect.left + 28 ? 8 : 30
+    const top = Math.max(margin, Math.min(rect.bottom + gap, window.innerHeight - doneBtn.offsetHeight - margin))
+    doneBtn.style.left = `${left}px`
+    doneBtn.style.top = `${top}px`
   }
+}
+
+function makeDragHandle(
+  overlay: HTMLElement,
+  className: 'te-col-drag' | 'te-row-drag',
+  index: number,
+  onMove: (from: number, to: number) => void,
+): HTMLDivElement {
+  const handle = document.createElement('div')
+  handle.className = className
+  handle.dataset.index = String(index)
+  let start: { id: number; x: number; y: number } | null = null
+  let target: HTMLElement | undefined
+
+  const handleAt = (event: PointerEvent) => document.elementsFromPoint(event.clientX, event.clientY)
+    .find((element): element is HTMLElement =>
+      element instanceof HTMLElement && element.parentElement === overlay && element.classList.contains(className))
+
+  const clear = () => {
+    start = null
+    handle.classList.remove('te-dragging')
+    target?.classList.remove('te-drop-target')
+    target = undefined
+  }
+
+  handle.addEventListener('pointerdown', (event) => {
+    if (!event.isPrimary || event.button !== 0) return
+    event.preventDefault()
+    handle.setPointerCapture(event.pointerId)
+    start = { id: event.pointerId, x: event.clientX, y: event.clientY }
+  })
+  handle.addEventListener('pointermove', (event) => {
+    if (start?.id !== event.pointerId) return
+    if (Math.hypot(event.clientX - start.x, event.clientY - start.y) < 5 &&
+        !handle.classList.contains('te-dragging')) return
+    handle.classList.add('te-dragging')
+    const next = handleAt(event)
+    target?.classList.remove('te-drop-target')
+    target = next === handle ? undefined : next
+    target?.classList.add('te-drop-target')
+  })
+  handle.addEventListener('pointerup', (event) => {
+    if (start?.id !== event.pointerId) return
+    const to = handle.classList.contains('te-dragging') ? handleAt(event)?.dataset.index : undefined
+    clear()
+    if (to !== undefined && Number(to) !== index) onMove(index, Number(to))
+  })
+  handle.addEventListener('pointercancel', clear)
+  handle.addEventListener('lostpointercapture', clear)
+  return handle
 }
 
 function showEditUI(view: EditorView, pos: number) {
@@ -78,105 +141,33 @@ function showEditUI(view: EditorView, pos: number) {
   const rect = table.getBoundingClientRect()
   const cols = (table.rows[0]?.cells.length) || 0
   const rows = table.rows.length
+  const locale = document.documentElement.lang === 'ru' ? 'ru' : 'en'
+  const t = (key: TranslationKey) => getTranslation(locale, key)
 
   const overlay = document.createElement('div')
   overlay.className = 'table-edit-overlay'
   overlay.style.cssText = `position:fixed;pointer-events:none;z-index:20;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;`
   currentOverlay = overlay
 
-  // Drag & drop columns
-  let pendingColMove: { from: number; to: number } | null = null
+  // The table handles use pointer capture rather than the browser's file drag loop.
   for (let i = 0; i < cols; i++) {
     const cell = table.rows[0].cells[i]
     if (!cell) continue
     const cr = cell.getBoundingClientRect()
-    const el = document.createElement('div')
-    el.className = 'te-col-drag'
-    el.style.cssText = `position:absolute;left:${cr.left - rect.left}px;top:0;width:${cr.width}px;height:${cr.height}px;cursor:grab;pointer-events:auto;z-index:2;`
-    el.draggable = true
-    const idx = i
-    el.addEventListener('dragstart', (e) => {
-      dragColIdx = idx
-      if (e.dataTransfer) {
-        e.dataTransfer.effectAllowed = 'move'
-        e.dataTransfer.setData('text/plain', String(idx))
-      }
-      el.classList.add('te-dragging')
-    })
-    el.addEventListener('dragover', (e) => {
-      e.preventDefault()
-      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
-      if (dragColIdx >= 0 && dragColIdx !== idx) el.classList.add('te-drop-target')
-    })
-    el.addEventListener('dragleave', () => el.classList.remove('te-drop-target'))
-    el.addEventListener('drop', (e) => {
-      e.preventDefault()
-      el.classList.remove('te-drop-target')
-      if (dragColIdx >= 0 && dragColIdx !== idx) {
-        pendingColMove = { from: dragColIdx, to: idx }
-      }
-    })
-    el.addEventListener('dragend', () => {
-      dragColIdx = -1
-      el.classList.remove('te-dragging', 'te-drop-target')
-      if (pendingColMove) {
-        const { from, to } = pendingColMove
-        pendingColMove = null
-        setTimeout(() => {
-          if (!view.isDestroyed) {
-            moveColumnAt(view, pos, from, to)
-          }
-        }, 0)
-      }
-    })
+    const el = makeDragHandle(overlay, 'te-col-drag', i, (from, to) => moveColumnAt(view, pos, from, to))
+    el.title = t('editor.table.edit.moveColumn')
+    el.style.cssText = `position:absolute;left:${cr.left - rect.left}px;top:0;width:${cr.width}px;height:${cr.height}px;pointer-events:auto;z-index:2;`
     overlay.appendChild(el)
   }
 
-  // Drag & drop rows (skip header row 0)
-  let pendingRowMove: { from: number; to: number } | null = null
+  // The header row stays fixed.
   for (let i = 1; i < rows; i++) {
     const cell = table.rows[i]?.cells[0]
     if (!cell) continue
     const cr = cell.getBoundingClientRect()
-    const el = document.createElement('div')
-    el.className = 'te-row-drag'
-    el.style.cssText = `position:absolute;top:${cr.top - rect.top}px;left:0;width:${cr.width}px;height:${cr.height}px;cursor:grab;pointer-events:auto;z-index:2;`
-    el.draggable = true
-    const idx = i
-    el.addEventListener('dragstart', (e) => {
-      dragRowIdx = idx
-      if (e.dataTransfer) {
-        e.dataTransfer.effectAllowed = 'move'
-        e.dataTransfer.setData('text/plain', String(idx))
-      }
-      el.classList.add('te-dragging')
-    })
-    el.addEventListener('dragover', (e) => {
-      e.preventDefault()
-      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
-      if (dragRowIdx >= 0 && dragRowIdx !== idx) el.classList.add('te-drop-target')
-    })
-    el.addEventListener('dragleave', () => el.classList.remove('te-drop-target'))
-    el.addEventListener('drop', (e) => {
-      e.preventDefault()
-      el.classList.remove('te-drop-target')
-      if (dragRowIdx >= 0 && dragRowIdx !== idx) {
-        pendingRowMove = { from: dragRowIdx, to: idx }
-      }
-    })
-    el.addEventListener('dragend', () => {
-      dragRowIdx = -1
-      el.classList.remove('te-dragging', 'te-drop-target')
-      if (pendingRowMove) {
-        const { from, to } = pendingRowMove
-        pendingRowMove = null
-        setTimeout(() => {
-          if (!view.isDestroyed) {
-            moveRowAt(view, pos, from, to)
-          }
-        }, 0)
-      }
-    })
+    const el = makeDragHandle(overlay, 'te-row-drag', i, (from, to) => moveRowAt(view, pos, from, to))
+    el.title = t('editor.table.edit.moveRow')
+    el.style.cssText = `position:absolute;top:${cr.top - rect.top}px;left:0;width:${cr.width}px;height:${cr.height}px;pointer-events:auto;z-index:2;`
     overlay.appendChild(el)
   }
 
@@ -185,11 +176,8 @@ function showEditUI(view: EditorView, pos: number) {
     const cell = table.rows[0].cells[i]
     if (!cell) continue
     const cr = cell.getBoundingClientRect()
-    const b = document.createElement('button')
-    b.className = 'te-col-del'
+    const b = makeControl('te-col-del', '×', t('editor.table.edit.deleteColumn'))
     b.style.cssText = `position:absolute;left:${cr.left - rect.left}px;top:-20px;width:${cr.width}px;height:18px;z-index:3;pointer-events:auto;`
-    b.textContent = '×'
-    b.title = 'Удалить столбец'
     const idx = i
     b.addEventListener('click', (e) => { e.stopPropagation(); deleteColumnAt(view, pos, idx) })
     overlay.appendChild(b)
@@ -200,11 +188,8 @@ function showEditUI(view: EditorView, pos: number) {
     const cell = table.rows[i]?.cells[0]
     if (!cell) continue
     const cr = cell.getBoundingClientRect()
-    const b = document.createElement('button')
-    b.className = 'te-row-del'
+    const b = makeControl('te-row-del', '×', t('editor.table.edit.deleteRow'))
     b.style.cssText = `position:absolute;top:${cr.top - rect.top}px;left:-20px;width:18px;height:${cr.height}px;z-index:3;pointer-events:auto;`
-    b.textContent = '×'
-    b.title = 'Удалить строку'
     const idx = i
     b.addEventListener('click', (e) => { e.stopPropagation(); deleteRowAt(view, pos, idx) })
     overlay.appendChild(b)
@@ -214,11 +199,8 @@ function showEditUI(view: EditorView, pos: number) {
   if (cols > 0 && table.rows[0]?.cells[0]) {
     const firstCell = table.rows[0].cells[0]
     const cr = firstCell.getBoundingClientRect()
-    const b = document.createElement('button')
-    b.className = 'te-col-add'
+    const b = makeControl('te-col-add', '+', t('editor.table.edit.addColumnBefore'))
     b.style.cssText = `position:absolute;left:${cr.left - rect.left - 9}px;top:2px;z-index:3;pointer-events:auto;`
-    b.textContent = '+'
-    b.title = 'Добавить столбец слева'
     b.addEventListener('click', (e) => { e.stopPropagation(); addColumnBeforeAt(view, pos, 0) })
     overlay.appendChild(b)
   }
@@ -231,11 +213,8 @@ function showEditUI(view: EditorView, pos: number) {
     const cx = (i === cols - 1)
       ? cr.right - rect.left + 3
       : cr.right - rect.left - 9
-    const b = document.createElement('button')
-    b.className = 'te-col-add'
+    const b = makeControl('te-col-add', '+', t('editor.table.edit.addColumnAfter'))
     b.style.cssText = `position:absolute;left:${cx}px;top:2px;z-index:3;pointer-events:auto;`
-    b.textContent = '+'
-    b.title = 'Добавить столбец справа'
     const idx = i
     b.addEventListener('click', (e) => { e.stopPropagation(); addColumnAfterAt(view, pos, idx) })
     overlay.appendChild(b)
@@ -245,11 +224,8 @@ function showEditUI(view: EditorView, pos: number) {
   if (rows > 0 && table.rows[0]?.cells[0]) {
     const firstRowCell = table.rows[0].cells[0]
     const cr = firstRowCell.getBoundingClientRect()
-    const b = document.createElement('button')
-    b.className = 'te-row-add'
+    const b = makeControl('te-row-add', '+', t('editor.table.edit.addRowBefore'))
     b.style.cssText = `position:absolute;left:2px;top:${cr.top - rect.top - 9}px;z-index:3;pointer-events:auto;`
-    b.textContent = '+'
-    b.title = 'Добавить строку сверху'
     b.addEventListener('click', (e) => { e.stopPropagation(); addRowBeforeAt(view, pos, 0) })
     overlay.appendChild(b)
   }
@@ -262,11 +238,8 @@ function showEditUI(view: EditorView, pos: number) {
     const cy = (i === rows - 1)
       ? cr.bottom - rect.top + 3
       : cr.bottom - rect.top - 9
-    const b = document.createElement('button')
-    b.className = 'te-row-add'
+    const b = makeControl('te-row-add', '+', t('editor.table.edit.addRowAfter'))
     b.style.cssText = `position:absolute;left:2px;top:${cy}px;z-index:3;pointer-events:auto;`
-    b.textContent = '+'
-    b.title = 'Добавить строку снизу'
     const idx = i
     b.addEventListener('click', (e) => { e.stopPropagation(); addRowAfterAt(view, pos, idx) })
     overlay.appendChild(b)
@@ -274,10 +247,8 @@ function showEditUI(view: EditorView, pos: number) {
 
   document.body.appendChild(overlay)
 
-  const done = document.createElement('button')
-  done.className = 'te-done-btn'
-  done.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.bottom + 6}px;z-index:20;`
-  done.textContent = 'Готово'
+  const title = t('editor.table.edit.done')
+  const done = makeControl('te-done-btn', title, title)
   done.addEventListener('click', (e) => {
     e.stopPropagation()
     view.dispatch(view.state.tr.setMeta(tableEditPluginKey, null))
@@ -285,6 +256,7 @@ function showEditUI(view: EditorView, pos: number) {
   })
   document.body.appendChild(done)
   doneBtn = done
+  updateOverlayPosition(view, pos)
 
   // Attach scroll & resize listeners to track live table position
   scrollListener = () => updateOverlayPosition(view, pos)
@@ -516,6 +488,15 @@ export function tableEditPlugin(): Plugin {
     },
     props: {
       handleDOMEvents: {
+        beforeinput(view, event) {
+          if (!view.editable || !event.cancelable || event.isComposing) return false
+          const { inputType, data } = event
+          const keyboardNewline = inputType === 'insertText' && /^(?:\r\n|\r|\n)$/.test(data ?? '')
+          if (inputType !== 'insertParagraph' && inputType !== 'insertLineBreak' && !keyboardNewline) return false
+          if (!tableEnterNav(view.state, view.dispatch)) return false
+          event.preventDefault()
+          return true
+        },
         keydown(view, event) {
           const editPos = tableEditPluginKey.getState(view.state)
           if (editPos != null) {

@@ -13,9 +13,9 @@
  * 4. Обычные текстовые блоки из HTML:
  *    - Вливаются в текущий абзац без разрезания.
  */
-import { Plugin, PluginKey, TextSelection } from 'prosemirror-state'
+import { Plugin, PluginKey, TextSelection, type Transaction } from 'prosemirror-state'
 import { Slice, Fragment } from 'prosemirror-model'
-import type { Node as PMNode } from 'prosemirror-model'
+import type { Node as PMNode, ResolvedPos } from 'prosemirror-model'
 import type { EditorView } from 'prosemirror-view'
 import { parseMarkdown } from './markdownConfig'
 import { isVideoUrl } from './videoUtils'
@@ -210,6 +210,122 @@ function handleBlockPaste(view: EditorView, slice: Slice): boolean {
   return true
 }
 
+function isRawPasteContext($pos: ResolvedPos): boolean {
+  for (let depth = $pos.depth; depth >= 1; depth--) {
+    const name = $pos.node(depth).type.name
+    if (name === 'code_block' || name === 'math_block' || name === 'math_inline') return true
+  }
+  return false
+}
+
+function pasteUrl(view: EditorView, url: string, tr = view.state.tr): boolean {
+  const { schema } = view.state
+  const { selection } = tr
+  if (!selection.empty) {
+    tr.addMark(selection.from, selection.to, schema.marks.link.create({ href: url }))
+    tr.setSelection(TextSelection.near(tr.doc.resolve(selection.to)))
+  } else {
+    const { $head } = selection
+    if ($head.parent.type.name === 'paragraph' && !$head.parent.textContent.trim() &&
+        (isVideoUrl(url) || isImageUrl(url))) {
+      const image = schema.nodes.image.create({ src: url })
+      const start = $head.before()
+      tr.replaceWith(start, $head.after(), image)
+      tr.setSelection(TextSelection.near(tr.doc.resolve(start + image.nodeSize), 1))
+    } else {
+      tr.replaceSelectionWith(schema.text(url, [schema.marks.link.create({ href: url })]), false)
+    }
+  }
+  view.dispatch(tr.scrollIntoView())
+  return true
+}
+
+function pasteContent(view: EditorView, plainText: string, htmlText: string, slice: Slice): boolean {
+  const { state } = view
+  const trimmedText = plainText.trim()
+  if (!trimmedText) return isBlockSlice(slice) && handleBlockPaste(view, slice)
+
+  if (isRawPasteContext(state.selection.$from)) {
+    const tr = state.tr.replaceSelectionWith(state.schema.text(plainText), false)
+    view.dispatch(tr.scrollIntoView())
+    return true
+  }
+
+  if (isUrl(trimmedText)) return pasteUrl(view, trimmedText)
+
+  let markdownToParse = ''
+
+  if (htmlText && isMeaningfulHtml(htmlText)) {
+    const converted = htmlToMarkdown(htmlText)
+    if (converted) {
+      markdownToParse = converted
+    }
+  }
+
+  if (!markdownToParse) {
+    markdownToParse = plainText
+  }
+
+  const parsedDoc = parseMarkdown(markdownToParse)
+  if (parsedDoc && parsedDoc.childCount > 0) {
+    const blockSlice = new Slice(parsedDoc.content, 0, 0)
+
+    // Если это чисто блочные ноды (таблицы, hr, картинки, блоки кода и т.д.)
+    if (isBlockSlice(blockSlice)) {
+      return handleBlockPaste(view, blockSlice)
+    }
+
+    // Если это один абзац с инлайн-содержимым (вставляется инлайн без разрыва строки)
+    if (parsedDoc.childCount === 1 && parsedDoc.firstChild?.type.name === 'paragraph') {
+      const openSlice = Slice.maxOpen(parsedDoc.content)
+      const tr = state.tr.replaceSelection(openSlice)
+      view.dispatch(tr.scrollIntoView())
+      return true
+    }
+
+    // Многострочный Markdown: если курсор на пустом параграфе — заменяем его целиком
+    const { selection } = state
+    const { $head } = selection
+    let blockDepth = -1
+    for (let d = $head.depth; d >= 1; d--) {
+      const name = $head.node(d).type.name
+      if (name === 'paragraph' || name === 'heading') {
+        blockDepth = d
+        break
+      }
+    }
+
+    const isEmptyParagraph =
+      selection.empty &&
+      blockDepth !== -1 &&
+      $head.node(blockDepth).type.name === 'paragraph' &&
+      $head.node(blockDepth).textContent.trim() === ''
+
+    if (isEmptyParagraph) {
+      const blockStart = $head.before(blockDepth)
+      const blockEnd = $head.after(blockDepth)
+      const tr = state.tr.replaceWith(blockStart, blockEnd, parsedDoc.content)
+      const insertEnd = blockStart + parsedDoc.content.size
+      tr.setSelection(TextSelection.near(tr.doc.resolve(Math.min(insertEnd, tr.doc.content.size)), 1))
+      view.dispatch(tr.scrollIntoView())
+      return true
+    }
+
+    const tr = state.tr.replaceSelection(blockSlice)
+    view.dispatch(tr.scrollIntoView())
+    return true
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // 3. Fallback: обработка HTML через ProseMirror (или блочный slice)
+  // ─────────────────────────────────────────────────────────────
+  if (isBlockSlice(slice)) {
+    return handleBlockPaste(view, slice)
+  }
+
+  return false
+}
+
 export function pastePlugin(): Plugin {
   return new Plugin({
     key: pastePluginKey,
@@ -220,8 +336,35 @@ export function pastePlugin(): Plugin {
         }
         return slice
       },
+      handleDOMEvents: {
+        beforeinput(view, event) {
+          if (!view.editable || !event.cancelable || event.isComposing) return false
+          const type = event.inputType
+          const explicitPaste = type === 'insertFromPaste'
+          if (!explicitPaste && type !== 'insertText' && type !== 'insertReplacementText') return false
+          if (event.dataTransfer?.files.length) return false
+
+          const text = event.data ?? event.dataTransfer?.getData('text/plain') ?? ''
+          // Keyboard clipboards can commit a whole URL as ordinary text input.
+          if (!text || (!explicitPaste && !isUrl(text) && !(/[\r\n]/.test(text) && hasMarkdownSyntax(text)))) return false
+          const html = explicitPaste ? event.dataTransfer?.getData('text/html') ?? '' : ''
+          if (!pasteContent(view, text, html, Slice.empty)) return false
+          event.preventDefault()
+          return true
+        },
+      },
+      handleTextInput(view, from, to, text) {
+        const url = text.trim()
+        if (!view.editable || view.composing || !isUrl(url)) return false
+        const { doc } = view.state
+        const $from = doc.resolve(from)
+        if (isRawPasteContext($from)) return false
+
+        // Some IMEs only report the inserted text after the DOM has changed.
+        const tr: Transaction = view.state.tr.setSelection(TextSelection.between($from, doc.resolve(to)))
+        return pasteUrl(view, url, tr)
+      },
       handlePaste(view, event, slice) {
-        const { state } = view
         const plainText = event.clipboardData?.getData('text/plain') ?? ''
         const trimmedText = plainText.trim()
         const htmlText = event.clipboardData?.getData('text/html') ?? ''
@@ -244,162 +387,7 @@ export function pastePlugin(): Plugin {
           return true
         }
 
-        if (!trimmedText) {
-          if (isBlockSlice(slice)) {
-            return handleBlockPaste(view, slice)
-          }
-          return false
-        }
-
-        // ─────────────────────────────────────────────────────────────
-        // 0. Если курсор внутри блока кода или формулы — вставляем сырой текст
-        // ─────────────────────────────────────────────────────────────
-        const { $from } = state.selection
-        let inRawBlock = false
-        for (let d = $from.depth; d >= 1; d--) {
-          const name = $from.node(d).type.name
-          if (name === 'code_block' || name === 'math_block' || name === 'math_inline') {
-            inRawBlock = true
-            break
-          }
-        }
-        if (inRawBlock) {
-          const tr = state.tr.replaceSelectionWith(state.schema.text(plainText), false)
-          view.dispatch(tr.scrollIntoView())
-          return true
-        }
-
-        // ─────────────────────────────────────────────────────────────
-        // 1. Вставка одиночного URL (ссылка, embed видео/картинки)
-        // ─────────────────────────────────────────────────────────────
-        if (isUrl(trimmedText)) {
-          const url = trimmedText
-          const { selection } = state
-
-          // 1.a. Если есть выделенный текст: оборачиваем его в ссылку [текст](url)
-          if (!selection.empty) {
-            const { from, to } = selection
-            const linkMark = state.schema.marks.link.create({ href: url })
-            const tr = state.tr.addMark(from, to, linkMark)
-            tr.setSelection(TextSelection.near(tr.doc.resolve(to)))
-            view.dispatch(tr.scrollIntoView())
-            return true
-          }
-
-          // 1.b. Если выделения нет: проверяем, находится ли курсор на пустой строке (абзаце)
-          const { $head } = selection
-          let blockDepth = -1
-          for (let d = $head.depth; d >= 1; d--) {
-            const name = $head.node(d).type.name
-            if (name === 'paragraph' || name === 'heading') {
-              blockDepth = d
-              break
-            }
-          }
-
-          const isParagraph = blockDepth !== -1 && $head.node(blockDepth).type.name === 'paragraph'
-          const isBlankLine = isParagraph && $head.node(blockDepth).textContent.trim() === ''
-
-          if (isBlankLine) {
-            const isVideo = isVideoUrl(url)
-            const isImage = isImageUrl(url)
-
-            if (isVideo || isImage) {
-              const imageNode = state.schema.nodes.image.create({ src: url })
-              const blockStart = $head.before(blockDepth)
-              const blockEnd = $head.after(blockDepth)
-              const tr = state.tr.replaceWith(blockStart, blockEnd, imageNode)
-              tr.setSelection(TextSelection.near(tr.doc.resolve(blockStart + imageNode.nodeSize), 1))
-              view.dispatch(tr.scrollIntoView())
-              return true
-            }
-          }
-
-          // 1.c. Обычная ссылка в тексте (или на пустой строке, если не медиа)
-          const linkMark = state.schema.marks.link.create({ href: url })
-          const textNode = state.schema.text(url, [linkMark])
-          const tr = state.tr.replaceSelectionWith(textNode, false)
-          view.dispatch(tr.scrollIntoView())
-          return true
-        }
-
-        // ─────────────────────────────────────────────────────────────
-        // 2. Получение и парсинг Markdown:
-        //    a. Если в буфере есть rich HTML (выделение с веб-страниц, AI-чатов, Google Docs):
-        //       -> преобразуем HTML в чистый Markdown через htmlToMarkdown().
-        //    b. Иначе (сырой Markdown, блокнот, код) используем plainText.
-        // ─────────────────────────────────────────────────────────────
-        let markdownToParse = ''
-
-        if (htmlText && isMeaningfulHtml(htmlText)) {
-          const converted = htmlToMarkdown(htmlText)
-          if (converted) {
-            markdownToParse = converted
-          }
-        }
-
-        if (!markdownToParse) {
-          markdownToParse = plainText
-        }
-
-        const parsedDoc = parseMarkdown(markdownToParse)
-        if (parsedDoc && parsedDoc.childCount > 0) {
-          const blockSlice = new Slice(parsedDoc.content, 0, 0)
-
-          // Если это чисто блочные ноды (таблицы, hr, картинки, блоки кода и т.д.)
-          if (isBlockSlice(blockSlice)) {
-            return handleBlockPaste(view, blockSlice)
-          }
-
-          // Если это один абзац с инлайн-содержимым (вставляется инлайн без разрыва строки)
-          if (parsedDoc.childCount === 1 && parsedDoc.firstChild?.type.name === 'paragraph') {
-            const openSlice = Slice.maxOpen(parsedDoc.content)
-            const tr = state.tr.replaceSelection(openSlice)
-            view.dispatch(tr.scrollIntoView())
-            return true
-          }
-
-          // Многострочный Markdown: если курсор на пустом параграфе — заменяем его целиком
-          const { selection } = state
-          const { $head } = selection
-          let blockDepth = -1
-          for (let d = $head.depth; d >= 1; d--) {
-            const name = $head.node(d).type.name
-            if (name === 'paragraph' || name === 'heading') {
-              blockDepth = d
-              break
-            }
-          }
-
-          const isEmptyParagraph =
-            selection.empty &&
-            blockDepth !== -1 &&
-            $head.node(blockDepth).type.name === 'paragraph' &&
-            $head.node(blockDepth).textContent.trim() === ''
-
-          if (isEmptyParagraph) {
-            const blockStart = $head.before(blockDepth)
-            const blockEnd = $head.after(blockDepth)
-            const tr = state.tr.replaceWith(blockStart, blockEnd, parsedDoc.content)
-            const insertEnd = blockStart + parsedDoc.content.size
-            tr.setSelection(TextSelection.near(tr.doc.resolve(Math.min(insertEnd, tr.doc.content.size)), 1))
-            view.dispatch(tr.scrollIntoView())
-            return true
-          }
-
-          const tr = state.tr.replaceSelection(blockSlice)
-          view.dispatch(tr.scrollIntoView())
-          return true
-        }
-
-        // ─────────────────────────────────────────────────────────────
-        // 3. Fallback: обработка HTML через ProseMirror (или блочный slice)
-        // ─────────────────────────────────────────────────────────────
-        if (isBlockSlice(slice)) {
-          return handleBlockPaste(view, slice)
-        }
-
-        return false
+        return pasteContent(view, plainText, htmlText, slice)
       },
     },
   })

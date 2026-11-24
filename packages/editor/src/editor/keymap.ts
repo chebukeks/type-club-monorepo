@@ -187,7 +187,7 @@ const createTableOnEnter: Command = (state, dispatch) => {
 }
 
 // Команда: навигация Enter внутри таблицы
-const tableEnterNav: Command = (state, dispatch) => {
+export const tableEnterNav: Command = (state, dispatch) => {
   const { $head } = state.selection
   let rowDepth = -1
   for (let d = $head.depth; d > 0; d--) {
@@ -201,19 +201,16 @@ const tableEnterNav: Command = (state, dispatch) => {
   const posAfterRow = $head.after(rowDepth)
   const isLastRow = posAfterRow === $head.end(rowDepth - 1)
 
-  if (isLastRow) {
-    // В конце таблицы: создаём новую строку (стандартная команда prosemirror-tables)
-    if (dispatch) return addRowAfter(state, dispatch)
-    return true
-  } else {
-    // Переход в первую ячейку следующей строки
-    if (dispatch) {
-       const tr = state.tr
-       tr.setSelection(TextSelection.near(tr.doc.resolve(posAfterRow + 2)))
-       dispatch(tr)
-    }
-    return true
+  if (!dispatch) return true
+
+  const selectNextRow = (tr: typeof state.tr) => {
+    tr.setSelection(TextSelection.near(tr.doc.resolve(posAfterRow + 2), 1))
+    dispatch(tr.scrollIntoView())
   }
+
+  if (isLastRow) return addRowAfter(state, selectNextRow)
+  selectNextRow(state.tr)
+  return true
 }
 
 // Команда: удаление выделенной строки таблицы по Backspace

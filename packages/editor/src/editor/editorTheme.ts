@@ -1098,55 +1098,105 @@ html[data-lang="ru"] figure[data-sug-delete]::after {
 }
 
 /* ── Table editing mode ── */
-.te-col-drag { background: transparent; border-radius: 4px; transition: background 0.12s; }
-.te-col-drag:hover { background: rgba(99,123,229,0.12); }
-.te-col-drag.te-dragging { background: rgba(99,123,229,0.28); cursor: grabbing; }
-.te-col-drag.te-drop-target { background: rgba(99,123,229,0.35); }
-
-.te-row-drag { background: transparent; border-radius: 4px; transition: background 0.12s; }
-.te-row-drag:hover { background: rgba(99,123,229,0.12); }
-.te-row-drag.te-dragging { background: rgba(99,123,229,0.28); cursor: grabbing; }
-.te-row-drag.te-drop-target { background: rgba(99,123,229,0.35); }
-
-.te-col-del, .te-row-del {
-  border: none; border-radius: 3px;
-  background: rgba(255,255,255,0.06);
-  color: var(--text-dim);
-  font-size: 13px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: all 0.12s;
+.table-edit-overlay, .te-done-btn {
+  --te-accent: var(--accent, #5776d8);
+  --te-surface: var(--bg-elevated, var(--table-header-bg));
+  animation: te-appear 150ms ease-out both;
 }
+
+.table-edit-overlay::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border: 1px solid color-mix(in srgb, var(--te-accent) 65%, transparent);
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+.te-col-drag, .te-row-drag {
+  border-radius: 4px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+.te-col-drag:hover, .te-row-drag:hover {
+  background-color: color-mix(in srgb, var(--te-accent) 12%, transparent);
+}
+.te-col-drag.te-dragging, .te-row-drag.te-dragging {
+  background-color: color-mix(in srgb, var(--te-accent) 18%, transparent);
+  cursor: grabbing;
+}
+.te-col-drag.te-drop-target, .te-row-drag.te-drop-target {
+  box-shadow: inset 0 0 0 2px var(--te-accent);
+  background-color: color-mix(in srgb, var(--te-accent) 25%, transparent);
+}
+.te-col-drag::after, .te-row-drag::after {
+  content: '';
+  position: absolute;
+  border-radius: 4px;
+  background: var(--te-accent);
+  opacity: 0.48;
+  pointer-events: none;
+}
+.te-col-drag::after { width: 14px; height: 2px; bottom: 3px; left: calc(50% - 7px); }
+.te-row-drag::after { width: 2px; height: 14px; right: 3px; top: calc(50% - 7px); }
+
+.te-col-add, .te-row-add, .te-col-del, .te-row-del, .te-done-btn {
+  border: 1px solid var(--border-default, var(--table-border));
+  background: var(--te-surface);
+  color: var(--text-primary, var(--editor-text));
+  font-family: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+.te-col-add, .te-row-add, .te-col-del, .te-row-del {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1;
+}
+.te-col-del, .te-row-del { border-radius: 5px; color: var(--text-muted, var(--editor-text)); }
 .te-col-del:hover, .te-row-del:hover {
-  background: rgba(232,17,35,0.25);
-  color: #e81123;
+  color: var(--text-danger, #d03549);
+  background: color-mix(in srgb, var(--text-danger, #d03549) 12%, var(--te-surface));
 }
-
 .te-col-add, .te-row-add {
-  width: 18px; height: 18px;
-  border: none; border-radius: 50%;
-  background: var(--accent);
-  color: #fff;
-  font-size: 13px; font-weight: bold;
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  opacity: 0.65;
-  transition: opacity 0.12s, transform 0.12s;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-weight: 650;
+  box-shadow: 0 1px 4px #0002;
 }
-.te-col-add:hover, .te-row-add:hover {
-  opacity: 1;
-  transform: scale(1.15);
+.te-col-add:hover, .te-row-add:hover, .te-done-btn:hover {
+  border-color: var(--te-accent);
+  background: color-mix(in srgb, var(--te-accent) 15%, var(--te-surface));
 }
-
+.table-edit-overlay button:focus-visible, .te-done-btn:focus-visible {
+  outline: 2px solid var(--te-accent);
+  outline-offset: 2px;
+}
 .te-done-btn {
-  padding: 4px 20px;
-  border: none; border-radius: 6px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 13px; font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.12s;
+  position: fixed;
+  z-index: 20;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px #0002;
 }
-.te-done-btn:hover { opacity: 0.85; }
+.te-done-btn::before { content: '✓'; margin-inline-end: 5px; }
+
+@keyframes te-appear { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .table-edit-overlay, .te-done-btn { animation: none; }
+  .table-edit-overlay > *, .te-done-btn { transition: none; }
+}
 
 /* ==========================================
    Совместная работа — курсоры и выделения
