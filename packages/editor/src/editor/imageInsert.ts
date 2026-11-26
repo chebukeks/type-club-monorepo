@@ -13,10 +13,11 @@ export const PASTE_IMAGE_FILES_EVENT = 'editor-paste-image-files'
 
 export interface PasteImageFilesDetail {
   files: File[]
+  altTexts?: (string | null)[]
 }
 
 /** Вставляет image-ноду отдельным блоком в позицию курсора и ставит курсор в абзац после неё. */
-export function insertImageNode(view: EditorView, src: string, alt: string | null = 'image'): void {
+export function insertImageNode(view: EditorView, src: string, alt: string | null = null): void {
   const { state, dispatch } = view
   const imageType = state.schema.nodes.image
   if (!imageType) return

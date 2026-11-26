@@ -386,12 +386,12 @@ export function MarkdownEditor({
     setChangeImageSrcTarget(null);
   };
 
-  const handleInsertImageFile = async (fileOrUrl: File | string) => {
+  const handleInsertImageFile = async (fileOrUrl: File | string, alt: string | null = null) => {
     const view = viewRef.current;
     if (!view) return;
 
     if (typeof fileOrUrl === "string") {
-      insertImageNode(view, fileOrUrl, "image");
+      insertImageNode(view, fileOrUrl, alt);
       return;
     }
 
@@ -408,7 +408,7 @@ export function MarkdownEditor({
           ? `${window.location.origin.replace(/\/$/, "")}${response.url}`
           : response.url;
         const currentView = viewRef.current;
-        if (currentView) insertImageNode(currentView, fullUrl, file.name || "image");
+        if (currentView) insertImageNode(currentView, fullUrl, alt);
       } catch (err: unknown) {
         console.error("Image upload failed", err);
         const detail = (err as any)?.detail || (err as any)?.message;
@@ -425,7 +425,7 @@ export function MarkdownEditor({
       reader.readAsDataURL(file);
     });
     const currentView = viewRef.current;
-    if (currentView) insertImageNode(currentView, dataUri, file.name || `photo-${Date.now()}`);
+    if (currentView) insertImageNode(currentView, dataUri, alt);
   };
 
   const handleInsertImageFileRef = useRef(handleInsertImageFile);
@@ -434,9 +434,12 @@ export function MarkdownEditor({
   // Картинки-файлы из буфера обмена (Ctrl+V): событие диспатчит pastePlugin
   useEffect(() => {
     const onPasteImageFiles = (e: Event) => {
-      const files = (e as CustomEvent<PasteImageFilesDetail>).detail?.files ?? [];
+      const detail = (e as CustomEvent<PasteImageFilesDetail>).detail;
+      if (!detail) return;
       void (async () => {
-        for (const file of files) await handleInsertImageFileRef.current(file);
+        for (const [index, file] of detail.files.entries()) {
+          await handleInsertImageFileRef.current(file, detail.altTexts?.[index]);
+        }
       })();
     };
     window.addEventListener(PASTE_IMAGE_FILES_EVENT, onPasteImageFiles);

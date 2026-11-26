@@ -2,7 +2,9 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { EditorState, TextSelection, type Transaction } from 'prosemirror-state'
 import type { EditorView } from 'prosemirror-view'
-import { parseMarkdown } from '../editor/markdownConfig'
+import { parseMarkdown, serializeMarkdown } from '../editor/markdownConfig'
+import { getKeymapPlugins } from '../editor/keymap'
+import { insertImageNode } from '../editor/imageInsert'
 import { pastePlugin } from '../editor/pastePlugin'
 import { tableEditPlugin } from '../editor/tableEditPlugin'
 
@@ -19,12 +21,41 @@ function editor(markdown: string, text?: string): EditorView {
     state: EditorState.create({ doc, selection: TextSelection.create(doc, pos) }),
     editable: true,
     composing: false,
+    focus() {},
     dispatch(tr: Transaction) {
       view.state = view.state.apply(tr)
     },
   }
   return view as unknown as EditorView
 }
+
+describe('Code block input', () => {
+  it('keeps repeated Enter presses inside the block and preserves blank lines in Markdown', () => {
+    const view = editor('```txt\ncode\n```')
+    view.dispatch(view.state.tr.setSelection(TextSelection.atEnd(view.state.doc)))
+    const keymap = getKeymapPlugins()[0]
+    for (let i = 0; i < 3; i++) {
+      assert.equal(keymap.props.handleKeyDown!.call(keymap, view, { key: 'Enter' } as KeyboardEvent), true)
+    }
+    assert.equal(view.state.doc.childCount, 1)
+    assert.equal(view.state.selection.$head.parent.type.name, 'code_block')
+    assert.equal(view.state.doc.firstChild!.textContent, 'code\n\n\n')
+    assert.ok(parseMarkdown(serializeMarkdown(view.state.doc)).eq(view.state.doc))
+  })
+})
+
+describe('Image insertion', () => {
+  it('leaves the caption empty unless alt text is supplied', () => {
+    const src = 'https://example.com/image.jpg'
+    const view = editor('')
+    insertImageNode(view, src)
+    assert.equal(view.state.doc.firstChild!.attrs.alt, null)
+    assert.ok(serializeMarkdown(view.state.doc).startsWith(`![](${src})`))
+
+    insertImageNode(view, src, 'A view of the mountains')
+    assert.equal(view.state.doc.child(1).attrs.alt, 'A view of the mountains')
+  })
+})
 
 function beforeInput(inputType: string, data: string | null = null) {
   return {

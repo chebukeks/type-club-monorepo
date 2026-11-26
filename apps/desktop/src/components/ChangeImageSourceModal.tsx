@@ -18,6 +18,7 @@ export function ChangeImageSourceModal({
   const [url, setUrl] = useState(currentSrc.startsWith("data:") ? "" : currentSrc);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pressedBackdrop = useRef(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -87,13 +88,19 @@ export function ChangeImageSourceModal({
   return (
     <div
       className="modal-overlay"
-      onClick={onClose}
+      onPointerDown={(e) => {
+        pressedBackdrop.current = e.target === e.currentTarget && e.button === 0;
+      }}
+      onPointerCancel={() => { pressedBackdrop.current = false; }}
+      onClick={(e) => {
+        if (pressedBackdrop.current && e.target === e.currentTarget) onClose();
+        pressedBackdrop.current = false;
+      }}
       style={{ zIndex: 100 }}
     >
       <div
         className="modal-panel"
         style={{ maxWidth: "460px", padding: 0, overflow: "hidden" }}
-        onClick={(e) => e.stopPropagation()}
       >
         <div
           style={{

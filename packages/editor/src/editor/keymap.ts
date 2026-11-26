@@ -2,7 +2,7 @@
  * keymap.ts — Горячие клавиши для ProseMirror
  */
 import { keymap } from 'prosemirror-keymap'
-import { toggleMark, wrapIn, chainCommands } from 'prosemirror-commands'
+import { toggleMark, wrapIn, chainCommands, newlineInCode } from 'prosemirror-commands'
 import { baseKeymap } from 'prosemirror-commands'
 import { undo as pmUndo, redo as pmRedo } from 'prosemirror-history'
 import { undo as yUndo, redo as yRedo } from 'y-prosemirror'
@@ -189,6 +189,7 @@ const createTableOnEnter: Command = (state, dispatch) => {
 // Команда: навигация Enter внутри таблицы
 export const tableEnterNav: Command = (state, dispatch) => {
   const { $head } = state.selection
+  if ($head.parent.type.spec.code) return false
   let rowDepth = -1
   for (let d = $head.depth; d > 0; d--) {
     if ($head.node(d).type.name === 'table_row') {
@@ -577,44 +578,6 @@ const selectAllInCodeBlock: Command = (state, dispatch) => {
   return false
 }
 
-// Команда: выход из блока кода по двойному Enter (пустая строка в конце блока)
-const codeBlockDoubleEnterExit: Command = (state, dispatch) => {
-  const { $head, empty } = state.selection
-  if (!empty) return false
-  if ($head.parent.type.name !== 'code_block') return false
-
-  const text = $head.parent.textContent
-  const offset = $head.parentOffset
-  if (offset > 0 && text[offset - 1] === '\n' && (offset === text.length || text[offset] === '\n')) {
-    if (dispatch) {
-      let codeDepth = -1
-      for (let d = $head.depth; d > 0; d--) {
-        if ($head.node(d).type.name === 'code_block') {
-          codeDepth = d
-          break
-        }
-      }
-      if (codeDepth === -1) return false
-
-      const start = $head.before(codeDepth)
-      const end = $head.after(codeDepth)
-      const newText = text.slice(0, offset - 1) + text.slice(offset)
-      const newCodeNode = schema.nodes.code_block.create(
-        $head.parent.attrs,
-        newText ? schema.text(newText) : undefined
-      )
-      const tr = state.tr.replaceWith(start, end, newCodeNode)
-      const insertPos = start + newCodeNode.nodeSize
-      const p = schema.nodes.paragraph.createAndFill()!
-      tr.insert(insertPos, p)
-      tr.setSelection(TextSelection.near(tr.doc.resolve(insertPos + 1)))
-      dispatch(tr.scrollIntoView())
-    }
-    return true
-  }
-  return false
-}
-
 /** Кастомные горячие клавиши */
 const customKeymap = keymap({
   // Выделение всего текста внутри блока кода
@@ -639,11 +602,11 @@ const customKeymap = keymap({
 
   // Умный Enter: цепочка команд (первая вернувшая true перехватывает событие)
   'Enter': chainCommands(
+    newlineInCode,
     tableEnterNav,
     createMathBlockOnEnter,
     createCodeBlockOnEnter,
     mathEnterCommand,
-    codeBlockDoubleEnterExit,
     createTableOnEnter,
     splitListItem(schema.nodes.list_item)
   ),

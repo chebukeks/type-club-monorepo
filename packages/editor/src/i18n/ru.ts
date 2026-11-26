@@ -834,6 +834,7 @@ export const ru: Record<TranslationKey, string> = {
   'image.contextMenu.copy': 'Копировать изображение',
   'image.contextMenu.copyLink': 'Копировать ссылку',
   'image.contextMenu.embed': 'Встроить в документ',
+  'image.contextMenu.embedFailed': 'Не удалось встроить изображение в документ',
   'image.contextMenu.changeSource': 'Сменить источник',
   'image.changeSource.title': 'Сменить источник изображения',
   'image.changeSource.byUrl': 'По ссылке',

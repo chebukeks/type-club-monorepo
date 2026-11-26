@@ -294,6 +294,7 @@ export interface IElectronAPI {
   joinPath: (...paths: string[]) => string;
   resolvePath: (...paths: string[]) => string;
   readFile: (filePath: string) => Promise<string>;
+  readLocalImageAsDataUrl: (fileUrl: string) => Promise<string>;
   writeFile: (filePath: string, content: string) => Promise<void>;
   readDir: (dirPath: string) => Promise<FileEntry[]>;
   exists: (filePath: string) => Promise<boolean>;

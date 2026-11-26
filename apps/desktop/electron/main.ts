@@ -353,6 +353,27 @@ function assertPathAllowed(filePath: string): void {
   }
 }
 
+async function readLocalImage(fileUrl: string): Promise<Response> {
+  const filePath = fileURLToPath(fileUrl)
+  if (!isPathAllowed(filePath)) return new Response(null, { status: 403 })
+  const realPath = await fs.promises.realpath(filePath)
+  if (!isPathAllowed(realPath)) return new Response(null, { status: 403 })
+
+  const response = await net.fetch(pathToFileURL(realPath).href)
+  const contentType = response.headers.get('content-type')
+  if (!response.ok || !contentType?.startsWith('image/')) {
+    await response.body?.cancel()
+    return new Response(null, { status: 415 })
+  }
+  return new Response(response.body, {
+    headers: {
+      'Content-Type': contentType,
+      'Content-Security-Policy': "default-src 'none'; sandbox",
+      'X-Content-Type-Options': 'nosniff',
+    },
+  })
+}
+
 // Загрузка сохранённых путей в доверенный список
 try {
   const lastFolder = store.get('lastFolderPath') as string | undefined
@@ -609,18 +630,30 @@ function createWindow() {
   win.on('unmaximize', saveBounds)
 
   // --- Перехват закрытия окна (диалог при несохранённых файлах) ---
-  win.on('close', (e) => {
-    if (!allowClose && win) {
+  const mainWindow = win
+  const contents = mainWindow.webContents
+  let closeHandlerReady = false
+  contents.ipc.on('window:close-handler-ready', (event) => {
+    if (event.senderFrame === contents.mainFrame) closeHandlerReady = true
+  })
+  contents.on('did-start-navigation', ({ isMainFrame, isSameDocument }) => {
+    if (isMainFrame && !isSameDocument) closeHandlerReady = false
+  })
+  mainWindow.on('close', (e) => {
+    if (!allowClose && closeHandlerReady && !contents.isCrashed()) {
       e.preventDefault()
-      win.webContents.send('window:before-close')
+      contents.send('window:before-close')
     }
   })
 
-  if (VITE_DEV_SERVER_URL) {
-    win.loadURL(VITE_DEV_SERVER_URL)
-  } else {
-    win.loadFile(path.join(RENDERER_DIST, 'index.html'))
-  }
+  const load = VITE_DEV_SERVER_URL
+    ? mainWindow.loadURL(VITE_DEV_SERVER_URL)
+    : mainWindow.loadFile(path.join(RENDERER_DIST, 'index.html'))
+  void load.catch((error: Error & { code?: string }) => {
+    if (error.code === 'ERR_ABORTED') return
+    console.error('[MAIN] Failed to load the application window:', error)
+    if (!mainWindow.isDestroyed() && !closeHandlerReady) mainWindow.close()
+  })
 
   // Разрешаем создание вспомогательных окон (Picture-in-Picture для настроек темы)
   // и блокируем произвольные внешние всплывающие окна
@@ -743,6 +776,13 @@ async function readDirRecursive(dirPath: string): Promise<FileEntry[]> {
 ipcMain.handle('fs:readFile', async (_event, filePath: string): Promise<string> => {
   assertPathAllowed(filePath)
   return fs.readFileSync(filePath, 'utf-8')
+})
+
+ipcMain.handle('fs:readLocalImageAsDataUrl', async (_event, fileUrl: string): Promise<string> => {
+  const response = await readLocalImage(fileUrl)
+  if (!response.ok) throw new Error(`Failed to read local image (${response.status})`)
+  const base64 = Buffer.from(await response.arrayBuffer()).toString('base64')
+  return `data:${response.headers.get('content-type')};base64,${base64}`
 })
 
 // --- Запись файла ---
@@ -1773,24 +1813,7 @@ app.whenReady().then(() => {
       }
 
       try {
-        const filePath = fileURLToPath(file)
-        if (!isPathAllowed(filePath)) return new Response(null, { status: 403 })
-        const realPath = await fs.promises.realpath(filePath)
-        if (!isPathAllowed(realPath)) return new Response(null, { status: 403 })
-
-        const response = await net.fetch(pathToFileURL(realPath).href)
-        const contentType = response.headers.get('content-type')
-        if (!response.ok || !contentType?.startsWith('image/')) {
-          await response.body?.cancel()
-          return new Response(null, { status: 415 })
-        }
-        return new Response(response.body, {
-          headers: {
-            'Content-Type': contentType,
-            'Content-Security-Policy': "default-src 'none'; sandbox",
-            'X-Content-Type-Options': 'nosniff',
-          },
-        })
+        return await readLocalImage(file)
       } catch {
         return new Response(null, { status: 404 })
       }

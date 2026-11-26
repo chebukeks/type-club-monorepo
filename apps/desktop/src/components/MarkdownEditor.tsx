@@ -23,7 +23,16 @@ import { StatsToast } from './StatsToast'
 import type { SuggestionItem, PasteImageFilesDetail } from '@type-club/editor'
 
 import { Monitor, Type, FileText } from 'lucide-react'
-import { resolveDesktopImageSrc } from '../utils/fileUtils'
+import { resolveDesktopImageSrc, resolveDocumentImageSrc } from '../utils/fileUtils'
+
+function imageBlobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(blob)
+  })
+}
 
 export function MarkdownEditor() {
   const { state, dispatch, setTextZoom, setDocumentZoom, t } = useEditor()
@@ -297,28 +306,32 @@ export function MarkdownEditor() {
   }
 
   const handleEmbedImage = async (src: string, pos: number) => {
+    const view = editorView
+    const image = view?.state.doc.nodeAt(pos)
+    if (!view || image?.type !== schema.nodes.image || image.attrs.src !== src) return
+
     try {
-      let resolvedSrc = src
-      if (resolvedSrc.startsWith('/uploads/')) {
-        const baseUrl = config.siteUrl || 'https://type-club.ru'
-        resolvedSrc = `${baseUrl.replace(/\/$/, '')}${resolvedSrc}`
-      }
-      const res = await fetch(resolvedSrc)
-      const blob = await res.blob()
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        const dataUri = reader.result as string
-        if (editorView) {
-          const node = editorView.state.doc.nodeAt(pos)
-          if (node) {
-            const tr = editorView.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: dataUri })
-            editorView.dispatch(tr)
-          }
+      let resolvedSrc = localDocumentPath ? resolveDocumentImageSrc(src, localDocumentPath) : src
+      let dataUrl: string
+      if (resolvedSrc.startsWith('file:')) {
+        dataUrl = await window.api.readLocalImageAsDataUrl(resolvedSrc)
+      } else {
+        if (resolvedSrc.startsWith('/uploads/')) {
+          const baseUrl = config.siteUrl || 'https://type-club.ru'
+          resolvedSrc = new URL(resolvedSrc, baseUrl).href
         }
+        const response = await fetch(resolvedSrc)
+        if (!response.ok) throw new Error(`HTTP error ${response.status}`)
+        const blob = await response.blob()
+        if (!blob.type.startsWith('image/')) throw new Error('Expected an image')
+        dataUrl = await imageBlobToDataUrl(blob)
       }
-      reader.readAsDataURL(blob)
+
+      if (view.isDestroyed || view.state.doc.nodeAt(pos) !== image) return
+      view.dispatch(view.state.tr.setNodeMarkup(pos, undefined, { ...image.attrs, src: dataUrl }))
     } catch (e) {
       console.error('Failed to embed image', e)
+      if (!view.isDestroyed) alert(t('image.contextMenu.embedFailed'))
     }
   }
 
@@ -379,7 +392,7 @@ export function MarkdownEditor() {
     }
   }
 
-  const handleInsertImageFile = async (file: File) => {
+  const handleInsertImageFile = async (file: File, alt: string | null = null) => {
     if (!editorView) return
     const aid = articleId || activeTab?.articleId
 
@@ -392,7 +405,7 @@ export function MarkdownEditor() {
         const fullUrl = response.url.startsWith('/')
           ? `${(config.siteUrl || 'https://type-club.ru').replace(/\/$/, '')}${response.url}`
           : response.url
-        insertImageNode(editorView, fullUrl, file.name || 'image')
+        insertImageNode(editorView, fullUrl, alt)
       } catch (e: unknown) {
         console.error('Failed to upload pasted image', e)
         const detail = (e as any)?.detail || (e as any)?.message
@@ -402,13 +415,8 @@ export function MarkdownEditor() {
     }
 
     // Локальный файл без коллаборации: встраиваем как data: URI
-    const dataUri = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(reader.result as string)
-      reader.onerror = () => reject(reader.error)
-      reader.readAsDataURL(file)
-    })
-    insertImageNode(editorView, dataUri, file.name || `photo-${Date.now()}`)
+    const dataUri = await imageBlobToDataUrl(file)
+    insertImageNode(editorView, dataUri, alt)
   }
 
   const handleInsertImageFileRef = useRef(handleInsertImageFile)
@@ -417,9 +425,12 @@ export function MarkdownEditor() {
   // Картинки-файлы из буфера обмена (Ctrl+V): событие диспатчит pastePlugin
   useEffect(() => {
     const onPasteImageFiles = (e: Event) => {
-      const files = (e as CustomEvent<PasteImageFilesDetail>).detail?.files ?? []
+      const detail = (e as CustomEvent<PasteImageFilesDetail>).detail
+      if (!detail) return
       void (async () => {
-        for (const file of files) await handleInsertImageFileRef.current(file)
+        for (const [index, file] of detail.files.entries()) {
+          await handleInsertImageFileRef.current(file, detail.altTexts?.[index])
+        }
       })()
     }
     window.addEventListener(PASTE_IMAGE_FILES_EVENT, onPasteImageFiles)

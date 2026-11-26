@@ -832,6 +832,7 @@ export const en = {
   'image.contextMenu.copy': 'Copy image',
   'image.contextMenu.copyLink': 'Copy image link',
   'image.contextMenu.embed': 'Embed in document',
+  'image.contextMenu.embedFailed': 'Could not embed the image in the document',
   'image.contextMenu.changeSource': 'Change source',
   'image.changeSource.title': 'Change Image Source',
   'image.changeSource.byUrl': 'By URL',

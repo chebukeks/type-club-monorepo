@@ -103,6 +103,10 @@ contextBridge.exposeInMainWorld('api', {
     return ipcRenderer.invoke('fs:readFile', filePath)
   },
 
+  readLocalImageAsDataUrl: (fileUrl: string): Promise<string> => {
+    return ipcRenderer.invoke('fs:readLocalImageAsDataUrl', fileUrl)
+  },
+
   /** Сохранение содержимого в файл */
   writeFile: (filePath: string, content: string): Promise<void> => {
     return ipcRenderer.invoke('fs:writeFile', filePath, content)
@@ -324,6 +328,7 @@ contextBridge.exposeInMainWorld('api', {
   onBeforeClose: (callback: () => void) => {
     const subscription = () => callback()
     ipcRenderer.on('window:before-close', subscription)
+    ipcRenderer.send('window:close-handler-ready')
     return () => ipcRenderer.off('window:before-close', subscription)
   },
 

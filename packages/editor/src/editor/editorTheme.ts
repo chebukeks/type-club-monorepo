@@ -992,6 +992,7 @@ html[data-lang="ru"] figure[data-sug-delete]::after {
 /* Интерактивные чекбоксы курсор */
 .ProseMirror:not(.preview-mode) li.task-list-item::before {
   cursor: pointer;
+  pointer-events: auto;
 }
 
 /* ==========================================

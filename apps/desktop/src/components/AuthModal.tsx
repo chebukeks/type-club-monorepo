@@ -194,7 +194,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
                   id="auth-remember-me"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  style={{ cursor: 'pointer' }}
+                  style={{ accentColor: 'var(--accent)' }}
                 />
                 <label htmlFor="auth-remember-me" style={{ fontSize: '12px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
                   {t('auth.rememberMe')}

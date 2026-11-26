@@ -310,3 +310,6 @@ body {
     padding-right: 12px !important;
   }
 }
+input[type="checkbox"]:enabled {
+  cursor: pointer;
+}

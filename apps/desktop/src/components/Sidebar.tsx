@@ -5,6 +5,13 @@ import { useAuth } from '../context/AuthContext'
 import type { FileEntry, TocItem } from '../types'
 import type { ArticleListItem } from '../api'
 import { Search, X, Pin } from 'lucide-react'
+import { StatsToast } from './StatsToast'
+
+const articleRoleFilters = [
+  ['author', 'sidebar.author'],
+  ['co_author', 'sidebar.coAuthor'],
+  ['editor', 'sidebar.advisor'],
+] as const
 
 const SIDEBAR_MOVE_TYPE = 'application/x-type-club-sidebar-move'
 const PINNED_LOCAL_TYPE = 'application/x-type-club-pinned-local'
@@ -313,7 +320,7 @@ export function Sidebar({ width }: { width: number }) {
   return (
     <div style={{ width: `${width}px`, minWidth: '140px', maxWidth: '500px' }} className="flex flex-col h-full flex-shrink-0 select-none">
       <div
-        className="flex items-center justify-between"
+        className="flex shrink-0 items-center justify-between"
         style={{ height: '36px', paddingLeft: '16px', paddingRight: '12px' }}
       >
         <span
@@ -424,42 +431,24 @@ export function Sidebar({ width }: { width: number }) {
         </div>
 
         {isOnline && (
-          <div className="select-none" style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingTop: '2px', paddingLeft: '2px' }}>
-            <label className="flex items-center text-[11px] text-[var(--text-secondary)] cursor-pointer hover:text-[var(--text-primary)]" style={{ gap: '6px' }}>
-              <input
-                type="checkbox"
-                checked={selectedRoles.includes('author')}
-                onChange={() => toggleRoleFilter('author')}
-                className="w-3.5 h-3.5 accent-[var(--accent)] rounded cursor-pointer"
-              />
-              <span>{t('sidebar.author')}</span>
-            </label>
-
-            <label className="flex items-center text-[11px] text-[var(--text-secondary)] cursor-pointer hover:text-[var(--text-primary)]" style={{ gap: '6px' }}>
-              <input
-                type="checkbox"
-                checked={selectedRoles.includes('co_author')}
-                onChange={() => toggleRoleFilter('co_author')}
-                className="w-3.5 h-3.5 accent-[var(--accent)] rounded cursor-pointer"
-              />
-              <span>{t('sidebar.coAuthor')}</span>
-            </label>
-
-            <label className="flex items-center text-[11px] text-[var(--text-secondary)] cursor-pointer hover:text-[var(--text-primary)]" style={{ gap: '6px' }}>
-              <input
-                type="checkbox"
-                checked={selectedRoles.includes('editor')}
-                onChange={() => toggleRoleFilter('editor')}
-                className="w-3.5 h-3.5 accent-[var(--accent)] rounded cursor-pointer"
-              />
-              <span>{t('sidebar.advisor')}</span>
-            </label>
+          <div className="flex flex-wrap gap-1">
+            {articleRoleFilters.map(([role, label]) => (
+              <button
+                key={role}
+                type="button"
+                aria-pressed={selectedRoles.includes(role)}
+                onClick={() => toggleRoleFilter(role)}
+                className="sidebar-role-filter"
+              >
+                {t(label)}
+              </button>
+            ))}
           </div>
         )}
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto py-2"
+      <div className="min-h-0 flex-1 overflow-y-auto py-2"
         onClick={(e) => { if (e.target === e.currentTarget) setActiveExplorerPath(null) }}
         onContextMenu={(e) => {
           if (e.target === e.currentTarget) {
@@ -823,6 +812,10 @@ export function Sidebar({ width }: { width: number }) {
           </>
         )}
       </div>
+
+      {state.showStats && state.statsLayoutMode === 'sidebar' && (
+        <StatsToast mode="sidebar" sidebarWidth={width} />
+      )}
 
       {/* Context menu — local */}
       {contextMenuMounted && (contextMenu || savedCtxMenu) && (() => {

@@ -476,7 +476,7 @@ export const markdownSerializer = new MarkdownSerializer(
     code_block(state, node) {
       state.write('```' + (node.attrs.params || '') + '\n')
       state.text(node.textContent, false)
-      state.ensureNewLine()
+      if (node.textContent) state.write('\n')
       state.write('```')
       state.closeBlock(node)
     },

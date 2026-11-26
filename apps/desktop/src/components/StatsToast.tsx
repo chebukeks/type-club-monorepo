@@ -39,6 +39,7 @@ export function StatsToast({ mode = 'right', sidebarWidth = 240, containerWidth 
 
   // Измерение ширины правой панели для режима 'right'
   useEffect(() => {
+    if (mode !== 'right') return
     const parent = toastRef.current?.parentElement
     if (!parent) return
     const ro = new ResizeObserver((entries) => {
@@ -48,7 +49,7 @@ export function StatsToast({ mode = 'right', sidebarWidth = 240, containerWidth 
     })
     ro.observe(parent)
     return () => ro.disconnect()
-  }, [])
+  }, [mode, activeTabId])
 
   // Отслеживание выделения текста в редакторе
   useEffect(() => {
@@ -165,9 +166,9 @@ export function StatsToast({ mode = 'right', sidebarWidth = 240, containerWidth 
 
   const outerStyle: React.CSSProperties = isSidebar
     ? {
-        position: 'absolute',
-        bottom: '24px',
-        left: '12px',
+        position: 'relative',
+        margin: '0 12px 24px',
+        flexShrink: 0,
         width: isExpanded ? 'max-content' : `${collapsedSidebarWidth}px`,
         minWidth: isExpanded ? `${expandedSidebarWidth}px` : 'auto',
         maxWidth: isExpanded ? '360px' : `${collapsedSidebarWidth}px`,

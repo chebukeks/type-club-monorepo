@@ -222,6 +222,10 @@ body,
   overflow: hidden;
 }
 
+input[type="checkbox"]:enabled {
+  cursor: pointer;
+}
+
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background-color: var(--bg-base);
@@ -578,6 +582,34 @@ body {
 .titlebar-badge { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: rgba(245,158,11,0.15); color: #f59e0b; font-weight: 500; }
 
 /* ── Role badges in sidebar ── */
+.sidebar-role-filter {
+  padding: 3px 8px;
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 150ms, border-color 150ms, color 150ms;
+}
+
+.sidebar-role-filter:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.sidebar-role-filter[aria-pressed="true"] {
+  background-color: color-mix(in srgb, var(--accent) 14%, var(--bg-surface));
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border-default));
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.sidebar-role-filter:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .role-badge { font-size: 10px; padding: 1px 5px; border-radius: 3px; font-weight: 500; }
 .role-badge.co_author { background: rgba(59,130,246,0.15); color: #3b82f6; }
 .role-badge.editor { background: rgba(245,158,11,0.15); color: #f59e0b; }

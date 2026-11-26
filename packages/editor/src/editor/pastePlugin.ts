@@ -20,7 +20,7 @@ import type { EditorView } from 'prosemirror-view'
 import { parseMarkdown } from './markdownConfig'
 import { isVideoUrl } from './videoUtils'
 import { htmlToMarkdown, isMeaningfulHtml } from './htmlToMarkdown'
-import { PASTE_IMAGE_FILES_EVENT } from './imageInsert'
+import { PASTE_IMAGE_FILES_EVENT, type PasteImageFilesDetail } from './imageInsert'
 
 export const pastePluginKey = new PluginKey('smartPaste')
 
@@ -376,8 +376,16 @@ export function pastePlugin(): Plugin {
         const imageFiles = getClipboardImageFiles(event)
         if (imageFiles.length > 0 && (!trimmedText || !htmlText || !isMeaningfulHtml(htmlText))) {
           event.preventDefault()
+          const detail: PasteImageFilesDetail = { files: imageFiles }
+          if (htmlText) {
+            const html = new DOMParser().parseFromString(htmlText, 'text/html')
+            const images = Array.from(html.querySelectorAll('img'))
+            if (images.length === imageFiles.length) {
+              detail.altTexts = images.map((image) => image.getAttribute('alt')?.trim() || null)
+            }
+          }
           window.dispatchEvent(
-            new CustomEvent(PASTE_IMAGE_FILES_EVENT, { detail: { files: imageFiles } }),
+            new CustomEvent(PASTE_IMAGE_FILES_EVENT, { detail }),
           )
           return true
         }

@@ -1,6 +1,6 @@
 /**
  * App.tsx — Корневой компонент приложения Type Club.
- * Собирает макет: TitleBar, Sidebar, TabBar, MarkdownEditor, StatsToast.
+ * Собирает макет: TitleBar, Sidebar, TabBar, MarkdownEditor.
  * Оборачивает всё в EditorProvider для управления состоянием.
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
@@ -9,7 +9,6 @@ import { TitleBar } from './components/TitleBar'
 import { Sidebar } from './components/Sidebar'
 import { TabBar } from './components/TabBar'
 import { MarkdownEditor } from './components/MarkdownEditor'
-import { StatsToast } from './components/StatsToast'
 
 const DEFAULT_SIDEBAR_WIDTH = 240
 const MIN_SIDEBAR_WIDTH = 140
@@ -101,11 +100,6 @@ function AppLayout() {
             <MarkdownEditor />
           </div>
         </div>
-
-        {/* Плашка статистики в сайдбаре */}
-        {state.showStats && state.statsLayoutMode === 'sidebar' && state.sidebarOpen && (
-          <StatsToast mode="sidebar" sidebarWidth={sidebarWidth} />
-        )}
       </div>
     </div>
   )
