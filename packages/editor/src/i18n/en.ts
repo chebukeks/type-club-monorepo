@@ -323,6 +323,7 @@ export const en = {
   'update.currentVersion': 'Current version',
   'update.newVersion': 'New version',
   'update.releaseDate': 'Release date',
+  'update.releaseNotes': 'What’s new',
   'update.formatPortable': 'Windows (portable version)',
   'update.formatInstaller': 'Windows (installer)',
   'update.formatLinux': 'Linux (AppImage)',

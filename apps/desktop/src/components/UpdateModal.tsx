@@ -11,17 +11,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useEditor } from "../context/EditorContext";
-
-interface UpdateInfo {
-  updateAvailable: boolean;
-  currentVersion: string;
-  latestVersion: string;
-  releaseDate?: string;
-  installType?: "portable" | "installer" | "appimage" | "dmg";
-  fileInfo?: { file: string; size: number; sha256?: string } | null;
-  downloadUrl?: string | null;
-  error?: string;
-}
+import type { UpdateInfo } from "../types";
 
 interface UpdateModalProps {
   updateInfo: UpdateInfo | null;
@@ -141,6 +131,9 @@ export function UpdateModal({
     >
       <div
         className="modal-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="update-modal-title"
         style={{
           width: "100%",
           maxWidth: "460px",
@@ -161,13 +154,14 @@ export function UpdateModal({
         >
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <DownloadCloud style={{ width: 17, height: 17, color: "var(--accent)" }} />
-            <span style={{ fontWeight: 600, fontSize: "13.5px", color: "var(--text-primary)" }}>
+            <span id="update-modal-title" style={{ fontWeight: 600, fontSize: "13.5px", color: "var(--text-primary)" }}>
               {t("update.modalTitle")}
             </span>
           </div>
           {status !== "downloading" && (
             <button
               onClick={onClose}
+              aria-label={t("common.close")}
               style={{
                 background: "none",
                 border: "none",
@@ -367,7 +361,36 @@ export function UpdateModal({
               </div>
 
               {/* Description or Progress */}
-              {status === "idle" && (
+              {status === "idle" && info.releaseNotes?.length ? (
+                <section
+                  aria-labelledby="update-release-notes"
+                  style={{
+                    padding: "12px 16px",
+                    borderRadius: "12px",
+                    border: "1px solid var(--border-default)",
+                    backgroundColor: "var(--bg-surface)",
+                  }}
+                >
+                  <h2 id="update-release-notes" style={{ margin: "0 0 8px", fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>
+                    {t("update.releaseNotes")}
+                  </h2>
+                  <ul style={{
+                    margin: 0,
+                    paddingInlineStart: "18px",
+                    fontSize: "12px",
+                    lineHeight: 1.5,
+                    color: "var(--text-secondary)",
+                    listStyleType: "disc",
+                    overflowWrap: "anywhere",
+                    maxHeight: "min(144px, 26vh)",
+                    overflowY: "auto",
+                  }}>
+                    {info.releaseNotes.map((note, index) => (
+                      <li key={index} style={{ marginTop: index ? "5px" : 0 }}>{note}</li>
+                    ))}
+                  </ul>
+                </section>
+              ) : status === "idle" && (
                 <p style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.5, margin: 0 }}>
                   {t("update.availableDesc")}
                 </p>

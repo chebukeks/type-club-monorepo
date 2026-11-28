@@ -325,6 +325,7 @@ export const ru: Record<TranslationKey, string> = {
   'update.currentVersion': 'Текущая версия',
   'update.newVersion': 'Новая версия',
   'update.releaseDate': 'Дата релиза',
+  'update.releaseNotes': 'Что нового',
   'update.formatPortable': 'Windows (портативная версия)',
   'update.formatInstaller': 'Windows (установщик)',
   'update.formatLinux': 'Linux (AppImage)',

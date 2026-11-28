@@ -6,6 +6,12 @@ DOWNLOAD_DIR="${TYPECLUB_DOWNLOADS_DIR:-./downloads}"
 
 cd "$SCRIPT_DIR"
 
+PATCH_NOTES_FILE="${TYPECLUB_PATCH_NOTES_FILE:-}"
+if [[ -n "$PATCH_NOTES_FILE" && ! -r "$PATCH_NOTES_FILE" ]]; then
+    echo "Cannot read patch notes file: $PATCH_NOTES_FILE" >&2
+    exit 1
+fi
+
 VERSION=$(node -p "require('./package.json').version")
 RELEASE_DIR="release/${VERSION}"
 DATE=$(date -u +%Y-%m-%d)
@@ -23,13 +29,13 @@ done
 
 echo "==> Generating latest.json..."
 
-python3 - "$DOWNLOAD_DIR" "$RELEASE_DIR" "$VERSION" "$DATE" <<'PYEOF'
+python3 - "$DOWNLOAD_DIR" "$RELEASE_DIR" "$VERSION" "$DATE" "$PATCH_NOTES_FILE" <<'PYEOF'
 import hashlib
 import json
 import os
 import sys
 
-downloads, release_dir, version, date = sys.argv[1:]
+downloads, release_dir, version, date, notes_file = sys.argv[1:]
 
 manifest = {
     "version": version,
@@ -40,6 +46,14 @@ manifest = {
         "macos": None,
     }
 }
+
+if notes_file:
+    with open(notes_file, encoding="utf-8-sig") as notes:
+        entries = [line.strip() for line in notes if line.strip()]
+    if len(entries) > 8 or any(len(entry) > 250 for entry in entries):
+        raise SystemExit("Use at most 8 patch notes of up to 250 characters each")
+    if entries:
+        manifest["releaseNotes"] = entries
 
 for f in sorted(os.listdir(release_dir)):
     if not f.startswith((f"TypeClub-Windows-{version}.", f"TypeClub-Linux-{version}.", f"TypeClub-Mac-{version}-")):

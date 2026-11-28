@@ -41,8 +41,11 @@ npm run build          # tsc + vite + electron-builder --linux --win
 
 ```bash
 cd /path/to/type-club-monorepo/apps/desktop
-TYPECLUB_DOWNLOADS_DIR=/usr/share/nginx/downloads ./deploy-release.sh
+TYPECLUB_PATCH_NOTES_FILE=/path/to/patch-notes.txt \
+  TYPECLUB_DOWNLOADS_DIR=/usr/share/nginx/downloads ./deploy-release.sh
 ```
+
+При повышении версии укажите путь к текстовому файлу с патчноутом для этого релиза. Используйте UTF-8 и пишите по одному пункту на строку без маркеров. Можно добавить до восьми пунктов по 250 символов, пустые строки пропускаются. Скрипт добавит их в `releaseNotes` в `latest.json`, откуда их прочитает окно обновления. Для релиза без патчноута опустите `TYPECLUB_PATCH_NOTES_FILE`.
 
 ### Docker-сборка (кроссплатформенная)
 

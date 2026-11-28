@@ -13,7 +13,7 @@ import { useAuth } from '../context/AuthContext'
 import { articlesApi, collaborationApi } from '../api'
 import { config } from '../config'
 import { Users, Lightbulb, PanelLeftClose, PanelLeftOpen, PanelTopClose, PanelTopOpen } from 'lucide-react'
-import type { EditorMode } from '../types'
+import type { EditorMode, UpdateInfo } from '../types'
 
 const modes: { key: EditorMode; label: string }[] = [
   { key: 'seamless', label: 'Seamless' },
@@ -105,7 +105,7 @@ function ProfileMenuPopup({ user, logout, onClose }: { user: { nickname: string;
 export function TitleBar() {
   const [showSettings, setShowSettings] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
-  const [updateInfo, setUpdateInfo] = useState<any>(null)
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null)
   const [showUpdateModal, setShowUpdateModal] = useState(false)
 
   // Периодическая проверка наличия обновлений с сайта

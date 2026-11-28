@@ -13,6 +13,8 @@ import { importFileFromPath } from './importers'
 import { markdownToDocxBuffer, DocxExportOptions } from './docxExporter'
 import { relaunchAppImage, replaceAppImage } from './appImageUpdate'
 import { LOCAL_IMAGE_SCHEME } from '../src/utils/fileUtils'
+import { readReleaseNotes } from '../src/utils/releaseNotes'
+import type { UpdateInfo } from '../src/types'
 
 // Используем встроенный оффлайн Hunspell вместо Windows Native Spellchecker.
 if (process.platform === 'win32') {
@@ -1484,17 +1486,19 @@ ipcMain.handle('app:check-update', async (_event, siteUrl: string) => {
         if (res.statusCode !== 200) {
           return reject(new Error(`Failed to fetch latest.json: HTTP ${res.statusCode}`))
         }
-        let data = ''
-        res.on('data', (chunk) => {
-          if (data.length + chunk.length > 512 * 1024) {
+        const chunks: Buffer[] = []
+        let size = 0
+        res.on('data', (chunk: Buffer) => {
+          size += chunk.length
+          if (size > 512 * 1024) {
             req.destroy()
             return reject(new Error('Manifest file size exceeded maximum allowable limit'))
           }
-          data += chunk
+          chunks.push(chunk)
         })
         res.on('end', () => {
           try {
-            resolve(JSON.parse(data))
+            resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')))
           } catch (e) {
             reject(e)
           }
@@ -1535,10 +1539,11 @@ ipcMain.handle('app:check-update', async (_event, siteUrl: string) => {
       currentVersion,
       latestVersion,
       releaseDate: manifestData.releaseDate,
+      releaseNotes: readReleaseNotes(manifestData.releaseNotes),
       installType,
       fileInfo,
       downloadUrl,
-    }
+    } satisfies UpdateInfo
   } catch (err: any) {
     console.warn('[UPDATER] Check failed:', err.message)
     return {

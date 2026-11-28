@@ -375,19 +375,22 @@ export interface IElectronAPI {
   importThemes: () => Promise<AppTheme[] | null>;
   /** Автообновление приложения */
   getAppVersion: () => Promise<string>;
-  checkUpdate: (siteUrl: string) => Promise<{
-    updateAvailable: boolean;
-    currentVersion: string;
-    latestVersion: string;
-    releaseDate?: string;
-    installType?: 'portable' | 'installer' | 'appimage' | 'dmg';
-    fileInfo?: { file: string; size: number; sha256?: string } | null;
-    downloadUrl?: string | null;
-    error?: string;
-  }>;
+  checkUpdate: (siteUrl: string) => Promise<UpdateInfo>;
   downloadUpdate: (downloadUrl: string, fileName: string, expectedSha256?: string) => Promise<{ success: boolean; filePath: string; sha256?: string }>;
   installUpdate: (filePath: string, installType: string) => Promise<{ success: boolean; error?: string }>;
   onUpdateProgress: (callback: (progress: { bytesDownloaded: number; totalBytes: number; percent: number }) => void) => () => void;
+}
+
+export interface UpdateInfo {
+  updateAvailable: boolean;
+  currentVersion: string;
+  latestVersion: string;
+  releaseDate?: string;
+  releaseNotes?: string[];
+  installType?: 'portable' | 'installer' | 'appimage' | 'dmg';
+  fileInfo?: { file: string; size: number; sha256?: string } | null;
+  downloadUrl?: string | null;
+  error?: string;
 }
 
 declare global {
