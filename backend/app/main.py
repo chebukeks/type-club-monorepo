@@ -107,6 +107,8 @@ async def startup():
         await conn.execute(text("ALTER TABLE typeclub_users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();"))
         await conn.execute(text("ALTER TABLE typeclub_articles ADD COLUMN IF NOT EXISTS share_token VARCHAR(64);"))
         await conn.execute(text("ALTER TABLE typeclub_articles ADD COLUMN IF NOT EXISTS share_role VARCHAR(20);"))
+        await conn.execute(text("""ALTER TABLE typeclub_articles ADD COLUMN IF NOT EXISTS download_roles JSON NOT NULL DEFAULT '["co_author", "editor"]';"""))
+        await conn.execute(text("ALTER TABLE typeclub_articles ADD COLUMN IF NOT EXISTS checkbox_mode VARCHAR(16) NOT NULL DEFAULT 'disabled';"))
         await conn.execute(text("ALTER TABLE article_views ADD COLUMN IF NOT EXISTS viewer_hash VARCHAR(64);"))
         await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_article_views_viewer_hash ON article_views (viewer_hash);"))
     logger.info("Database tables and schema migrations completed")

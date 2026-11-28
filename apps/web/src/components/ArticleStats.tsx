@@ -2,16 +2,20 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { statsApi } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
-import { Heart, Eye, Link } from "lucide-react";
+import { Heart, Eye, Link, Download } from "lucide-react";
 
 interface Props {
   articleId: number;
   initialViews: number;
   initialLikes: number;
   initialLiked: boolean;
+  onDownload?: () => void;
+  downloadError?: string;
 }
 
-export default function ArticleStats({ articleId, initialViews, initialLikes, initialLiked }: Props) {
+const linkActionClass = "flex items-center gap-1.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors";
+
+export default function ArticleStats({ articleId, initialViews, initialLikes, initialLiked, onDownload, downloadError }: Props) {
   const { user } = useAuth();
   const { t } = useLanguage();
   const [views, setViews] = useState(initialViews);
@@ -73,7 +77,7 @@ export default function ArticleStats({ articleId, initialViews, initialLikes, in
     <>
       <div ref={sentinelRef} className="h-px" />
       <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-800">
-        <div className="flex items-center gap-5 text-sm text-gray-500">
+        <div className="flex flex-wrap items-center gap-5 text-sm text-gray-500">
           <span className="flex items-center gap-1.5">
             <Eye size={16} />
             {t('readArticle.views', { count: views })}
@@ -91,13 +95,20 @@ export default function ArticleStats({ articleId, initialViews, initialLikes, in
           </button>
           <button
             onClick={handleCopyLink}
-            className="flex items-center gap-1.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+            className={linkActionClass}
             title={t('readArticle.copyLink')}
           >
             <Link size={16} />
             {copied ? t('readArticle.copied') : t('readArticle.copyLink')}
           </button>
+          {onDownload && (
+            <button type="button" onClick={onDownload} className={linkActionClass} title={t('publish.downloadArticle')}>
+              <Download size={16} />
+              {t('publish.downloadArticle')}
+            </button>
+          )}
         </div>
+        {downloadError && <p role="alert" className="mt-2 text-sm text-red-600">{downloadError}</p>}
       </div>
     </>
   );

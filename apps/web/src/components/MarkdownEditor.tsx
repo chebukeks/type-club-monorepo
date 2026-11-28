@@ -35,6 +35,9 @@ interface MarkdownEditorProps {
   textZoom?: number;
   documentZoom?: number;
   readOnly?: boolean;
+  interactiveTasks?: boolean;
+  taskProgressKey?: string;
+  onSaveTask?: (id: string, checked: boolean) => Promise<void>;
   collaboration?: CollaborationConfig;
   userRole?: "author" | "co_author" | "editor" | null;
   userId?: number;
@@ -51,6 +54,9 @@ export function MarkdownEditor({
   textZoom = 100,
   documentZoom = 100,
   readOnly = false,
+  interactiveTasks,
+  taskProgressKey,
+  onSaveTask,
   collaboration,
   userRole,
   userId,
@@ -681,10 +687,14 @@ export function MarkdownEditor({
       <EditorCore
         content={content}
         editorMode={editorMode}
+        nativeTextAssistance={navigator.maxTouchPoints > 0}
         onChange={onChange}
         textZoom={textZoom}
         documentZoom={documentZoom}
         readOnly={readOnly}
+        interactiveTasks={interactiveTasks}
+        taskProgressKey={taskProgressKey}
+        onSaveTask={onSaveTask}
         collaboration={collaboration}
         userRole={userRole}
         userId={userId}

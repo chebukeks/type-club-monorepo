@@ -26,15 +26,20 @@ import {
   GripHorizontal,
 } from "lucide-react";
 import { type Locale, type TranslationKey, spellcheckService } from "@type-club/editor";
-import type { AppTheme, ThemeColors, ThemeTypography } from "../types";
-import { DARK_THEME, LIGHT_THEME, BUILTIN_THEMES, getThemeBackgroundImage } from "../utils/themePresets";
+import type { AppTheme, ThemeAppearance, ThemeColors, ThemeTypography } from "../types";
+import { DARK_THEME, LIGHT_THEME, BUILTIN_THEMES, getThemeEditorSwatch } from "../utils/themePresets";
 
 interface SettingsModalProps {
   onClose: () => void;
 }
 
 type SettingsTab = "theme" | "language" | "shortcuts";
-type ThemeCategory = "ui" | "editor" | "code" | "tables" | "typography";
+type ThemeCategory = "ui" | "editor" | "code" | "tables" | "typography" | "appearance";
+
+const appearanceToggles = [
+  "flatFrame", "compactControls", "shadedSidebarHeader", "outlinedTabs",
+  "outlinedBlocks", "headingDividers", "compactTables", "ruledPaper",
+] as const;
 
 const builtinThemeNames: Partial<Record<string, TranslationKey>> = {
   dark: "theme.dark",
@@ -57,6 +62,9 @@ const builtinThemeNames: Partial<Record<string, TranslationKey>> = {
   sherbet: "settings.theme.sherbet",
   lagoon: "settings.theme.lagoon",
   aurora: "settings.theme.aurora",
+  "amber-office": "settings.theme.amberOffice",
+  "two-threads": "settings.theme.twoThreads",
+  "twelve-sheets": "settings.theme.twelveSheets",
 };
 
 function localizeTheme(theme: AppTheme, t: (key: TranslationKey) => string): AppTheme {
@@ -332,9 +340,15 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
   };
 
   const handleRemoveCustomWord = async (word: string) => {
-    setCustomWords((prev) => prev.filter((w) => w !== word));
-    spellcheckService.removeCustomWord(word);
-    await window.api.removeCustomWord(word);
+    try {
+      if (await window.api.removeCustomWord(word)) {
+        const lower = word.trim().toLowerCase();
+        setCustomWords((prev) => prev.filter((w) => w.trim().toLowerCase() !== lower));
+        spellcheckService.removeCustomWord(word);
+      }
+    } catch (err) {
+      console.error("Failed to remove a custom dictionary word:", err);
+    }
   };
 
   // --- Theme Actions ---
@@ -369,6 +383,15 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
     });
   };
 
+  const handleUpdateDraftAppearance = <K extends keyof ThemeAppearance>(
+    key: K,
+    value: ThemeAppearance[K]
+  ) => {
+    const updated = { ...draftTheme, appearance: { ...draftTheme.appearance, [key]: value } };
+    setDraftTheme(updated);
+    applyLiveTheme(updated);
+  };
+
   const handleSaveTheme = async () => {
     let name = draftTheme.name.trim();
     if (!name) {
@@ -396,8 +419,8 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
       };
     }
 
-    await saveCustomTheme(finalTheme);
-    setTheme(finalTheme.id, finalTheme);
+    if (!await saveCustomTheme(finalTheme)) return;
+    await setTheme(finalTheme.id, finalTheme);
     setDraftTheme({ ...finalTheme });
     showThemeToast(t("settings.theme.saved"));
   };
@@ -679,7 +702,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                             <div className="flex items-center gap-2.5 min-w-0">
                               <div
                                 className="w-3.5 h-3.5 rounded-full border border-black/10 shadow-xs flex-shrink-0"
-                                style={{ backgroundColor: bTheme.colors.bgBase, backgroundImage: getThemeBackgroundImage(bTheme, 'editor') }}
+                                style={{ backgroundColor: bTheme.colors.bgBase, backgroundImage: getThemeEditorSwatch(bTheme) }}
                               />
                               <span className="text-[13px] text-[var(--text-primary)] font-medium truncate">
                                 {bTheme.name}
@@ -776,7 +799,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                               <div className="flex items-center gap-2.5 flex-1 min-w-0">
                                 <div
                                   className="w-3.5 h-3.5 rounded-full border border-black/10 shadow-xs shrink-0"
-                                  style={{ backgroundColor: cTheme.colors.bgBase, backgroundImage: getThemeBackgroundImage(cTheme, 'editor') }}
+                                  style={{ backgroundColor: cTheme.colors.bgBase, backgroundImage: getThemeEditorSwatch(cTheme) }}
                                 />
                                 <span className="text-[13px] text-[var(--text-primary)] font-medium truncate">
                                   {cTheme.name}
@@ -868,7 +891,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
 
                       {/* Category Selector Tabs */}
                       <div
-                        className="flex rounded-lg bg-[var(--bg-base)]"
+                        className="flex flex-wrap rounded-lg bg-[var(--bg-base)]"
                         style={{ padding: "3px", gap: "3px" }}
                       >
                         {[
@@ -877,14 +900,16 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                           { key: "code" as ThemeCategory, label: t("settings.theme.groupCode"), icon: Code2 },
                           { key: "tables" as ThemeCategory, label: t("settings.theme.groupTables"), icon: Table },
                           { key: "typography" as ThemeCategory, label: t("settings.theme.groupTypography"), icon: Type },
+                          { key: "appearance" as ThemeCategory, label: t("settings.theme.groupAppearance"), icon: Sparkles },
                         ].map((cat) => {
                           const Icon = cat.icon;
                           const isCatActive = activeThemeCategory === cat.key;
                           return (
                             <button
                               key={cat.key}
+                              aria-pressed={isCatActive}
                               onClick={() => setActiveThemeCategory(cat.key)}
-                              className={`flex-1 flex items-center justify-center gap-1.5 rounded-md text-[11.5px] font-medium transition-all ${
+                              className={`flex-auto flex items-center justify-center gap-1.5 rounded-md text-[11.5px] font-medium transition-all ${
                                 isCatActive
                                   ? "bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-xs"
                                   : "text-[var(--text-dim)] hover:text-[var(--text-secondary)]"
@@ -1025,7 +1050,61 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                         </div>
                       )}
 
-                      {/* Category: Typography & Fonts */}
+                      {activeThemeCategory === "appearance" && (
+                        <div className="flex max-h-60 flex-col gap-3 overflow-y-auto" style={{ paddingInlineEnd: "4px" }}>
+                          <div className="grid grid-cols-2 gap-2">
+                            {appearanceToggles.map(key => (
+                              <label
+                                key={key}
+                                className="flex cursor-pointer items-center gap-2 rounded-lg border border-[var(--border-default)] text-[11.5px]"
+                                style={{ padding: "6px 8px" }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="shrink-0 cursor-pointer accent-[var(--accent)]"
+                                  checked={draftTheme.appearance?.[key] ?? false}
+                                  onChange={(e) => handleUpdateDraftAppearance(key, e.target.checked)}
+                                />
+                                {t(`settings.theme.appearance.${key}`)}
+                              </label>
+                            ))}
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            {([
+                              "spellingColor", "taskColor",
+                              ...(draftTheme.appearance?.outlinedTabs
+                                ? ["tabBackground", "tabHover", "tabBorder", "tabActiveBackground", "tabActiveBorder"] as const
+                                : []),
+                              ...(draftTheme.appearance?.ruledPaper ? ["ruleColor"] as const : []),
+                            ] as const).map(key => (
+                              <ColorControl
+                                key={key}
+                                label={t(`settings.theme.appearance.${key}`)}
+                                value={draftTheme.appearance?.[key] ?? ""}
+                                placeholder={t("settings.theme.appearance.defaultColor")}
+                                onChange={(value) => handleUpdateDraftAppearance(key, value || undefined)}
+                              />
+                            ))}
+                          </div>
+                          {draftTheme.appearance?.ruledPaper && (
+                            <label className="flex flex-col gap-1 text-[11.5px]">
+                              <span className="flex justify-between">
+                                {t("settings.theme.appearance.ruleGap")}
+                                <span>{draftTheme.appearance.ruleGap ?? 36}%</span>
+                              </span>
+                              <input
+                                type="range"
+                                min={0}
+                                max={60}
+                                value={draftTheme.appearance.ruleGap ?? 36}
+                                onChange={(e) => handleUpdateDraftAppearance("ruleGap", Number(e.target.value))}
+                                className="w-full accent-[var(--accent)]"
+                              />
+                            </label>
+                          )}
+                        </div>
+                      )}
+
                       {activeThemeCategory === "typography" && (
                         <div className="flex flex-col gap-3" style={{ maxHeight: "240px", overflowY: "auto", paddingRight: "4px" }}>
                           {/* UI Font */}
@@ -1041,6 +1120,8 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                             >
                               <option value="'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">Inter (Default)</option>
                               <option value="'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif">Segoe UI</option>
+                              <option value="'Segoe UI', Tahoma, Arial, sans-serif">Segoe UI / Tahoma</option>
+                              <option value="'Trebuchet MS', Arial, sans-serif">Trebuchet MS</option>
                               <option value="'Roboto', sans-serif">Roboto</option>
                               <option value="system-ui, -apple-system, sans-serif">System UI</option>
                             </select>
@@ -1063,6 +1144,9 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                               <option value="'Lora', serif">Lora (Serif)</option>
                               <option value="'PT Serif', serif">PT Serif (Serif)</option>
                               <option value="'PT Sans', sans-serif">PT Sans</option>
+                              <option value="'Caveat', 'Segoe Print', 'Bradley Hand', cursive">Caveat</option>
+                              <option value="'Segoe UI', Tahoma, Arial, sans-serif">Segoe UI / Tahoma</option>
+                              <option value="'Trebuchet MS', Arial, sans-serif">Trebuchet MS</option>
                             </select>
                           </div>
 
@@ -1095,7 +1179,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                                 type="range"
                                 min={12}
                                 max={24}
-                                step={1}
+                                step={0.5}
                                 value={draftTheme.typography.fontSizeEditor}
                                 onChange={(e) => handleUpdateDraftTypography("fontSizeEditor", Number(e.target.value))}
                                 className="w-full accent-[var(--accent)]"
@@ -1111,7 +1195,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                                 type="range"
                                 min={1.2}
                                 max={2.2}
-                                step={0.1}
+                                step={0.05}
                                 value={draftTheme.typography.lineHeightEditor}
                                 onChange={(e) => handleUpdateDraftTypography("lineHeightEditor", Number(e.target.value))}
                                 className="w-full accent-[var(--accent)]"
@@ -1413,10 +1497,12 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
 function ColorControl({
   label,
   value,
+  placeholder,
   onChange,
 }: {
   label: string;
   value: string;
+  placeholder?: string;
   onChange: (val: string) => void;
 }) {
   const colorInputRef = useRef<HTMLInputElement>(null);
@@ -1446,6 +1532,7 @@ function ColorControl({
           <input
             ref={colorInputRef}
             type="color"
+            aria-label={label}
             value={hexValue}
             onChange={(e) => onChange(e.target.value)}
             className="absolute inset-0 opacity-0 cursor-pointer pointer-events-none"
@@ -1453,7 +1540,9 @@ function ColorControl({
         </div>
         <input
           type="text"
+          aria-label={label}
           value={value}
+          placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
           className="w-16 bg-transparent border-none outline-none font-mono text-[10.5px] text-[var(--text-primary)] text-right"
         />

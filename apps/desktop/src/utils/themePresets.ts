@@ -1,4 +1,50 @@
-import type { AppTheme, ThemeColors, ThemeTypography } from '../types'
+import type { AppTheme, ThemeAppearance, ThemeColors, ThemeTypography } from '../types'
+
+const appearanceFlags = {
+  flatFrame: 'data-theme-flat-frame',
+  outlinedTabs: 'data-theme-outlined-tabs',
+  compactControls: 'data-theme-compact-controls',
+  compactTables: 'data-theme-compact-tables',
+  shadedSidebarHeader: 'data-theme-shaded-sidebar-header',
+  outlinedBlocks: 'data-theme-outlined-blocks',
+  headingDividers: 'data-theme-heading-dividers',
+  ruledPaper: 'data-theme-ruled-paper',
+} as const
+
+const appearanceColorTokens = {
+  ruleColor: '--theme-rule-color',
+  spellingColor: '--theme-spelling-color',
+  taskColor: '--theme-task-color',
+  tabBackground: '--theme-tab-background',
+  tabHover: '--theme-tab-hover',
+  tabBorder: '--theme-tab-border',
+  tabActiveBackground: '--theme-tab-active-background',
+  tabActiveBorder: '--theme-tab-active-border',
+} as const
+
+function readAppearanceColor(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const color = value.trim()
+  if (!/^(?:#[\da-f]{3,8}|[a-z]+|(?:rgba?|hsla?|hwb|oklab|oklch|lab|lch|color)\([\w.,%+ /-]+\))$/i.test(color)) return undefined
+  if (typeof CSS !== 'undefined' && !CSS.supports('color', color)) return undefined
+  return color
+}
+
+function readThemeAppearance(value: unknown): ThemeAppearance | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const source = value as Record<string, unknown>
+  const appearance: ThemeAppearance = {}
+  for (const key of Object.keys(appearanceFlags) as (keyof typeof appearanceFlags)[]) {
+    if (source[key] === true) appearance[key] = true
+  }
+  for (const key of Object.keys(appearanceColorTokens) as (keyof typeof appearanceColorTokens)[]) {
+    const color = readAppearanceColor(source[key])
+    if (color) appearance[key] = color
+  }
+  const gap = source.ruleGap
+  if (typeof gap === 'number' && Number.isFinite(gap)) appearance.ruleGap = Math.max(0, Math.min(60, gap))
+  return Object.keys(appearance).length ? appearance : undefined
+}
 
 export const DARK_COLORS: ThemeColors = {
   // Интерфейс
@@ -331,8 +377,163 @@ function createColorfulTheme(
   }
 }
 
+const notebookTheme = createBuiltinTheme('twelve-sheets', 'Twelve Sheets', 'light', {
+  bgBase: '#fcfbf1', bgSurface: '#b5cf87', bgElevated: '#f3f7df', bgHover: '#c7db9d', bgActive: '#a7c379',
+  borderDefault: '#a0b77f', borderStrong: '#749251', textPrimary: '#263b25', textSecondary: '#395838',
+  textMuted: '#30482f', accent: '#336242', accentHover: '#294e35', editorLink: '#574582',
+})
+
+const NOTEBOOK_THEME: AppTheme = {
+  ...notebookTheme,
+  backgrounds: {
+    panels: 'linear-gradient(150deg, #bdd794, #a3c174)',
+  },
+  appearance: {
+    ruledPaper: true,
+    ruleColor: '#a7c5df',
+    spellingColor: '#a3454a',
+    taskColor: '#23447b',
+  },
+  colors: {
+    ...notebookTheme.colors,
+    editorText: '#23447b',
+    editorHeading: '#48326e',
+    editorCaret: '#23447b',
+    editorSelection: '#8ba7d14d',
+    editorSyntax: '#5f5a51',
+    editorHr: '#a7c5df',
+    editorStrike: '#635e55',
+    editorCodeBg: '#efede2',
+    editorCodeText: '#494640',
+    editorMarkBg: '#f7e6a7',
+    editorMarkText: '#514021',
+    editorBlockquoteBg: '#f5f1e5',
+    editorBlockquoteBorder: '#826454',
+    editorBlockquoteText: '#554e45',
+    codeblockBg: '#efede2',
+    codeblockBorder: '#c6c0af',
+    codeblockText: '#494640',
+    codeblockLang: '#5f5145',
+    hljsKeyword: '#614681',
+    hljsString: '#3d633e',
+    hljsTitle: '#8c4145',
+    hljsNumber: '#814f32',
+    hljsComment: '#656054',
+    tableBorder: '#a7c5df',
+    tableHeaderBg: '#e9edf2',
+    tableHeaderText: '#48326e',
+    tableCellText: '#23447b',
+    tableEvenBg: '#f6f4e9',
+    tableSelected: '#a8c5e4',
+  },
+  typography: {
+    ...DEFAULT_TYPOGRAPHY,
+    fontFamilyEditor: "'Caveat', 'Segoe Print', 'Bradley Hand', cursive",
+    fontSizeEditor: 19.5,
+    lineHeightEditor: 1.55,
+  },
+}
+
+const threadsTheme = createBuiltinTheme('two-threads', 'Two Threads', 'light', {
+  bgBase: '#ededed', bgSurface: '#ededed', bgElevated: '#dadada', bgHover: '#e1e1e1', bgActive: '#d5d5d5',
+  borderDefault: '#d4d4d4', borderStrong: '#a2a2a2', textPrimary: '#292929', textSecondary: '#414141',
+  textMuted: '#555555', accent: '#ab4400', accentHover: '#8d3600', editorLink: '#ab4400',
+})
+
+const TWO_THREADS_THEME: AppTheme = {
+  ...threadsTheme,
+  appearance: {
+    flatFrame: true,
+    shadedSidebarHeader: true,
+    outlinedBlocks: true,
+    headingDividers: true,
+  },
+  colors: {
+    ...threadsTheme.colors,
+    bgInput: '#f4f4f4',
+    editorHeading: '#004b8e',
+    editorBlockquoteBg: '#dadada',
+    editorBlockquoteBorder: '#adadad',
+    editorBlockquoteText: '#292929',
+    editorMarkBg: '#ffdec5',
+    editorMarkText: '#603005',
+    editorCodeBg: '#dedede',
+    editorCodeText: '#373737',
+    codeblockBg: '#dadada',
+    codeblockText: '#292929',
+    codeblockLang: '#004b8e',
+    hljsKeyword: '#164c84',
+    hljsString: '#285b33',
+    hljsTitle: '#723e77',
+    hljsNumber: '#86401a',
+    hljsComment: '#535353',
+    tableHeaderBg: '#dadada',
+    tableHeaderText: '#004b8e',
+    tableEvenBg: '#e5e5e5',
+    tableSelected: '#f5c9ab',
+  },
+  typography: {
+    ...DEFAULT_TYPOGRAPHY,
+    fontFamilyUi: "'Trebuchet MS', Arial, sans-serif",
+    fontFamilyEditor: "'Trebuchet MS', Arial, sans-serif",
+    lineHeightEditor: 1.45,
+  },
+}
+
+const officeTheme = createBuiltinTheme('amber-office', 'Amber Office', 'light', {
+  bgBase: '#ffffff', bgSurface: '#fff0a3', bgElevated: '#f2f2f2', bgHover: '#fff5c5', bgActive: '#f8db54',
+  borderDefault: '#cecece', borderStrong: '#a8a8a8', textPrimary: '#252525', textSecondary: '#424242',
+  textMuted: '#555044', accent: '#795600', accentHover: '#624400', editorLink: '#23578b',
+})
+
+const AMBER_OFFICE_THEME: AppTheme = {
+  ...officeTheme,
+  appearance: {
+    flatFrame: true,
+    outlinedTabs: true,
+    compactControls: true,
+    compactTables: true,
+    tabBackground: '#fff5ca',
+    tabHover: '#fff9e3',
+    tabBorder: '#e0d49e',
+    tabActiveBorder: '#b89b42',
+  },
+  colors: {
+    ...officeTheme.colors,
+    bgInput: '#ffffff',
+    editorHeading: '#242424',
+    editorSelection: '#f8db5466',
+    editorHr: '#cecece',
+    editorCodeBg: '#f2f2f2',
+    editorBlockquoteBg: '#faf8ed',
+    editorBlockquoteBorder: '#dfb922',
+    editorMarkBg: '#fff0a3',
+    editorMarkText: '#4b3b13',
+    codeblockBg: '#f2f2f2',
+    codeblockText: '#252525',
+    codeblockLang: '#23578b',
+    hljsKeyword: '#23578b',
+    hljsString: '#2c653e',
+    hljsTitle: '#704540',
+    hljsNumber: '#865310',
+    hljsComment: '#585858',
+    tableHeaderBg: '#eeeeee',
+    tableEvenBg: '#f7f7f7',
+    tableSelected: '#ffe686',
+  },
+  typography: {
+    ...DEFAULT_TYPOGRAPHY,
+    fontFamilyUi: "'Segoe UI', Tahoma, Arial, sans-serif",
+    fontFamilyEditor: "'Segoe UI', Tahoma, Arial, sans-serif",
+    lineHeightEditor: 1.45,
+  },
+}
+
 export const BUILTIN_THEMES: AppTheme[] = [
   DARK_THEME, LIGHT_THEME, PEACHY_THEME, DISSONANCE_THEME,
+  AMBER_OFFICE_THEME,
+  TWO_THREADS_THEME,
+  NOTEBOOK_THEME,
   createBuiltinTheme('parchment', 'Parchment', 'light', {
     bgBase: '#fbf5e8', bgSurface: '#f1e7d3', bgElevated: '#fff9ed', bgHover: '#eee0c5', bgActive: '#e6d4b5',
     borderDefault: '#e3d3b7', borderStrong: '#cbb691', textPrimary: '#3a2b1d', textSecondary: '#59422c',
@@ -437,8 +638,14 @@ function readGradient(value: unknown): string | undefined {
 }
 
 export function getThemeBackgroundImage(theme: AppTheme, area: 'editor' | 'panels'): string {
-  const color = area === 'editor' ? theme.colors.bgBase : theme.colors.bgSurface
+  const color = area === 'editor' ? theme.colors?.bgBase : theme.colors?.bgSurface
   return readGradient(theme.backgrounds?.[area]) ?? readGradient(color) ?? 'none'
+}
+
+export function getThemeEditorSwatch(theme: AppTheme): string {
+  if (!theme.appearance?.ruledPaper) return getThemeBackgroundImage(theme, 'editor')
+  const color = readAppearanceColor(theme.appearance.ruleColor) ?? '#a7c5df'
+  return `repeating-linear-gradient(to bottom, transparent 0 11px, ${color} 11px 12px)`
 }
 
 function getBackgroundColor(value: string, fallback: string): string {
@@ -447,14 +654,50 @@ function getBackgroundColor(value: string, fallback: string): string {
   return value
 }
 
+function readCssValue(property: string, value: unknown): string | undefined {
+  if (typeof value !== 'string' || !value.trim() || /[;{}\\<>!]|\/\*|url\s*\(/i.test(value)) return undefined
+  if (typeof CSS !== 'undefined' && !CSS.supports(property, value)) return undefined
+  return value
+}
+
+function readThemeColors(value: unknown, fallback: ThemeColors): ThemeColors {
+  const source = value as Partial<ThemeColors> | undefined
+  const colors = { ...fallback }
+  for (const key of Object.keys(colors) as (keyof ThemeColors)[]) {
+    const gradient = key === 'bgBase' || key === 'bgSurface' ? readGradient(source?.[key]) : undefined
+    colors[key] = gradient ?? readCssValue('color', source?.[key]) ?? fallback[key]
+  }
+  return colors
+}
+
+function readThemeTypography(value: unknown): ThemeTypography {
+  const source = value as Partial<ThemeTypography> | undefined
+  const typography = { ...DEFAULT_TYPOGRAPHY }
+  for (const key of ['fontFamilyUi', 'fontFamilyEditor', 'fontFamilyCode'] as const) {
+    typography[key] = readCssValue('font-family', source?.[key]) ?? typography[key]
+  }
+  for (const key of ['fontSizeEditor', 'lineHeightEditor'] as const) {
+    const number = source?.[key]
+    if (typeof number === 'number' && Number.isFinite(number) && number > 0) typography[key] = number
+  }
+  return typography
+}
+
 /** Генерация CSS переменных для темы */
 export function generateCssVariables(theme: AppTheme): string {
-  const { colors, typography } = theme
   const isDark = theme.baseTheme === 'dark'
   const fallback = isDark ? DARK_COLORS : LIGHT_COLORS
+  const colors = readThemeColors(theme.colors, fallback)
+  const typography = readThemeTypography(theme.typography)
+  const appearance = readThemeAppearance(theme.appearance)
+  const appearanceColors = Object.entries(appearanceColorTokens)
+    .map(([key, token]) => {
+      const color = appearance?.[key as keyof typeof appearanceColorTokens]
+      return color ? `${token}: ${color};` : ''
+    }).filter(Boolean).join('\n      ')
 
   return `
-    :root, [data-theme="${theme.baseTheme}"] {
+    :root, [data-theme="${isDark ? 'dark' : 'light'}"] {
       --bg-base: ${getBackgroundColor(colors.bgBase, fallback.bgBase)} !important;
       --bg-surface: ${getBackgroundColor(colors.bgSurface, fallback.bgSurface)} !important;
       --theme-editor-image: ${getThemeBackgroundImage(theme, 'editor')} !important;
@@ -546,8 +789,10 @@ export function generateCssVariables(theme: AppTheme): string {
       --font-ui: ${typography.fontFamilyUi};
       --font-editor: ${typography.fontFamilyEditor};
       --font-code: ${typography.fontFamilyCode};
-      --editor-font-size: ${typography.fontSizeEditor}px;
       --editor-line-height: ${typography.lineHeightEditor};
+      --theme-editor-font-size: ${typography.fontSizeEditor}px;
+      ${appearance?.ruleGap === undefined ? '' : `--theme-rule-gap: ${appearance.ruleGap / 100}em;`}
+      ${appearanceColors}
     }
 
     body {
@@ -556,7 +801,7 @@ export function generateCssVariables(theme: AppTheme): string {
 
     .ProseMirror, .cm-editor, .markdown-body {
       font-family: var(--font-editor) !important;
-      font-size: var(--editor-font-size) !important;
+      font-size: calc(var(--theme-editor-font-size) * var(--editor-zoom, 1)) !important;
       line-height: var(--editor-line-height) !important;
     }
 
@@ -572,7 +817,11 @@ export function generateCssVariables(theme: AppTheme): string {
 
 /** Применить тему к DOM */
 export function applyThemeToDOM(theme: AppTheme) {
-  document.documentElement.setAttribute('data-theme', theme.baseTheme)
+  const root = document.documentElement
+  root.setAttribute('data-theme', theme.baseTheme)
+  for (const key of Object.keys(appearanceFlags) as (keyof typeof appearanceFlags)[]) {
+    root.toggleAttribute(appearanceFlags[key], theme.appearance?.[key] === true)
+  }
 
   let styleTag = document.getElementById('typeclub-custom-theme-vars') as HTMLStyleElement | null
   if (!styleTag) {
@@ -592,17 +841,11 @@ export function parseSingleTheme(data: any): AppTheme | null {
   const baseTheme = data.baseTheme === 'light' ? 'light' : 'dark'
   const fallbackColors = baseTheme === 'light' ? LIGHT_COLORS : DARK_COLORS
 
-  const colors: ThemeColors = {
-    ...fallbackColors,
-    ...(data.colors && typeof data.colors === 'object' ? data.colors : {}),
-  }
-
-  const typography: ThemeTypography = {
-    ...DEFAULT_TYPOGRAPHY,
-    ...(data.typography && typeof data.typography === 'object' ? data.typography : {}),
-  }
+  const colors = readThemeColors(data.colors, fallbackColors)
+  const typography = readThemeTypography(data.typography)
   const editor = readGradient(data.backgrounds?.editor)
   const panels = readGradient(data.backgrounds?.panels)
+  const appearance = readThemeAppearance(data.appearance)
 
   return {
     id: typeof data.id === 'string' && data.id ? data.id : `custom_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -611,6 +854,7 @@ export function parseSingleTheme(data: any): AppTheme | null {
     baseTheme,
     colors,
     ...(editor || panels ? { backgrounds: { editor, panels } } : {}),
+    ...(appearance ? { appearance } : {}),
     typography,
   }
 }

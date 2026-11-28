@@ -685,6 +685,10 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
     const contentToSave = activeTab?.content || ''
     try {
+      if (activeTab?.articleId && !(await articlesApi.get(activeTab.articleId)).can_download) {
+        alert(getTranslation(state.language, 'publish.downloadDenied'))
+        return
+      }
       const defaultFallback = state.language === 'ru' ? 'Без названия.md' : 'Untitled.md'
       const baseName = (!activeTab || activeTab.filePath === '__draft__')
         ? suggestFileName(contentToSave, defaultFallback)
@@ -896,14 +900,18 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       return
     }
     const themeObj = customThemeObj || findThemeById(themeId)
-    if (themeObj.baseTheme === 'light') {
-      await setLightThemeId(themeObj.id)
-      await setThemeMode('light')
-    } else {
-      await setDarkThemeId(themeObj.id)
-      await setThemeMode('dark')
-    }
-  }, [setThemeMode, setLightThemeId, setDarkThemeId, findThemeById])
+    const themeMode = themeObj.baseTheme
+    const slot = themeMode === 'light' ? 'lightThemeId' : 'darkThemeId'
+    dispatch({
+      type: 'SET_THEME_SLOTS',
+      payload: { [slot]: themeObj.id, themeMode, activeTheme: themeObj },
+    })
+    applyCustomThemeToDOM(themeObj)
+    try {
+      await window.api.storeSet(slot, themeObj.id)
+      await window.api.storeSet('theme', themeMode)
+    } catch (e) { /* ignore */ }
+  }, [setThemeMode, findThemeById])
 
   // --- Сохранить пользовательскую тему ---
   const saveCustomTheme = useCallback(async (theme: AppTheme): Promise<boolean> => {
@@ -1369,9 +1377,10 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
 
   const downloadOnlineArticle = useCallback(async (tabId: string) => {
     const tab = state.tabs.find(t => t.id === tabId)
-    if (!tab) return
+    if (!tab?.articleId) return
     try {
-      const result = await window.api.saveFileAs(tab.content, tab.fileName + '.md')
+      const { content } = await articlesApi.download(tab.articleId)
+      const result = await window.api.saveFileAs(content, tab.fileName + '.md')
       if (!result) return
     } catch (err) { console.error('Ошибка скачивания:', err) }
   }, [state.tabs])

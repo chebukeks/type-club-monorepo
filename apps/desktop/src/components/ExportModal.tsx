@@ -12,6 +12,7 @@ import {
   BookOpen,
 } from 'lucide-react'
 import { useEditor } from '../context/EditorContext'
+import { articlesApi } from '../api'
 import { generateExportHtml, stripMarkdown } from '@type-club/editor'
 
 export type ExportFormat = 'pdf' | 'docx' | 'html' | 'txt'
@@ -97,6 +98,10 @@ export function ExportModal({ onClose }: ExportModalProps) {
     setIsExporting(true)
     setErrorMessage(null)
     try {
+      if (activeTab?.articleId && !(await articlesApi.get(activeTab.articleId)).can_download) {
+        setErrorMessage(t('publish.downloadDenied'))
+        return
+      }
       let success = false
 
       if (format === 'pdf') {

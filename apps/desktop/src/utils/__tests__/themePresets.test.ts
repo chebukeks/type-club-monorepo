@@ -6,6 +6,7 @@ import {
   BUILTIN_THEMES,
   generateCssVariables,
   getThemeBackgroundImage,
+  getThemeEditorSwatch,
   validateThemeJson,
   parseSingleTheme,
   DARK_COLORS,
@@ -27,7 +28,7 @@ function contrastRatio(first: string, second: string): number {
 describe('Theme Presets & Utilities', () => {
   it('keeps text readable in new palettes and on gradient color stops', () => {
     const ids = ['brick-box', 'rubber-duck', 'bubblegum', 'marbles', 'toy-rocket', 'tin-robot',
-      'walnut', 'sherbet', 'lagoon', 'aurora']
+      'walnut', 'sherbet', 'lagoon', 'aurora', 'twelve-sheets', 'two-threads', 'amber-office']
     for (const id of ids) {
       const theme = BUILTIN_THEMES.find(theme => theme.id === id)
       assert.ok(theme, id)
@@ -62,6 +63,36 @@ describe('Theme Presets & Utilities', () => {
     assert.ok(generateCssVariables(legacy).includes(`--bg-base: ${LIGHT_COLORS.bgBase}`))
   })
 
+  it('preserves the appearance of built-in themes when imported as custom themes', () => {
+    for (const id of ['twelve-sheets', 'two-threads', 'amber-office']) {
+      const builtin = BUILTIN_THEMES.find(theme => theme.id === id)
+      assert.ok(builtin?.appearance)
+      const imported = parseSingleTheme(JSON.parse(JSON.stringify(builtin)))
+      assert.ok(imported)
+      assert.equal(imported.isBuiltin, false)
+      assert.deepEqual(imported.appearance, builtin.appearance)
+      assert.equal(generateCssVariables(imported), generateCssVariables(builtin))
+      assert.equal(getThemeEditorSwatch(imported), getThemeEditorSwatch(builtin))
+    }
+  })
+
+  it('uses safe appearance values for imported themes and the live preview', () => {
+    const appearance = {
+      ruledPaper: true,
+      outlinedTabs: 'true',
+      ruleGap: 600,
+      ruleColor: '#bacdef',
+      tabBorder: 'red; invalid-css',
+      unknown: 'value',
+    }
+    const imported = parseSingleTheme({ name: 'Custom', appearance })
+    assert.deepEqual(imported?.appearance, { ruledPaper: true, ruleGap: 60, ruleColor: '#bacdef' })
+    const css = generateCssVariables({ ...LIGHT_THEME, appearance: { ruleGap: 36, ruleColor: 'red; invalid-css' } })
+    assert.match(css, /--theme-rule-gap: 0.36em/)
+    assert.doesNotMatch(css, /invalid-css/)
+    assert.equal(parseSingleTheme({ name: 'Legacy' })?.appearance, undefined)
+  })
+
   it('should have properly structured built-in dark and light themes', () => {
     assert.equal(DARK_THEME.id, 'dark')
     assert.equal(DARK_THEME.isBuiltin, true)
@@ -93,7 +124,7 @@ describe('Theme Presets & Utilities', () => {
     assert.ok(css.includes('--font-ui:'))
     assert.ok(css.includes('--font-editor:'))
     assert.ok(css.includes('--font-code:'))
-    assert.ok(css.includes(`--editor-font-size: ${DEFAULT_TYPOGRAPHY.fontSizeEditor}px;`))
+    assert.ok(css.includes(`--theme-editor-font-size: ${DEFAULT_TYPOGRAPHY.fontSizeEditor}px;`))
     assert.ok(css.includes(`--editor-line-height: ${DEFAULT_TYPOGRAPHY.lineHeightEditor};`))
 
     // Editor & Code

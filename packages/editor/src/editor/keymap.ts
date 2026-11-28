@@ -3,6 +3,7 @@
  */
 import { keymap } from 'prosemirror-keymap'
 import { toggleMark, wrapIn, chainCommands, newlineInCode } from 'prosemirror-commands'
+import { deleteCodePair, enterInCode, indentInCode, pairInCode } from './codeEditing'
 import { baseKeymap } from 'prosemirror-commands'
 import { undo as pmUndo, redo as pmRedo } from 'prosemirror-history'
 import { undo as yUndo, redo as yRedo } from 'y-prosemirror'
@@ -602,6 +603,7 @@ const customKeymap = keymap({
 
   // Умный Enter: цепочка команд (первая вернувшая true перехватывает событие)
   'Enter': chainCommands(
+    enterInCode,
     newlineInCode,
     tableEnterNav,
     createMathBlockOnEnter,
@@ -612,7 +614,7 @@ const customKeymap = keymap({
   ),
 
   // Математика, заголовки, блоки кода и табличный бэкспэйс
-  'Backspace': chainCommands(mathBackspaceCommand, headingBackspace, tableBackspaceCommand, codeBlockBackspaceCommand),
+  'Backspace': chainCommands(deleteCodePair, mathBackspaceCommand, headingBackspace, tableBackspaceCommand, codeBlockBackspaceCommand),
   'Delete': mathDeleteCommand,
   'Space': mathSpaceCommand,
   '$': mathDollarCommand,
@@ -621,9 +623,9 @@ const customKeymap = keymap({
   'ArrowLeft': mathArrowLeftCommand,
 
   // Списки
-  'Tab': sinkListItem(schema.nodes.list_item),
+  'Tab': chainCommands(indentInCode(), sinkListItem(schema.nodes.list_item)),
 
-  'Shift-Tab': liftListItem(schema.nodes.list_item),
+  'Shift-Tab': chainCommands(indentInCode(true), liftListItem(schema.nodes.list_item)),
 
   // Undo/Redo
   'Mod-z': chainCommands(pmUndo, yUndo),
@@ -661,11 +663,15 @@ function wrapSelection(open: string, close: string): Command {
 
 /** Клавиши для оборачивания выделения (#38) */
 const bracketKeymap = keymap({
-  '(': wrapSelection('(', ')'),
-  '[': wrapSelection('[', ']'),
-  '{': wrapSelection('{', '}'),
-  '"': wrapSelection('"', '"'),
-  "'": wrapSelection("'", "'"),
+  '(': chainCommands(pairInCode('('), wrapSelection('(', ')')),
+  '[': chainCommands(pairInCode('['), wrapSelection('[', ']')),
+  '{': chainCommands(pairInCode('{'), wrapSelection('{', '}')),
+  '"': chainCommands(pairInCode('"'), wrapSelection('"', '"')),
+  "'": chainCommands(pairInCode("'"), wrapSelection("'", "'")),
+  '`': pairInCode('`'),
+  ')': pairInCode(')'),
+  ']': pairInCode(']'),
+  '}': pairInCode('}'),
 })
 
 /** Базовые клавиши (Enter, Backspace, Delete, etc.) */

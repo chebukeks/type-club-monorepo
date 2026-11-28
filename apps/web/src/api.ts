@@ -1,3 +1,5 @@
+import type { PublicationOptions } from "@type-club/editor";
+
 const BASE = "/api";
 
 export class ApiError extends Error {
@@ -145,6 +147,8 @@ export interface Article {
   title: string;
   content: string;
   access_state: "private" | "link" | "public" | "blocked";
+  publication?: PublicationOptions;
+  can_download?: boolean;
   slug: string;
   view_count: number;
   like_count: number;
@@ -175,6 +179,7 @@ export interface ArticlesQuery {
   q?: string;
   author?: string;
   roles?: string[];
+  access?: string[];
 }
 
 function buildQuery(params: ArticlesQuery): string {
@@ -184,6 +189,7 @@ function buildQuery(params: ArticlesQuery): string {
   if (params.q) sp.set("q", params.q);
   if (params.author) sp.set("author", params.author);
   if (params.roles) sp.set("roles", params.roles.join(","));
+  if (params.access) sp.set("access", params.access.join(","));
   return sp.toString();
 }
 
@@ -194,12 +200,15 @@ export const articlesApi = {
     getPaged<ArticleListItem>(`/articles?${buildQuery(params)}`),
   myListPaged: (params: ArticlesQuery) =>
     getPaged<ArticleListItem>(`/articles/my?${buildQuery(params)}`),
-  create: (data: { title: string; content?: string; slug?: string }) =>
+  create: (data: { title: string; content?: string; slug?: string; access_state?: string; publication?: PublicationOptions }) =>
     api.post<Article>("/articles", data),
   get: (id: number) => api.get<Article>(`/articles/${id}`),
   getByPath: (username: string, slug: string) =>
     api.get<Article>(`/articles/lookup/${username}/${slug}`),
-  update: (id: number, data: { title?: string; content?: string; access_state?: string; slug?: string }) =>
+  download: (id: number) => api.get<{ content: string }>(`/articles/${id}/download`),
+  saveTask: (id: number, task_id: string, checked: boolean) =>
+    api.patch<void>(`/articles/${id}/task-state`, { task_id, checked }),
+  update: (id: number, data: { title?: string; content?: string; access_state?: string; slug?: string; publication?: PublicationOptions }) =>
     api.patch<Article>(`/articles/${id}`, data),
   delete: (id: number) => api.delete<void>(`/articles/${id}`),
   moderate: (id: number, action: "block" | "unblock") =>

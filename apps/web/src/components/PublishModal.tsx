@@ -4,12 +4,14 @@ import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { X, Copy, Check, ExternalLink } from "lucide-react";
 import CollaborationModal from "./CollaborationModal";
+import { PublicationFields, type PublicationOptions } from "@type-club/editor";
 
 interface PublishModalProps {
   currentState: string;
   currentSlug: string;
   articleId?: number | null;
-  onApply: (accessState: string, slug: string) => void;
+  currentPublication: PublicationOptions;
+  onApply: (accessState: string, slug: string, publication: PublicationOptions) => Promise<void>;
   onClose: () => void;
 }
 
@@ -26,6 +28,7 @@ export default function PublishModal({
   currentState,
   currentSlug,
   articleId,
+  currentPublication,
   onApply,
   onClose,
 }: PublishModalProps) {
@@ -36,6 +39,9 @@ export default function PublishModal({
   const [slug, setSlug] = useState(currentSlug || generateRandomSlug());
   const [copied, setCopied] = useState(false);
   const [showCollab, setShowCollab] = useState(false);
+  const [publication, setPublication] = useState(currentPublication);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   const states = [
     { value: "private", label: t('publish.private'), desc: t('publish.privateDesc') },
@@ -52,10 +58,18 @@ export default function PublishModal({
   const finalSlug = slug.trim() || generateRandomSlug();
   const error = slugError(finalSlug);
 
-  const handleApply = () => {
-    if (error) return;
-    onApply(accessState, finalSlug);
-    onClose();
+  const handleApply = async () => {
+    if (error || saving) return;
+    setSaving(true);
+    setSaveError("");
+    try {
+      await onApply(accessState, finalSlug, publication);
+      onClose();
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : t('publish.publishFailed'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCopy = () => {
@@ -69,7 +83,7 @@ export default function PublishModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-150" onClick={onClose}>
       <div
-        className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border border-gray-200/80 dark:border-gray-800/80 rounded-2xl shadow-2xl w-full max-w-md p-6 mx-4 animate-in fade-in zoom-in-95 duration-150 ease-out"
+        className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border border-gray-200/80 dark:border-gray-800/80 rounded-2xl shadow-2xl w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto p-6 mx-4 animate-in fade-in zoom-in-95 duration-150 ease-out"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-6">
@@ -95,6 +109,8 @@ export default function PublishModal({
             </button>
           ))}
         </div>
+
+        <PublicationFields value={publication} onChange={setPublication} disabled={saving} t={t} />
 
         <div className="mb-6">
           <label className="block text-sm font-medium mb-1">{t('publish.slug')}</label>
@@ -131,12 +147,13 @@ export default function PublishModal({
           </button>
         </div>
 
+        {saveError && <p role="alert" className="mb-2 text-sm text-red-600">{saveError}</p>}
         <button
           onClick={handleApply}
-          disabled={!!error}
+          disabled={!!error || saving}
           className="w-full py-2.5 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
         >
-          {t('publish.apply')}
+          {saving ? t('publish.publishing') : t('publish.apply')}
         </button>
 
         {articleId && (

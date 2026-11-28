@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 import re
@@ -188,10 +188,22 @@ class ResetPasswordRequest(BaseModel):
 
 # ── Articles ──
 
+class PublicationOptions(BaseModel):
+    download_roles: list[Literal["co_author", "editor", "reader"]]
+    checkbox_mode: Literal["disabled", "temporary", "persistent", "document"]
+
+
+class TaskStateRequest(BaseModel):
+    task_id: str = Field(max_length=40, pattern=r"^\d+:\d+:\d+$")
+    checked: bool
+
+
 class ArticleCreateRequest(BaseModel):
     title: str
     content: str = ""
     slug: Optional[str] = None
+    access_state: Literal["private", "link", "public"] = "private"
+    publication: PublicationOptions | None = None
 
 
 class ArticleUpdateRequest(BaseModel):
@@ -199,6 +211,7 @@ class ArticleUpdateRequest(BaseModel):
     content: Optional[str] = None
     access_state: Optional[str] = None
     slug: Optional[str] = None
+    publication: PublicationOptions | None = None
 
     @field_validator("access_state")
     @classmethod
@@ -215,6 +228,8 @@ class ArticleResponse(BaseModel):
     content: str
     access_state: str
     slug: str
+    publication: PublicationOptions
+    can_download: bool = False
     view_count: int = 0
     like_count: int = 0
     comment_count: int = 0
@@ -238,6 +253,7 @@ class ArticleListItem(BaseModel):
     created_at: datetime
     updated_at: datetime
     my_roles: Optional[list[str]] = None
+    can_download: bool = False
 
     model_config = {"from_attributes": True}
 

@@ -9,7 +9,7 @@ import TableOfContents from "../components/TableOfContents";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { useCollaboration } from "../hooks/useCollaboration";
-import type { TocItem, SuggestionItem } from "@type-club/editor";
+import { defaultPublication, type PublicationOptions, type TocItem, type SuggestionItem } from "@type-club/editor";
 
 export default function Editor() {
   const { id } = useParams<{ id: string }>();
@@ -27,6 +27,7 @@ export default function Editor() {
   const [saving, setSaving] = useState(false);
   const [showPublish, setShowPublish] = useState(false);
   const [accessState, setAccessState] = useState("private");
+  const [publication, setPublication] = useState(defaultPublication);
   const [slug, setSlug] = useState("");
   const [authorNickname, setAuthorNickname] = useState("");
   const [loaded, setLoaded] = useState(id ? false : true);
@@ -77,6 +78,7 @@ export default function Editor() {
       setTitle(a.title);
       setContent(a.content);
       setAccessState(a.access_state);
+      setPublication(a.publication ?? defaultPublication);
       setSlug(a.slug || generateRandomSlug());
       setAuthorNickname(a.author_nickname || "");
       setLoaded(true);
@@ -143,19 +145,18 @@ export default function Editor() {
   }, [articleId, title, content, navigate, t]);
 
   const handlePublish = useCallback(
-    async (newState: string, newSlug: string) => {
+    async (newState: string, newSlug: string, options: PublicationOptions) => {
+      const metadata = { access_state: newState, slug: newSlug, publication: options };
       if (!articleId) {
-        const res = await articlesApi.create({ title: title || t('common.untitled'), content, slug: newSlug });
+        const res = await articlesApi.create({ title: title || t('common.untitled'), content, ...metadata });
         setArticleId(res.id);
         navigate(`/editor/${res.id}`, { replace: true });
-        await articlesApi.update(res.id, { access_state: newState, slug: newSlug });
-        setAccessState(newState);
-        setSlug(newSlug);
       } else {
-        await articlesApi.update(articleId, { access_state: newState, slug: newSlug });
-        setAccessState(newState);
-        setSlug(newSlug);
+        await articlesApi.update(articleId, metadata);
       }
+      setAccessState(newState);
+      setSlug(newSlug);
+      setPublication(options);
     },
     [articleId, title, content, navigate, t]
   );
@@ -238,6 +239,7 @@ export default function Editor() {
         <PublishModal
           currentState={accessState}
           currentSlug={slug}
+          currentPublication={publication}
           articleId={articleId}
           onApply={handlePublish}
           onClose={() => setShowPublish(false)}

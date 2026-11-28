@@ -47,7 +47,7 @@ export function TabBar() {
   }
 
   return (
-    <div className="flex items-center h-[36px] overflow-x-auto select-none" style={{ paddingLeft: '10px', paddingRight: '10px', gap: '6px' }}>
+    <div className="workspace-tabs flex items-center h-[36px] overflow-x-auto select-none" style={{ paddingLeft: '10px', paddingRight: '10px', gap: '6px' }}>
       {state.tabs.map((tab, index) => {
         const isActive = tab.id === state.activeTabId
         const isDropTarget = dropIndex === index && dragIndex !== null && dragIndex !== index
@@ -55,6 +55,7 @@ export function TabBar() {
         return (
           <div
             key={tab.id}
+            aria-current={isActive || undefined}
             draggable
             onDragStart={(e) => handleDragStart(e, index)}
             onDragEnd={handleDragEnd}
@@ -70,7 +71,7 @@ export function TabBar() {
                 closeTab(tab.id)
               }
             }}
-            className={`group flex items-center cursor-pointer transition-colors min-w-0 max-w-[220px] rounded-lg font-medium ${
+            className={`workspace-tab group flex items-center cursor-pointer transition-colors min-w-0 max-w-[220px] rounded-lg font-medium ${
               isActive
                 ? 'bg-[var(--bg-base)] text-[var(--text-primary)] shadow-xs border border-[var(--border-default)]'
                 : 'text-[var(--text-dim)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] border border-transparent'

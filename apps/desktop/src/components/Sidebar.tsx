@@ -318,7 +318,7 @@ export function Sidebar({ width }: { width: number }) {
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
   const onlineUsername = user?.nickname || 'username'
   return (
-    <div style={{ width: `${width}px`, minWidth: '140px', maxWidth: '500px' }} className="flex flex-col h-full flex-shrink-0 select-none">
+    <div style={{ width: `${width}px`, minWidth: '140px', maxWidth: '500px' }} className="workspace-sidebar flex flex-col h-full flex-shrink-0 select-none">
       <div
         className="flex shrink-0 items-center justify-between"
         style={{ height: '36px', paddingLeft: '16px', paddingRight: '12px' }}
@@ -1029,19 +1029,22 @@ export function Sidebar({ width }: { width: number }) {
             }}>
               {t('sidebar.openInBrowser')}
             </button>
-            <button className="menu-item enabled" onClick={async () => {
+            {menu.article.can_download && <button className="menu-item enabled" onClick={async () => {
               try {
                 const { articlesApi } = await import('../api')
-                const article = await articlesApi.get(menu.article.id)
+                const article = await articlesApi.download(menu.article.id)
                 await window.api.saveFileAs(
                   article.content,
                   menu.article.title + '.md'
                 )
-              } catch (err) { console.error('Ошибка скачивания:', err) }
+              } catch (err) {
+                console.error('Ошибка скачивания:', err)
+                alert(t('publish.downloadDenied'))
+              }
               setOnlineMenu(null)
             }}>
               {t('sidebar.download')}
-            </button>
+            </button>}
           </div>
         )
       })()}

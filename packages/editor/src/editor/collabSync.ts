@@ -18,6 +18,7 @@ import { prosemirrorToYXmlFragment, yXmlFragmentToProsemirrorJSON } from "y-pros
 import type * as Y from "yjs"
 import { schema } from "./schema"
 import { parseMarkdown, serializeMarkdown } from "./markdownConfig"
+import { visitTasks } from "./taskIdentity"
 
 /** Populate an (expected empty) Y.XmlFragment from a markdown string. */
 export function seedYFragmentFromMarkdown(markdown: string, fragment: Y.XmlFragment): void {
@@ -30,4 +31,28 @@ export function yFragmentToMarkdown(fragment: Y.XmlFragment): string {
   const json = yXmlFragmentToProsemirrorJSON(fragment)
   const doc = schema.nodeFromJSON(json)
   return serializeMarkdown(doc)
+}
+
+/** Update one task in-place, preserving the rest of the live CRDT. */
+export function setTaskState(fragment: Y.XmlFragment, taskId: string, checked: boolean): boolean {
+  const doc = schema.nodeFromJSON(yXmlFragmentToProsemirrorJSON(fragment))
+  const taskIds: string[] = []
+  visitTasks(doc, (_node, _pos, id) => taskIds.push(id))
+  const target = taskIds.indexOf(taskId)
+  if (target === -1) return false
+
+  let index = 0
+  const update = (parent: Y.XmlFragment): boolean => {
+    for (const child of parent.toArray()) {
+      if (!("nodeName" in child)) continue
+      const task = child as Y.XmlElement<{ checked: boolean }>
+      if (task.nodeName === 'list_item' && typeof task.getAttribute('checked') === 'boolean' && index++ === target) {
+        if (task.getAttribute('checked') !== checked) task.setAttribute('checked', checked)
+        return true
+      }
+      if (update(child)) return true
+    }
+    return false
+  }
+  return update(fragment)
 }

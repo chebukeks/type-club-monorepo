@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text, func, text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -36,6 +36,8 @@ class Article(Base):
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False, default="")
     access_state: Mapped[str] = mapped_column(String(20), nullable=False, default="private")
+    download_roles: Mapped[list[str]] = mapped_column(JSON, nullable=False, server_default=text("'[\"co_author\", \"editor\"]'"))
+    checkbox_mode: Mapped[str] = mapped_column(String(16), nullable=False, server_default="disabled")
     slug: Mapped[str] = mapped_column(String(255), nullable=False)
     share_token: Mapped[Optional[str]] = mapped_column(String(64), unique=True, nullable=True)
     share_role: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)

@@ -4,9 +4,9 @@
  *
  * Поддерживает два режима:
  * - ProseMirror (Seamless/Preview) — подсветка через декорации
- * - Raw textarea — подсветка через native selection
+ * - Raw textarea — подсветка в отдельном слое
  */
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { EditorView } from 'prosemirror-view'
 import { Plugin, PluginKey } from 'prosemirror-state'
 import { Decoration, DecorationSet } from 'prosemirror-view'
@@ -258,120 +258,51 @@ export function SearchBar({ view, onClose }: SearchBarProps) {
 }
 
 // ============================================================
-// Прокрутка textarea к позиции символа
-// ============================================================
-
-function scrollTextareaToPos(textarea: HTMLTextAreaElement, content: string, charPos: number) {
-  const lineHeight = parseFloat(getComputedStyle(textarea).lineHeight) || 20
-  const linesBeforeMatch = content.substring(0, charPos).split('\n').length - 1
-  const targetY = linesBeforeMatch * lineHeight
-  const viewportHeight = textarea.clientHeight
-  // Центрируем совпадение по вертикали
-  textarea.scrollTop = Math.max(0, targetY - viewportHeight / 2)
-}
-
-// ============================================================
-// React компонент SearchBar — Raw textarea режим
+// Поиск по исходному Markdown
 // ============================================================
 
 interface RawSearchBarProps {
   textarea: HTMLTextAreaElement
   content: string
   onClose: () => void
-  onMatchesChange?: (matches: { from: number; to: number }[], currentIndex: number) => void
+  onMatchChange: (match: { from: number; to: number } | null) => void
 }
 
-export function RawSearchBar({ textarea, content, onClose, onMatchesChange }: RawSearchBarProps) {
+export function RawSearchBar({ textarea, content, onClose, onMatchChange }: RawSearchBarProps) {
   const [query, setQuery] = useState('')
-  const [matches, setMatches] = useState<{ from: number; to: number }[]>([])
-  const [currentIndex, setCurrentIndex] = useState(-1)
+  const [index, setIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
+  const matches = useMemo(() => {
+    if (!query) return []
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return [...content.matchAll(new RegExp(escaped, 'giu'))].map(({ index, 0: text }) => ({
+      from: index!,
+      to: index! + text.length,
+    }))
+  }, [content, query])
+  const currentIndex = matches.length ? Math.min(index, matches.length - 1) : -1
 
   useEffect(() => {
-    requestAnimationFrame(() => inputRef.current?.focus())
-  }, [])
+    inputRef.current?.focus()
+    return () => onMatchChange(null)
+  }, [onMatchChange])
 
-  // Уведомляем родителя об изменении совпадений для отрисовки подсветки
   useEffect(() => {
-    onMatchesChange?.(matches, currentIndex)
-  }, [matches, currentIndex, onMatchesChange])
+    onMatchChange(matches[currentIndex] ?? null)
+  }, [matches, currentIndex, onMatchChange])
 
-  // Очистить подсветку при размонтировании
-  useEffect(() => {
-    return () => onMatchesChange?.([], -1)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const move = (direction: number) => {
+    if (!matches.length) return
+    setIndex((currentIndex + direction + matches.length) % matches.length)
+    inputRef.current?.focus()
+  }
 
-  const runSearch = useCallback((q: string) => {
-    if (!q) { setMatches([]); setCurrentIndex(-1); return }
-    const lowerQ = q.toLowerCase()
-    const lowerContent = content.toLowerCase()
-    const results: { from: number; to: number }[] = []
-    let idx = 0
-    while (true) {
-      idx = lowerContent.indexOf(lowerQ, idx)
-      if (idx === -1) break
-      results.push({ from: idx, to: idx + q.length })
-      idx += 1
-    }
-    setMatches(results)
-    if (results.length > 0) {
-      setCurrentIndex(0)
-      textarea.focus()
-      textarea.setSelectionRange(results[0].from, results[0].to)
-      scrollTextareaToPos(textarea, content, results[0].from)
-    } else {
-      setCurrentIndex(-1)
-    }
-  }, [content, textarea])
-
-  const pendingQueryRef = useRef(query)
-  const doSearch = useCallback(() => {
-    runSearch(pendingQueryRef.current)
-  }, [runSearch])
-  const [debouncedSearch, flushSearch] = useDebounce(doSearch, 300)
-
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const q = e.target.value
-    setQuery(q)
-    pendingQueryRef.current = q
-    if (!q) { setMatches([]); setCurrentIndex(-1) }
-    else debouncedSearch()
-  }, [debouncedSearch])
-
-  const goTo = useCallback((idx: number) => {
-    if (matches.length === 0) return
-    setCurrentIndex(idx)
-    textarea.focus()
-    textarea.setSelectionRange(matches[idx].from, matches[idx].to)
-    scrollTextareaToPos(textarea, content, matches[idx].from)
-  }, [matches, textarea, content])
-
-  const goNext = useCallback(() => {
-    if (matches.length === 0) return
-    goTo((currentIndex + 1) % matches.length)
-  }, [matches, currentIndex, goTo])
-
-  const goPrev = useCallback(() => {
-    if (matches.length === 0) return
-    goTo((currentIndex - 1 + matches.length) % matches.length)
-  }, [matches, currentIndex, goTo])
-
-  const handleClose = useCallback(() => {
+  const close = () => {
+    const match = matches[currentIndex]
+    if (match) textarea.setSelectionRange(match.from, match.to)
     textarea.focus()
     onClose()
-  }, [textarea, onClose])
-
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      e.preventDefault()
-      handleClose()
-    } else if (e.key === 'Enter') {
-      e.preventDefault()
-      flushSearch()
-      if (e.shiftKey) goPrev()
-      else if (matches.length > 0) goNext()
-    }
-  }, [handleClose, goNext, goPrev, flushSearch, matches])
+  }
 
   return (
     <SearchBarUI
@@ -379,11 +310,20 @@ export function RawSearchBar({ textarea, content, onClose, onMatchesChange }: Ra
       query={query}
       matchCount={matches.length}
       currentIdx={currentIndex}
-      onClose={handleClose}
-      onChange={handleChange}
-      onKeyDown={handleKeyDown}
-      onPrev={goPrev}
-      onNext={goNext}
+      onClose={close}
+      onChange={(event) => {
+        setQuery(event.target.value)
+        setIndex(0)
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' || (event.key === 'Enter' && event.target === inputRef.current)) {
+          event.preventDefault()
+          if (event.key === 'Escape') close()
+          else move(event.shiftKey ? -1 : 1)
+        }
+      }}
+      onPrev={() => move(-1)}
+      onNext={() => move(1)}
     />
   )
 }

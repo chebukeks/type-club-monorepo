@@ -13,6 +13,7 @@ import { importFileFromPath } from './importers'
 import { markdownToDocxBuffer, DocxExportOptions } from './docxExporter'
 import { relaunchAppImage, replaceAppImage } from './appImageUpdate'
 import { LOCAL_IMAGE_SCHEME } from '../src/utils/fileUtils'
+import { BUILTIN_THEMES, validateThemeJson } from '../src/utils/themePresets'
 import { readReleaseNotes } from '../src/utils/releaseNotes'
 import type { UpdateInfo } from '../src/types'
 
@@ -29,10 +30,12 @@ const require = createRequire(import.meta.url)
 import { MODERN_WORDS, RUSSIAN_PRODUCTIVE_PREFIXES, RUSSIAN_NOUN_SUFFIXES } from './modernWords'
 
 // Локальный спеллчекер (0ms latency, оффлайн) с отложенной фоновой инициализацией
-let spellRu: any = null
-let spellEn: any = null
+type NSpellInstance = ReturnType<typeof import('nspell')['default']>
+let spellRu: NSpellInstance | null = null
+let spellEn: NSpellInstance | null = null
 let englishWordsSet: Set<string> | null = null
-const customWordsSet = new Set<string>()
+let customWordsSet = new Set<string>()
+const addedHunspellWords = new WeakMap<NSpellInstance, Set<string>>()
 
 let spellcheckInitialized = false
 let spellcheckInitPromise: Promise<void> | null = null
@@ -51,7 +54,6 @@ async function ensureSpellcheckerReady(): Promise<void> {
 
       spellRu = nspell(dictRu)
       spellEn = nspell(dictEn)
-      customWordsSet.clear()
 
       // Добавляем расширенный словарь терминов
       for (const w of MODERN_WORDS) {
@@ -59,15 +61,7 @@ async function ensureSpellcheckerReady(): Promise<void> {
         if (spellEn) spellEn.add(w)
       }
 
-      const stored = (store.get('customDictionaryWords', []) as string[]) || []
-      for (const w of stored) {
-        const clean = w.trim().toLowerCase()
-        if (clean) {
-          customWordsSet.add(clean)
-          if (spellRu) spellRu.add(clean)
-          if (spellEn) spellEn.add(clean)
-        }
-      }
+      syncCustomWords(store.get('customDictionaryWords', []) as string[])
 
       try {
         const englishArray = require('an-array-of-english-words')
@@ -93,17 +87,25 @@ async function ensureSpellcheckerReady(): Promise<void> {
   return spellcheckInitPromise
 }
 
-async function reinitCustomWords(): Promise<void> {
-  await ensureSpellcheckerReady()
-  customWordsSet.clear()
-  const stored = (store.get('customDictionaryWords', []) as string[]) || []
-  for (const w of stored) {
-    const clean = w.trim().toLowerCase()
-    if (clean) {
-      customWordsSet.add(clean)
-      if (spellRu) spellRu.add(clean)
-      if (spellEn) spellEn.add(clean)
+function syncCustomWords(words: string[]): void {
+  customWordsSet = new Set(words.map(word => word.trim().toLowerCase()).filter(Boolean))
+  for (const spell of [spellRu, spellEn]) {
+    if (!spell) continue
+    const added = addedHunspellWords.get(spell) ?? new Set<string>()
+    for (const word of added) {
+      if (customWordsSet.has(word)) continue
+      spell.remove(word)
+      added.delete(word)
     }
+    for (const word of customWordsSet) {
+      if (added.has(word)) continue
+      const { correct, forbidden } = spell.spell(word)
+      if (correct || forbidden) continue
+      // Track only words added by us so remove() keeps the base dictionary intact.
+      spell.add(word)
+      added.add(word)
+    }
+    addedHunspellWords.set(spell, added)
   }
 }
 
@@ -244,7 +246,7 @@ function checkWordMisspelled(rawWord: string): boolean {
 }
 
 function getWordSuggestions(rawWord: string): string[] {
-  const clean = rawWord.trim().toLowerCase()
+  const clean = rawWord.trim()
   if (!clean) return []
 
   const enabledLangs = (store.get('spellcheckLanguages', ['ru-RU', 'en-US']) as string[]) || ['ru-RU', 'en-US']
@@ -1204,15 +1206,13 @@ ipcMain.handle('spellcheck:addCustomWord', async (_event, word: string) => {
   const trimmed = word.trim()
   if (!trimmed) return false
   const lower = trimmed.toLowerCase()
-  customWordsSet.add(lower)
-  if (spellRu) spellRu.add(lower)
-  if (spellEn) spellEn.add(lower)
 
   const current = (store.get('customDictionaryWords', []) as string[]) || []
   if (!current.some((w) => w.toLowerCase() === lower)) {
     current.push(trimmed)
     store.set('customDictionaryWords', current)
   }
+  syncCustomWords(current)
   if (win) {
     try {
       win.webContents.session.addWordToSpellCheckerDictionary(trimmed)
@@ -1225,17 +1225,20 @@ ipcMain.handle('spellcheck:addCustomWord', async (_event, word: string) => {
 
 /** Удалить слово из пользовательского словаря */
 ipcMain.handle('spellcheck:removeCustomWord', async (_event, word: string) => {
+  await ensureSpellcheckerReady()
   const lower = word.trim().toLowerCase()
-  customWordsSet.delete(lower)
   const current = (store.get('customDictionaryWords', []) as string[]) || []
-  const filtered = current.filter((w) => w.toLowerCase() !== lower)
+  const removed = current.filter((w) => w.trim().toLowerCase() === lower)
+  const filtered = current.filter((w) => w.trim().toLowerCase() !== lower)
   store.set('customDictionaryWords', filtered)
-  await reinitCustomWords()
+  syncCustomWords(filtered)
   if (win) {
-    try {
-      win.webContents.session.removeWordFromSpellCheckerDictionary(word)
-    } catch {
-      /* ignore */
+    for (const storedWord of removed) {
+      try {
+        win.webContents.session.removeWordFromSpellCheckerDictionary(storedWord.trim())
+      } catch {
+        /* ignore */
+      }
     }
   }
   return true
@@ -1314,27 +1317,15 @@ ipcMain.handle('theme:importThemes', async () => {
 
   try {
     const content = await fs.promises.readFile(filePaths[0], 'utf-8')
-    const parsed = JSON.parse(content)
-    const items = Array.isArray(parsed) ? parsed : [parsed]
-    const validThemes: any[] = []
-
-    for (const raw of items) {
-      if (raw && typeof raw === 'object' && typeof raw.name === 'string' && raw.name.trim()) {
-        const id = typeof raw.id === 'string' && raw.id ? raw.id : `custom_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
-        validThemes.push({
-          ...raw,
-          id,
-          isBuiltin: false,
-        })
-      }
-    }
-
-    if (validThemes.length === 0) return null
+    const validThemes = validateThemeJson(JSON.parse(content))
+    if (!validThemes) return null
 
     const existing = (store.get('customThemes', []) as any[]) || []
     for (const newTheme of validThemes) {
+      if (BUILTIN_THEMES.some(t => t.id === newTheme.id)) newTheme.id = `custom_${crypto.randomUUID()}`
       const idx = existing.findIndex((t: any) => t.id === newTheme.id || t.name === newTheme.name)
       if (idx >= 0) {
+        newTheme.id = existing[idx].id
         existing[idx] = newTheme
       } else {
         existing.push(newTheme)

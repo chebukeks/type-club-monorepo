@@ -23,13 +23,24 @@ from app.schemas import (
     InviteCollaboratorRequest,
     ModerateRequest,
     ModerateResponse,
+    PublicationOptions,
     ShareLinkResponse,
     SyncStateRequest,
+    TaskStateRequest,
 )
 
 router = APIRouter(prefix="/api/articles", tags=["articles"])
 
 logger = logging.getLogger(__name__)
+
+
+def _can_download(article: Article, user: User | None) -> bool:
+    if user and user.id == article.author_id:
+        return True
+    role = next((member.role for member in article.collaborators if user and member.user_id == user.id), None)
+    if role:
+        return role in article.download_roles
+    return article.access_state in ("link", "public") and "reader" in article.download_roles
 
 
 def _article_to_response(
@@ -47,6 +58,8 @@ def _article_to_response(
         title=article.title,
         content=article.content,
         access_state=article.access_state,
+        publication=PublicationOptions(download_roles=article.download_roles, checkbox_mode=article.checkbox_mode),
+        can_download=_can_download(article, current_user),
         slug=article.slug,
         view_count=len(article.views),
         like_count=len(article.likes),
@@ -58,7 +71,7 @@ def _article_to_response(
     )
 
 
-def _article_to_list_item(article: Article, my_roles: list[str] | None = None) -> ArticleListItem:
+def _article_to_list_item(article: Article, my_roles: list[str] | None = None, current_user: User | None = None) -> ArticleListItem:
     return ArticleListItem(
         id=article.id,
         title=article.title,
@@ -71,6 +84,7 @@ def _article_to_list_item(article: Article, my_roles: list[str] | None = None) -
         created_at=article.created_at,
         updated_at=article.updated_at,
         my_roles=my_roles,
+        can_download=_can_download(article, current_user),
     )
 
 
@@ -110,10 +124,11 @@ async def list_articles(
     )
     articles = result.scalars().all()
     response.headers["X-Total-Count"] = str(total)
-    return [_article_to_list_item(a) for a in articles]
+    return [_article_to_list_item(a, current_user=current_user) for a in articles]
 
 
 VALID_MY_ROLES = ("author", "co_author", "editor")
+VALID_ACCESS_STATES = ("private", "link", "public", "blocked")
 
 
 @router.get("/my", response_model=list[ArticleListItem])
@@ -123,6 +138,7 @@ async def list_my_articles(
     size: int = Query(20, ge=1, le=100),
     q: str | None = Query(None, max_length=500),
     roles: str | None = Query(None, max_length=100),
+    access: str | None = Query(None, max_length=100),
     current_user: User = Depends(get_verified_user),
     session: AsyncSession = Depends(get_session),
 ):
@@ -161,6 +177,9 @@ async def list_my_articles(
         return []
 
     filters = [or_(*conditions)]
+    if access is not None:
+        states = [state for state in access.split(",") if state in VALID_ACCESS_STATES]
+        filters.append(Article.access_state.in_(states))
     if q and q.strip():
         filters.append(Article.title.ilike(f"%{escape_like(q.strip())}%", escape="\\"))
 
@@ -185,7 +204,7 @@ async def list_my_articles(
         collab_role = collab_role_by_article.get(a.id)
         if collab_role:
             my_roles.append(collab_role)
-        items.append(_article_to_list_item(a, my_roles))
+        items.append(_article_to_list_item(a, my_roles, current_user))
     return items
 
 
@@ -210,11 +229,13 @@ async def create_article(
         title=data.title,
         content=data.content,
         slug=slug,
+        access_state=data.access_state,
+        **(data.publication.model_dump() if data.publication else {}),
     )
     session.add(article)
     await session.commit()
     await session.refresh(article)
-    return _article_to_response(article, current_user)
+    return _article_to_response(article, current_user, current_user)
 
 
 @router.get("/lookup/{username}/{slug}", response_model=ArticleResponse)
@@ -265,6 +286,56 @@ async def get_article(
     return _article_to_response(article, author, current_user)
 
 
+@router.get("/{article_id}/download")
+async def download_article(
+    article_id: int,
+    current_user: User | None = Depends(get_optional_user),
+    session: AsyncSession = Depends(get_session),
+):
+    check_scope(current_user, "articles:read")
+    article = await session.get(Article, article_id)
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+    if not _can_download(article, current_user):
+        raise HTTPException(status_code=403, detail="Download is disabled for this role")
+    return {"content": article.content}
+
+
+@router.patch("/{article_id}/task-state", status_code=204)
+async def update_task_state(
+    article_id: int,
+    data: TaskStateRequest,
+    current_user: User = Depends(get_verified_user),
+    session: AsyncSession = Depends(get_session),
+):
+    check_scope(current_user, "articles:write")
+    article = await session.get(Article, article_id)
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+    if article.checkbox_mode != "document" or (
+        article.access_state not in ("public", "link") and not _user_can_access(article, current_user)
+    ):
+        raise HTTPException(status_code=403, detail="Shared checkboxes are unavailable")
+
+    # Write through the active Yjs document so a checkbox update cannot replace concurrent edits.
+    collab_url = settings.collab_internal_url.rstrip("/")
+    headers = {"Authorization": f"Bearer {settings.service_token}"}
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            result = await client.post(
+                f"{collab_url}/internal/task-state",
+                headers=headers,
+                params={"articleId": article_id, "taskId": data.task_id, "checked": str(data.checked).lower()},
+            )
+    except httpx.RequestError:
+        raise HTTPException(status_code=503, detail="Could not save the shared checkbox") from None
+    if result.status_code == 409:
+        raise HTTPException(status_code=409, detail="The checkbox has changed")
+    if result.status_code != 204:
+        raise HTTPException(status_code=503, detail="Could not save the shared checkbox")
+    return Response(status_code=204)
+
+
 async def _notify_collab_server_reload(article_id: int, content: str) -> None:
     """Notify collab-server that article content was updated via REST so any live or cached Yjs doc resyncs."""
     try:
@@ -288,13 +359,17 @@ async def update_article(
 ):
     if data.content is not None:
         check_scope(current_user, "articles:write")
-    if data.title is not None or data.access_state is not None or data.slug is not None:
+    if data.title is not None or data.access_state is not None or data.slug is not None or data.publication is not None:
         check_scope(current_user, "articles:manage")
     article = await session.get(Article, article_id)
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
     if not _user_can_edit(article, current_user):
         raise HTTPException(status_code=403, detail="Not your article")
+    if current_user.id != article.author_id and (
+        data.access_state is not None or data.slug is not None or data.publication is not None
+    ):
+        raise HTTPException(status_code=403, detail="Only the author can publish")
 
     if article.access_state == "blocked" and data.access_state and data.access_state != "blocked":
         raise HTTPException(status_code=403, detail="Cannot change state of blocked article")
@@ -307,6 +382,9 @@ async def update_article(
         content_updated = True
     if data.access_state is not None:
         article.access_state = data.access_state
+    if data.publication is not None:
+        article.download_roles = data.publication.download_roles
+        article.checkbox_mode = data.publication.checkbox_mode
     if data.slug is not None:
         existing = (
             await session.execute(
@@ -327,7 +405,7 @@ async def update_article(
     if content_updated and data.content is not None:
         await _notify_collab_server_reload(article_id, data.content)
 
-    return _article_to_response(article, current_user)
+    return _article_to_response(article, article.author, current_user)
 
 
 @router.post("/{article_id}/moderate", response_model=ModerateResponse)

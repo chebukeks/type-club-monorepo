@@ -474,10 +474,13 @@ export const markdownSerializer = new MarkdownSerializer(
     },
 
     code_block(state, node) {
-      state.write('```' + (node.attrs.params || '') + '\n')
+      let fenceLength = 3
+      for (const match of node.textContent.matchAll(/`{3,}/g)) fenceLength = Math.max(fenceLength, match[0].length + 1)
+      const fence = '`'.repeat(fenceLength)
+      state.write(fence + (node.attrs.params || '') + '\n')
       state.text(node.textContent, false)
       if (node.textContent) state.write('\n')
-      state.write('```')
+      state.write(fence)
       state.closeBlock(node)
     },
 

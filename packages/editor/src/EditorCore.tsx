@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import "katex/dist/katex.min.css";
 import katex from "katex";
 import { EditorState, Plugin, PluginKey } from "prosemirror-state";
@@ -28,6 +28,7 @@ import { HeadingView } from "./editor/headingView";
 import { MathInlineView } from "./editor/mathInlineView";
 import { ImageView } from "./editor/imageView";
 import { interactivePlugin } from "./editor/interactivePlugin";
+import { taskProgressPlugin } from "./editor/taskProgressPlugin";
 import { typographyPlugin } from "./editor/typographyPlugin";
 import { focusModePlugin } from "./editor/focusModePlugin";
 import { tocPlugin } from "./editor/tocPlugin";
@@ -106,7 +107,13 @@ export function EditorCore({
   textZoom = 100,
   documentZoom = 100,
   readOnly = false,
+  nativeTextAssistance = false,
   onEditorView,
+  onRawTextarea,
+  rawSearchMatch,
+  interactiveTasks,
+  taskProgressKey,
+  onSaveTask,
   className,
   focusMode,
   onTocUpdate,
@@ -124,7 +131,36 @@ export function EditorCore({
   const editorRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const rawHighlightRef = useRef<HTMLDivElement | null>(null);
+  const setRawTextarea = useCallback((el: HTMLTextAreaElement | null) => {
+    textareaRef.current = el;
+    scrollContainerRef.current = el;
+    onRawTextarea?.(el);
+  }, [onRawTextarea]);
+  const syncRawHighlight = useCallback(() => {
+    const textarea = textareaRef.current;
+    const highlight = rawHighlightRef.current;
+    if (!textarea || !highlight) return;
+    highlight.style.width = `${textarea.clientWidth}px`;
+    highlight.scrollTop = textarea.scrollTop;
+    highlight.scrollLeft = textarea.scrollLeft;
+  }, []);
+
+  useLayoutEffect(() => {
+    syncRawHighlight();
+    const textarea = textareaRef.current;
+    const highlight = rawHighlightRef.current;
+    if (!textarea || !highlight) return;
+    const match = highlight.querySelector("mark");
+    if (match && (match.offsetTop < textarea.scrollTop || match.offsetTop + match.offsetHeight > textarea.scrollTop + textarea.clientHeight)) {
+      textarea.scrollTop = match.offsetTop - textarea.clientHeight / 2;
+      syncRawHighlight();
+    }
+    const observer = new ResizeObserver(syncRawHighlight);
+    observer.observe(textarea);
+    return () => observer.disconnect();
+  }, [rawSearchMatch, syncRawHighlight]);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const contentRef = useRef(content);
@@ -318,7 +354,7 @@ export function EditorCore({
     });
 
     const plugins: Plugin[] = isPreview
-      ? [...historyPlugins, dropCursor(), gapCursor(), syncPlugin, foldingPlugin, interactivePlugin, syntaxHighlightPlugin, typographyPlugin(), focusModePlugin(() => focusModeRef.current || 'none'), tocPlugin((toc, sug) => onTocUpdateRef.current?.(toc, sug)), customColumnResizing({}), selectionTrackingPlugin, ...collabPlugins, ...(extraPlugins || [])]
+      ? [...historyPlugins, dropCursor(), gapCursor(), syncPlugin, foldingPlugin, interactivePlugin, syntaxHighlightPlugin, typographyPlugin(), focusModePlugin(() => focusModeRef.current || 'none'), tocPlugin((toc, sug) => onTocUpdateRef.current?.(toc, sug)), customColumnResizing({}), selectionTrackingPlugin, ...(interactiveTasks ? [taskProgressPlugin(taskProgressKey, onSaveTask)] : []), ...collabPlugins, ...(extraPlugins || [])]
       : [
           ...suggestionPlugins,
           ...getKeymapPlugins(),
@@ -353,8 +389,8 @@ export function EditorCore({
       state: editorState,
       editable: () => !isPreview,
       attributes: {
-        spellcheck: 'false',
-        autocorrect: 'off',
+        spellcheck: nativeTextAssistance && !isPreview ? 'true' : 'false',
+        autocorrect: nativeTextAssistance && !isPreview ? 'on' : 'off',
         autocapitalize: 'off',
       },
       nodeViews: {
@@ -388,7 +424,7 @@ export function EditorCore({
       view.destroy();
       viewRef.current = null;
     };
-  }, [editorMode, readOnly, collaboration, userRole, userId, userNickname, suggestionModeActive, resolveImageSrc]);
+  }, [editorMode, readOnly, nativeTextAssistance, collaboration, userRole, userId, userNickname, suggestionModeActive, resolveImageSrc, interactiveTasks, taskProgressKey, onSaveTask]);
 
   useEffect(() => {
     const handleFlushSync = () => {
@@ -468,45 +504,62 @@ export function EditorCore({
   }, [editorMode]);
 
   if (editorMode === "raw") {
+    const rawText = collaboration ? (rawBufferRef.current ?? content) : content;
+    const rawTextStyle: React.CSSProperties = {
+      fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
+      fontSize: `${14 * (textZoom / 100)}px`,
+      lineHeight: "1.6",
+      tabSize: 2,
+      whiteSpace: "pre-wrap",
+      overflowWrap: "break-word",
+    };
     return (
       <div className="flex-1 h-full flex flex-col overflow-auto bg-[var(--bg-base)] rounded-[inherit]" style={containerStyle}>
-        <textarea
-          ref={(el) => {
-            (textareaRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = el;
-            scrollContainerRef.current = el;
-          }}
-          onScroll={handleScroll}
-          onSelect={(e) => {
-            const target = e.currentTarget;
-            const text = target.value.slice(target.selectionStart, target.selectionEnd);
-            window.dispatchEvent(
-              new CustomEvent('editor-selection-change', {
-                detail: { selectedText: text, empty: !text },
-              })
-            );
-          }}
-          spellCheck={false}
-          autoCorrect="off"
-          autoCapitalize="off"
-          className="w-full flex-1 resize-none outline-none bg-transparent text-[var(--editor-text)] p-6"
-          style={{
-            fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
-            fontSize: `${14 * (textZoom / 100)}px`,
-            lineHeight: "1.6",
-            maxWidth: "860px",
-            margin: "0 auto",
-            display: "block",
-            tabSize: 2,
-          }}
-          value={collaboration ? (rawBufferRef.current ?? content) : content}
-          onChange={(e) => {
-            if (collaboration) {
-              rawBufferRef.current = e.target.value;
-            }
-            onChange(e.target.value);
-          }}
-          readOnly={readOnly}
-        />
+        <div className="relative flex flex-1 min-h-0 w-full max-w-[860px] mx-auto">
+          {rawSearchMatch && (
+            <div
+              ref={rawHighlightRef}
+              aria-hidden="true"
+              className="absolute inset-0 p-6 overflow-hidden pointer-events-none text-transparent"
+              style={rawTextStyle}
+            >
+              {rawText.slice(0, rawSearchMatch.from)}
+              <mark className="search-match-current" style={{ color: 'transparent' }}>
+                {rawText.slice(rawSearchMatch.from, rawSearchMatch.to)}
+              </mark>
+              {rawText.slice(rawSearchMatch.to)}{"\n"}
+            </div>
+          )}
+          <textarea
+            ref={setRawTextarea}
+            onScroll={(e) => {
+              syncRawHighlight();
+              handleScroll(e);
+            }}
+            onSelect={(e) => {
+              const target = e.currentTarget;
+              const text = target.value.slice(target.selectionStart, target.selectionEnd);
+              window.dispatchEvent(
+                new CustomEvent('editor-selection-change', {
+                  detail: { selectedText: text, empty: !text },
+                })
+              );
+            }}
+            spellCheck={false}
+            autoCorrect="off"
+            autoCapitalize="off"
+            className="relative w-full flex-1 resize-none outline-none bg-transparent text-[var(--editor-text)] p-6"
+            style={rawTextStyle}
+            value={rawText}
+            onChange={(e) => {
+              if (collaboration) {
+                rawBufferRef.current = e.target.value;
+              }
+              onChange(e.target.value);
+            }}
+            readOnly={readOnly}
+          />
+        </div>
       </div>
     );
   }
@@ -524,6 +577,7 @@ export function EditorCore({
         className={`flex-1 overflow-auto bg-[var(--bg-base)] rounded-[inherit] ${className || ''} ${focusClass}`}
         style={{
           "--editor-font-size": `${15 * (textZoom / 100) * docScale}px`,
+          "--editor-zoom": (textZoom / 100) * docScale,
           "--doc-scale": docScale,
           ...containerStyle,
         } as React.CSSProperties}

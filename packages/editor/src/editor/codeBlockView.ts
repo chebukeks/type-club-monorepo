@@ -3,7 +3,8 @@ import { EditorView, NodeView } from 'prosemirror-view'
 import { suggestionPluginKey } from './suggestionPlugin'
 
 import { ImageLightbox } from './ImageLightbox'
-import { getTranslation, Locale } from '../i18n'
+import { getTranslation, type Locale, type TranslationKey } from '../i18n'
+import { serializeMarkdown } from './markdownConfig'
 
 function getLocale(): Locale {
   const lang = typeof document !== 'undefined' ? document.documentElement.getAttribute('lang') : 'en';
@@ -97,6 +98,7 @@ export class CodeBlockView implements NodeView {
   node: PMNode
   view: EditorView
   getPos: () => number | undefined
+  private closeHeaderMenu?: () => void
 
   private preElement: HTMLElement
   private langBtn: HTMLButtonElement
@@ -190,6 +192,7 @@ export class CodeBlockView implements NodeView {
     })
 
     header.contentEditable = 'false'
+    header.addEventListener('contextmenu', (event) => this.openHeaderMenu(event))
     header.appendChild(this.headerLeft)
     header.appendChild(copyBtn)
 
@@ -217,6 +220,83 @@ export class CodeBlockView implements NodeView {
     const isSuggestionActive = suggestionPluginKey.getState(this.view.state)?.active
     if (isSuggestionActive) return false
     return true
+  }
+
+  private openHeaderMenu(event: MouseEvent) {
+    event.preventDefault()
+    event.stopPropagation()
+    this.closeHeaderMenu?.()
+    const menu = document.createElement('div')
+    menu.className = 'code-block-menu'
+    menu.setAttribute('role', 'menu')
+    const close = () => {
+      menu.remove()
+      document.removeEventListener('pointerdown', dismiss, true)
+      document.removeEventListener('keydown', onKeyDown, true)
+      window.removeEventListener('blur', close)
+      this.closeHeaderMenu = undefined
+    }
+    const dismiss = (e: PointerEvent) => {
+      if (!menu.contains(e.target as Node)) close()
+    }
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!['Escape', 'ArrowUp', 'ArrowDown'].includes(e.key)) return
+      e.preventDefault()
+      e.stopPropagation()
+      if (e.key === 'Escape') {
+        close()
+        if (!this.view.isDestroyed) this.view.focus()
+        return
+      }
+      const items = Array.from(menu.querySelectorAll('button'))
+      const index = items.indexOf(document.activeElement as HTMLButtonElement)
+      items[(index + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus()
+    }
+    const remove = () => {
+      if (this.view.isDestroyed || !this.isSeamlessEditable()) return
+      const pos = this.getPos()
+      if (pos == null) return
+      this.view.dispatch(this.view.state.tr.deleteRange(pos, pos + this.node.nodeSize).scrollIntoView())
+      this.view.focus()
+    }
+    const writeBlock = () => {
+      const text = serializeMarkdown(this.node.type.schema.topNodeType.createChecked(null, this.node))
+      return navigator.clipboard.writeText(text)
+    }
+    const addAction = (key: TranslationKey, action: () => void, destructive = false) => {
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.setAttribute('role', 'menuitem')
+      button.classList.toggle('destructive', destructive)
+      button.textContent = getTranslation(getLocale(), key)
+      button.addEventListener('pointerdown', e => e.preventDefault())
+      button.addEventListener('click', () => {
+        close()
+        action()
+      })
+      menu.appendChild(button)
+    }
+    addAction('editor.code.copyBlock', () => {
+      void writeBlock().catch(console.error)
+      this.view.focus()
+    })
+    if (this.isSeamlessEditable()) {
+      addAction('editor.code.cutBlock', () => {
+        const copiedNode = this.node
+        void writeBlock().then(() => {
+          if (this.node === copiedNode) remove()
+        }).catch(console.error)
+      })
+      addAction('editor.code.deleteBlock', remove, true)
+    }
+    document.body.appendChild(menu)
+    menu.style.left = `${Math.max(4, Math.min(event.clientX, window.innerWidth - menu.offsetWidth - 4))}px`
+    menu.style.top = `${Math.max(4, Math.min(event.clientY, window.innerHeight - menu.offsetHeight - 4))}px`
+    menu.querySelector('button')?.focus()
+    document.addEventListener('pointerdown', dismiss, true)
+    document.addEventListener('keydown', onKeyDown, true)
+    window.addEventListener('blur', close)
+    this.closeHeaderMenu = close
   }
 
   private updateLangBadgeState() {
@@ -431,6 +511,7 @@ export class CodeBlockView implements NodeView {
   }
 
   destroy() {
+    this.closeHeaderMenu?.()
     if (this.renderDebounceTimer) {
       clearTimeout(this.renderDebounceTimer)
       this.renderDebounceTimer = null

@@ -26,7 +26,7 @@ export function getEditorStyles(): string {
 
 /* Проверка орфографии: мгновенное выделение ошибок */
 .ProseMirror .spelling-error {
-  text-decoration: underline wavy var(--text-danger, #ef4444);
+  text-decoration: underline wavy var(--theme-spelling-color, var(--text-danger, #ef4444));
   text-decoration-thickness: 1.5px;
   text-underline-offset: 3.5px;
   text-decoration-skip-ink: none;
@@ -534,15 +534,15 @@ html[data-lang="ru"] figure[data-sug-delete]::after {
   position: absolute;
   left: 0.25em; top: 0.25em;
   width: 1em; height: 1em;
-  border: 0.08em solid var(--accent);
+  border: 0.08em solid var(--theme-task-color, var(--accent));
   border-radius: 0.25em;
   background: transparent;
   display: inline-block;
   pointer-events: none;
 }
 .ProseMirror li.task-list-item[data-checked="true"]::before {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--theme-task-color, var(--accent));
+  border-color: var(--theme-task-color, var(--accent));
 }
 .ProseMirror li.task-list-item[data-checked="true"]::after {
   content: '';
@@ -557,6 +557,25 @@ html[data-lang="ru"] figure[data-sug-delete]::after {
 .ProseMirror li.task-list-item[data-checked="true"] > p {
   color: var(--editor-strike);
   text-decoration: line-through;
+}
+.ProseMirror li.task-list-item.reader-task::before,
+.ProseMirror li.task-list-item.reader-task::after { content: none; }
+.ProseMirror .reader-task-checkbox {
+  position: absolute;
+  left: 0.25em;
+  top: 0.3em;
+  width: 1em;
+  height: 1em;
+  accent-color: var(--theme-task-color, var(--accent));
+  cursor: pointer;
+}
+.ProseMirror li.reader-task[data-reader-checked="true"] > p {
+  color: var(--editor-strike);
+  text-decoration: line-through;
+}
+.ProseMirror li.reader-task[data-reader-checked="false"] > p {
+  color: inherit;
+  text-decoration: none;
 }
 
 /* Блоки кода */
@@ -603,6 +622,32 @@ html[data-lang="ru"] figure[data-sug-delete]::after {
   background: var(--bg-hover, rgba(255, 255, 255, 0.08));
   color: var(--text-primary, #fff);
 }
+
+.code-block-menu {
+  position: fixed;
+  z-index: 100;
+  min-width: 170px;
+  padding: 4px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 20%);
+}
+.code-block-menu button {
+  display: block;
+  width: 100%;
+  padding: 6px 9px;
+  border-radius: 5px;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.code-block-menu button:hover, .code-block-menu button:focus-visible {
+  outline: none;
+  background: var(--bg-hover);
+}
+.code-block-menu button.destructive { color: var(--text-danger); }
 .code-block-tabs {
   display: inline-flex;
   align-items: center;
@@ -924,10 +969,10 @@ html[data-lang="ru"] figure[data-sug-delete]::after {
 .ProseMirror th { background: var(--table-header-bg); font-weight: 600; color: var(--table-header-text); border-bottom: 2px solid var(--table-border); }
 .ProseMirror td { background: var(--table-cell-bg); color: var(--table-cell-text); }
 .ProseMirror tbody tr:nth-child(even) td { background: var(--table-even-bg); }
-.ProseMirror .selectedCell::after {
-  z-index: 2; position: absolute; content: "";
-  left: 0; right: 0; top: 0; bottom: 0;
-  background: var(--table-selected); pointer-events: none;
+.ProseMirror tbody tr td.selectedCell,
+.ProseMirror tr th.selectedCell {
+  background-color: color-mix(in srgb, var(--table-selected) 40%, var(--table-cell-bg));
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 .ProseMirror .column-resize-handle {
   position: absolute; right: -2px; top: 0; bottom: 0;

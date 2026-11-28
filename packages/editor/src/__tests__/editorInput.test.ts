@@ -5,6 +5,9 @@ import type { EditorView } from 'prosemirror-view'
 import { parseMarkdown, serializeMarkdown } from '../editor/markdownConfig'
 import { getKeymapPlugins } from '../editor/keymap'
 import { insertImageNode } from '../editor/imageInsert'
+import { Doc } from 'yjs'
+import { seedYFragmentFromMarkdown, setTaskState, yFragmentToMarkdown } from '../editor/collabSync'
+import { visitTasks } from '../editor/taskIdentity'
 import { pastePlugin } from '../editor/pastePlugin'
 import { tableEditPlugin } from '../editor/tableEditPlugin'
 
@@ -22,6 +25,7 @@ function editor(markdown: string, text?: string): EditorView {
     editable: true,
     composing: false,
     focus() {},
+    endOfTextblock() { return false },
     dispatch(tr: Transaction) {
       view.state = view.state.apply(tr)
     },
@@ -30,6 +34,12 @@ function editor(markdown: string, text?: string): EditorView {
 }
 
 describe('Code block input', () => {
+  function key(view: EditorView, character: string, shiftKey = false) {
+    return getKeymapPlugins().some((keymap) =>
+      keymap.props.handleKeyDown?.call(keymap, view, { key: character, shiftKey } as KeyboardEvent),
+    )
+  }
+
   it('keeps repeated Enter presses inside the block and preserves blank lines in Markdown', () => {
     const view = editor('```txt\ncode\n```')
     view.dispatch(view.state.tr.setSelection(TextSelection.atEnd(view.state.doc)))
@@ -41,6 +51,38 @@ describe('Code block input', () => {
     assert.equal(view.state.selection.$head.parent.type.name, 'code_block')
     assert.equal(view.state.doc.firstChild!.textContent, 'code\n\n\n')
     assert.ok(parseMarkdown(serializeMarkdown(view.state.doc)).eq(view.state.doc))
+  })
+
+  it('indents Python after a colon and uses tabs for Go', () => {
+    const python = editor('```python\nif ready:\n```')
+    python.dispatch(python.state.tr.setSelection(TextSelection.atEnd(python.state.doc)))
+    assert.equal(key(python, 'Enter'), true)
+    assert.equal(python.state.doc.firstChild!.textContent, 'if ready:\n    ')
+    assert.equal(key(python, 'Tab', true), true)
+    assert.equal(python.state.doc.firstChild!.textContent, 'if ready:\n')
+
+    const go = editor('```go\n```')
+    assert.equal(key(go, 'Tab'), true)
+    assert.equal(go.state.doc.firstChild!.textContent, '\t')
+  })
+
+  it('opens a pair, creates an indented line within it and removes an empty pair', () => {
+    const view = editor('```js\n```')
+    assert.equal(key(view, '{'), true)
+    assert.equal(key(view, 'Enter'), true)
+    assert.equal(view.state.doc.firstChild!.textContent, '{\n  \n}')
+    assert.equal(key(view, '('), true)
+    assert.equal(key(view, 'Backspace'), true)
+    assert.equal(view.state.doc.firstChild!.textContent, '{\n  \n}')
+
+    const end = editor('```js\nx\n```')
+    end.dispatch(end.state.tr.setSelection(TextSelection.atEnd(end.state.doc)))
+    assert.equal(key(end, 'Backspace'), false)
+  })
+
+  it('uses a longer fence when the code contains a Markdown fence', () => {
+    const doc = parseMarkdown('````md\n```\nExample\n```\n````')
+    assert.ok(parseMarkdown(serializeMarkdown(doc)).eq(doc))
   })
 })
 
@@ -63,6 +105,27 @@ function beforeInput(inputType: string, data: string | null = null) {
     preventDefault() { this.defaultPrevented = true },
   }
 }
+
+it('saves an individual shared task in the CRDT without replacing other blocks', () => {
+  const markdown = 'Introduction\n\n- [ ] Same\n  - [ ] Nested\n- [ ] Same\n\nConclusion'
+  const doc = new Doc()
+  try {
+    const fragment = doc.getXmlFragment('content')
+    seedYFragmentFromMarkdown(markdown, fragment)
+    const textNode = fragment.get(0)
+    const ids: string[] = []
+    visitTasks(parseMarkdown(markdown), (_node, _pos, id) => ids.push(id))
+
+    assert.equal(setTaskState(fragment, ids[2], true), true)
+    assert.equal(setTaskState(fragment, ids[1], true), true)
+    assert.equal(setTaskState(fragment, '0:0:0', true), false)
+    assert.equal(fragment.get(0), textNode)
+    const expected = 'Introduction\n\n- [ ] Same\n  - [x] Nested\n- [x] Same\n\nConclusion'
+    assert.equal(yFragmentToMarkdown(fragment), serializeMarkdown(parseMarkdown(expected)))
+  } finally {
+    doc.destroy()
+  }
+})
 
 describe('Table input', () => {
   const plugin = tableEditPlugin()

@@ -1,6 +1,14 @@
 /* Подключение Tailwind CSS v4 */
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Caveat";
+  src: url("./assets/fonts/caveat-variable.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+}
+
 /* ============================================================
    Цветовые переменные — Dark / Light тема
    ============================================================ */
@@ -234,6 +242,62 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+[data-theme-flat-frame] .editor-frame {
+  border-radius: 2px;
+  box-shadow: none;
+}
+
+[data-theme-outlined-tabs] .workspace-tabs {
+  margin-block-end: 4px;
+}
+
+[data-theme-outlined-tabs] .workspace-tab {
+  flex-shrink: 0;
+  border-radius: 5px;
+  border-color: var(--theme-tab-border, var(--border-default));
+  background: var(--theme-tab-background, var(--bg-surface));
+  color: var(--text-secondary);
+  box-shadow: none;
+}
+
+[data-theme-outlined-tabs] .workspace-tab:hover {
+  background: var(--theme-tab-hover, var(--bg-hover));
+}
+
+[data-theme-outlined-tabs] .workspace-tab[aria-current="true"] {
+  border-color: var(--theme-tab-active-border, var(--border-strong));
+  background: var(--theme-tab-active-background, var(--bg-base));
+  color: var(--text-primary);
+}
+
+[data-theme-compact-controls] .workspace-sidebar input[type="text"],
+[data-theme-compact-controls] .ProseMirror :is(.tableWrapper, .code-block-wrapper) {
+  border-radius: 2px;
+}
+
+[data-theme-compact-tables] :is(.ProseMirror, .markdown-body) :is(th, td) {
+  padding-block: 4px;
+}
+
+[data-theme-shaded-sidebar-header] .workspace-sidebar > :first-child {
+  background: var(--bg-elevated);
+}
+
+[data-theme-outlined-blocks] :is(.ProseMirror, .markdown-body) :is(blockquote, .code-block-wrapper) {
+  border: 1px solid var(--border-default);
+  border-radius: 2px;
+  box-shadow: none;
+}
+
+[data-theme-outlined-blocks] :is(.ProseMirror, .markdown-body) blockquote {
+  border-left: 2px solid var(--editor-blockquote-border);
+}
+
+[data-theme-heading-dividers] :is(.ProseMirror, .markdown-body) :is(h1, h2) {
+  padding-block-end: 0.2em;
+  border-block-end: 1px solid var(--border-default);
+}
+
 .theme-panel-background {
   background-image: var(--theme-panel-image, none);
 }
@@ -241,6 +305,47 @@ body {
 .theme-editor-background {
   background-image: var(--theme-editor-image, none);
 }
+
+[data-theme-ruled-paper] .ProseMirror {
+  --rule-color: var(--theme-rule-color, #a7c5df);
+  --notebook-rule: repeating-linear-gradient(to bottom, transparent 0 calc(1lh - 1px), var(--rule-color) calc(1lh - 1px) 1lh);
+  --notebook-rule-gap: var(--theme-rule-gap, max(4px, 0.36em));
+  background-image: var(--notebook-rule);
+  background-size: 100% 1lh;
+  background-position-y: calc(var(--notebook-baseline, 43px) + var(--notebook-rule-gap) - 1lh);
+  background-repeat: repeat-y;
+}
+
+[data-theme-ruled-paper] .ProseMirror :is(p, li) {
+  margin-bottom: 0;
+}
+
+[data-theme-ruled-paper] .ProseMirror > h1 {
+  line-height: calc(2 * var(--notebook-row-height, 30px));
+}
+
+[data-theme-ruled-paper] .ProseMirror > :is(h2, h3, h4, h5, h6) {
+  line-height: var(--notebook-row-height, 30px);
+}
+
+[data-theme-ruled-paper] .ProseMirror li {
+  --notebook-task-offset: 0px;
+  line-height: inherit;
+}
+
+[data-theme-ruled-paper] .ProseMirror li > :is(ul, ol) {
+  margin-block: 0;
+}
+
+[data-theme-ruled-paper] .ProseMirror li.task-list-item[data-checked]::before {
+  top: calc(0.25em + var(--notebook-task-offset));
+}
+
+[data-theme-ruled-paper] .ProseMirror li.task-list-item[data-checked="true"]::after {
+  top: calc(0.375em + var(--notebook-task-offset));
+}
+
+[data-theme-ruled-paper] .theme-editor-background:has(.ProseMirror) { background-image: none; }
 
 ::selection {
   background-color: var(--editor-selection);

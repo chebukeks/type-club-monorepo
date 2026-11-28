@@ -2,6 +2,7 @@ declare module 'nspell' {
   interface NSpellInstance {
     correct(word: string): boolean;
     suggest(word: string): string[];
+    spell(word: string): { correct: boolean; forbidden: boolean; warn: boolean };
     add(word: string): void;
     remove(word: string): void;
     personal(dic: string): void;

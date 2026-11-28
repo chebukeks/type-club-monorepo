@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { articlesApi, collaborationApi, Article } from "../api";
 import { useAuth } from "../context/AuthContext";
@@ -18,11 +18,13 @@ export default function ReadArticle() {
   const [userRole, setUserRole] = useState<"author" | "co_author" | "editor" | null>(null);
   const [toc, setToc] = useState<TocItem[]>([]);
   const [error, setError] = useState("");
+  const [downloadError, setDownloadError] = useState("");
+  const [taskError, setTaskError] = useState("");
   const navigate = useNavigate();
 
   const accessLabels: Record<string, string> = {
     public: t('publish.public'),
-    unlisted: t('publish.unlisted'),
+    link: t('publish.link'),
     private: t('publish.private'),
     blocked: t('publish.blocked'),
   };
@@ -35,7 +37,7 @@ export default function ReadArticle() {
         setError(err.message);
         if (err.message === "Not authenticated") navigate("/login");
       });
-  }, [username, slug, navigate]);
+  }, [username, slug, navigate, user?.id]);
 
   useEffect(() => {
     if (!article || !user) {
@@ -51,6 +53,18 @@ export default function ReadArticle() {
       }).catch(() => setUserRole(null));
     }
   }, [article, user]);
+
+  const articleId = article?.id;
+  const saveTask = useCallback(async (id: string, checked: boolean) => {
+    if (articleId == null) return;
+    setTaskError("");
+    try {
+      await articlesApi.saveTask(articleId, id, checked);
+    } catch (err) {
+      setTaskError(t('publish.taskSaveFailed'));
+      throw err;
+    }
+  }, [articleId, t]);
 
   if (error) {
     return (
@@ -69,6 +83,23 @@ export default function ReadArticle() {
   const isModerator = user?.role === "moderator";
   const canEdit = userRole === "author" || userRole === "co_author";
   const canSuggest = userRole === "author" || userRole === "co_author" || userRole === "editor";
+  const checkboxMode = article.publication?.checkbox_mode ?? "disabled";
+  const canSaveTasks = checkboxMode === "document" && !!user?.email_verified;
+
+  const handleDownload = async () => {
+    setDownloadError("");
+    try {
+      const { content } = await articlesApi.download(article.id);
+      const url = URL.createObjectURL(new Blob([content], { type: "text/markdown;charset=utf-8" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${article.slug}.md`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      setDownloadError(err instanceof Error ? err.message : t('publish.downloadDenied'));
+    }
+  };
 
   const handleBlock = async () => {
     try {
@@ -114,7 +145,7 @@ export default function ReadArticle() {
           <h1 className="text-3xl md:text-4xl font-bold">{article.title}</h1>
           
           {(canEdit || canSuggest) && (
-            <div className="flex items-center gap-2 mt-4">
+            <div className="flex flex-wrap items-center gap-2 mt-4">
               {canEdit && (
                 <Link
                   to={`/editor/${article.id}`}
@@ -166,20 +197,32 @@ export default function ReadArticle() {
 
         <div className="min-h-[50vh] border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden bg-[var(--bg-base)] mb-8">
           <MarkdownEditor
+            key={`${article.id}:${article.updated_at}`}
             content={article.content}
             editorMode="preview"
             onChange={() => {}}
             readOnly
+            interactiveTasks={canSaveTasks || checkboxMode === "temporary" || checkboxMode === "persistent"}
+            onSaveTask={canSaveTasks ? saveTask : undefined}
+            taskProgressKey={checkboxMode === "persistent"
+              ? `type-club:tasks:${article.id}:${user?.id ?? "guest"}`
+              : undefined}
             articleId={article.id}
             onTocUpdate={setToc}
           />
         </div>
+        {taskError && <p role="alert" className="mb-4 text-sm text-red-600">{taskError}</p>}
+        {checkboxMode === "document" && !canSaveTasks && (
+          <p className="mb-4 text-sm text-gray-500">{t('publish.checkboxesDocumentHint')}</p>
+        )}
 
         <ArticleStats
           articleId={article.id}
           initialViews={article.view_count}
           initialLikes={article.like_count}
           initialLiked={article.liked_by_user}
+          onDownload={article.can_download ? handleDownload : undefined}
+          downloadError={downloadError}
         />
 
         <CommentSection articleId={article.id} />

@@ -4,6 +4,7 @@
  */
 
 import { config } from "./config";
+import type { PublicationOptions } from "@type-club/editor";
 
 const BASE = config.apiUrl;
 
@@ -131,6 +132,8 @@ export interface Article {
   title: string;
   content: string;
   access_state: "private" | "link" | "public" | "blocked";
+  publication?: PublicationOptions;
+  can_download?: boolean;
   slug: string;
   created_at: string;
   updated_at: string;
@@ -146,6 +149,7 @@ export interface ArticleListItem {
   created_at: string;
   updated_at: string;
   my_roles?: string[];
+  can_download?: boolean;
 }
 
 export const articlesApi = {
@@ -159,9 +163,10 @@ export const articlesApi = {
     return api.get<ArticleListItem[]>(`/articles/my?${sp}`);
   },
   get: (id: number) => api.get<Article>(`/articles/${id}`),
-  create: (data: { title: string; content?: string; slug?: string }) =>
+  download: (id: number) => api.get<{ content: string }>(`/articles/${id}/download`),
+  create: (data: { title: string; content?: string; slug?: string; access_state?: string; publication?: PublicationOptions }) =>
     api.post<Article>("/articles", data),
-  update: (id: number, data: { title?: string; content?: string; access_state?: string; slug?: string }) =>
+  update: (id: number, data: { title?: string; content?: string; access_state?: string; slug?: string; publication?: PublicationOptions }) =>
     api.patch<Article>(`/articles/${id}`, data),
   delete: (id: number) => api.delete<void>(`/articles/${id}`),
   myRole: (articleId: number) => api.get<{ role: string }>(`/articles/${articleId}/my-role`),

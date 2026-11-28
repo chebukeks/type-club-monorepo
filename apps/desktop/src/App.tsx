@@ -96,7 +96,7 @@ function AppLayout() {
         {/* Правая панель — вкладки + редактор */}
         <div className="relative flex flex-col flex-1 overflow-hidden p-2 pt-0">
           {state.tabBarOpen && <TabBar />}
-          <div className="flex-1 overflow-hidden rounded-xl border border-[var(--border-default)] shadow-xs bg-[var(--bg-base)] flex flex-col relative isolate" style={{ backgroundClip: 'padding-box' }}>
+          <div className="editor-frame flex-1 overflow-hidden rounded-xl border border-[var(--border-default)] shadow-xs bg-[var(--bg-base)] flex flex-col relative isolate" style={{ backgroundClip: 'padding-box' }}>
             <MarkdownEditor />
           </div>
         </div>

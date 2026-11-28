@@ -24,6 +24,7 @@ import type { SuggestionItem, PasteImageFilesDetail } from '@type-club/editor'
 
 import { Monitor, Type, FileText } from 'lucide-react'
 import { resolveDesktopImageSrc, resolveDocumentImageSrc } from '../utils/fileUtils'
+import { observeRuledPaper } from '../utils/notebookRuling'
 
 function imageBlobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -37,7 +38,12 @@ function imageBlobToDataUrl(blob: Blob): Promise<string> {
 export function MarkdownEditor() {
   const { state, dispatch, setTextZoom, setDocumentZoom, t } = useEditor()
   const [editorView, setEditorView] = useState<EditorView | null>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [rawTextarea, setRawTextarea] = useState<HTMLTextAreaElement | null>(null)
+  const [rawSearchMatch, setRawSearchMatch] = useState<{ from: number; to: number } | null>(null)
+  useEffect(() => {
+    if (!editorView || editorView.isDestroyed) return
+    return observeRuledPaper(editorView.dom)
+  }, [state.documentZoom, state.textZoom, state.typewriterMode, editorView])
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(0)
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([])
@@ -1364,8 +1370,13 @@ export function MarkdownEditor() {
         <SearchBar view={editorView} onClose={() => setShowSearch(false)} />
       )}
 
-      {state.editorMode === 'raw' && showSearch && textareaRef.current && activeTab && (
-        <RawSearchBar textarea={textareaRef.current} content={content} onClose={() => setShowSearch(false)} />
+      {state.editorMode === 'raw' && showSearch && rawTextarea && activeTab && (
+        <RawSearchBar
+          textarea={rawTextarea}
+          content={rawContent ?? content}
+          onMatchChange={setRawSearchMatch}
+          onClose={() => setShowSearch(false)}
+        />
       )}
 
       <EditorCore
@@ -1382,6 +1393,8 @@ export function MarkdownEditor() {
         userNickname={user?.nickname || ''}
         suggestionModeActive={isSuggestionActive}
         onEditorView={(v) => setEditorView(v)}
+        onRawTextarea={setRawTextarea}
+        rawSearchMatch={rawSearchMatch}
         className={state.typewriterMode ? 'typewriter-mode' : ''}
         focusMode={state.focusMode}
         onTocUpdate={(tocItems, sugItems) => {

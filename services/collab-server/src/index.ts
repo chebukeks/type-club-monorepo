@@ -11,7 +11,7 @@ import {
   messageYjsUpdate,
 } from "y-protocols/sync"
 import { Awareness, encodeAwarenessUpdate, applyAwarenessUpdate } from "y-protocols/awareness"
-import { seedYFragmentFromMarkdown, yFragmentToMarkdown } from "@type-club/editor/src/editor/collabSync"
+import { seedYFragmentFromMarkdown, setTaskState, yFragmentToMarkdown } from "@type-club/editor/src/editor/collabSync"
 
 const PORT = parseInt(process.env.PORT || "8001", 10)
 const BACKEND_URL = (process.env.BACKEND_URL || "http://localhost:8000").replace(/\/$/, "")
@@ -91,7 +91,8 @@ interface DocState {
   articleId: number
   seeded: boolean
   dirty: boolean
-  saving: boolean
+  revision: number
+  saving: Promise<boolean> | null
   saveFailures: number
   saveTimer: NodeJS.Timeout | null
   destroyTimer: NodeJS.Timeout | null
@@ -112,7 +113,8 @@ function getOrCreateDoc(articleId: number): DocState {
     articleId,
     seeded: false,
     dirty: false,
-    saving: false,
+    revision: 0,
+    saving: null,
     saveFailures: 0,
     saveTimer: null,
     destroyTimer: null,
@@ -132,6 +134,7 @@ function getOrCreateDoc(articleId: number): DocState {
   })
 
   doc.on("update", (update: Uint8Array, origin: any) => {
+    newState.revision++
     const payload = encodeSyncMessage(update)
     newState.clients.forEach((_, ws) => {
       if (ws !== origin && ws.readyState === WebSocket.OPEN) {
@@ -194,20 +197,26 @@ function scheduleSave(state: DocState): void {
   }, SAVE_DEBOUNCE_MS)
 }
 
-async function persist(state: DocState): Promise<void> {
-  if (!state.dirty) return
-  if (state.saving) {
-    // A save is already in flight; make sure another one runs afterwards.
-    scheduleSave(state)
-    return
+async function persist(state: DocState): Promise<boolean> {
+  while (state.saving) {
+    if (!(await state.saving)) return false
   }
-  state.saving = true
+  if (!state.dirty) return true
+  state.saving = saveToBackend(state)
+  try {
+    return await state.saving
+  } finally {
+    state.saving = null
+  }
+}
+
+async function saveToBackend(state: DocState): Promise<boolean> {
   state.dirty = false
   try {
     const fragment = state.doc.getXmlFragment(FRAGMENT_KEY)
     if (fragment.length === 0) {
       // Never clobber a real article with an empty doc (e.g. failed seed).
-      return
+      return false
     }
     const content = yFragmentToMarkdown(fragment)
     saveDocToDisk(state)
@@ -223,15 +232,16 @@ async function persist(state: DocState): Promise<void> {
     if (!res.ok) {
       console.error(`[persist] article=${state.articleId} backend responded ${res.status}`)
       retryPersist(state)
+      return false
     } else {
       state.saveFailures = 0
       console.log(`[persist] article=${state.articleId} saved ${content.length} chars`)
+      return true
     }
   } catch (err) {
     console.error(`[persist] article=${state.articleId} error:`, err)
     retryPersist(state)
-  } finally {
-    state.saving = false
+    return false
   }
 }
 
@@ -246,16 +256,28 @@ function retryPersist(state: DocState): void {
   scheduleSave(state)
 }
 
-async function flush(state: DocState): Promise<void> {
+async function flush(state: DocState): Promise<boolean> {
   if (state.saveTimer) {
     clearTimeout(state.saveTimer)
     state.saveTimer = null
   }
-  if (state.dirty) {
-    await persist(state)
+  if (state.dirty || state.saving) {
+    return persist(state)
   } else {
     saveDocToDisk(state)
+    return true
   }
+}
+
+function scheduleIdleDestroy(state: DocState): void {
+  if (state.clients.size > 0) return
+  if (state.destroyTimer) clearTimeout(state.destroyTimer)
+  state.destroyTimer = setTimeout(() => {
+    if (state.clients.size === 0) {
+      states.delete(state.articleId)
+      state.doc.destroy()
+    }
+  }, DOC_TTL_MS)
 }
 
 // ── Message encoding helpers ──
@@ -400,6 +422,43 @@ async function reloadArticleContent(articleId: number, content: string | null): 
 }
 
 const server = http.createServer((req, res) => {
+  if (req.method === "POST" && req.url?.split("?")[0] === "/internal/task-state") {
+    if (req.headers.authorization !== `Bearer ${SERVICE_TOKEN}`) {
+      res.writeHead(403).end()
+      return
+    }
+    const params = new URLSearchParams(req.url.split("?")[1])
+    const articleId = Number(params.get("articleId"))
+    const taskId = params.get("taskId")
+    const checked = params.get("checked")
+    if (!Number.isSafeInteger(articleId) || articleId < 1 || !taskId || !/^\d+:\d+:\d+$/.test(taskId) ||
+      (checked !== "true" && checked !== "false")) {
+      res.writeHead(400).end()
+      return
+    }
+    const state = getOrCreateDoc(articleId)
+    void (async () => {
+      if (!state.seeded) await seedFromBackend(state)
+      const fragment = state.doc.getXmlFragment(FRAGMENT_KEY)
+      if (fragment.length === 0) {
+        res.writeHead(503).end()
+        return
+      }
+      const changed = state.doc.transact(() => setTaskState(fragment, taskId, checked === "true"), "shared-task")
+      if (!changed) {
+        res.writeHead(409).end()
+        return
+      }
+      // An idempotent retry must also wait for an earlier write to reach the database.
+      state.dirty = true
+      res.writeHead(await flush(state) ? 204 : 503).end()
+    })().catch((err) => {
+      console.error(`[task] article=${articleId} error:`, err)
+      res.writeHead(503).end()
+    }).finally(() => scheduleIdleDestroy(state))
+    return
+  }
+
   if (req.method === "POST" && req.url?.startsWith("/internal/reload-article")) {
     const authHeader = req.headers.authorization || ""
     if (authHeader !== `Bearer ${SERVICE_TOKEN}`) {
@@ -522,12 +581,7 @@ wss.on("connection", async (ws, req) => {
       console.log(`[ws] disconnect article=${articleId} clients=${docState.clients.size} code=${code} reason=${reason}`)
       if (docState.clients.size === 0) {
         void flush(docState)
-        docState.destroyTimer = setTimeout(() => {
-          if (docState && docState.clients.size === 0) {
-            states.delete(articleId)
-            docState.doc.destroy()
-          }
-        }, DOC_TTL_MS)
+        scheduleIdleDestroy(docState)
       }
     } else {
       console.log(`[ws] disconnect before auth article=${articleId} code=${code} reason=${reason}`)
@@ -620,9 +674,10 @@ wss.on("connection", async (ws, req) => {
     } else {
       await seedFromBackend(state)
     }
-  } else if (state.clients.size === 1) {
+  } else if (state.clients.size === 1 && !state.dirty && !state.saving) {
     // If state was already seeded (e.g. from disk snapshot) and this is the first client connecting,
     // verify against the backend in case content was updated externally via REST while collab-server was idle.
+    const revision = state.revision
     try {
       const res = await fetch(`${BACKEND_URL}/api/articles/${articleId}/content`, {
         headers: { Authorization: `Bearer ${SERVICE_TOKEN}` },
@@ -632,7 +687,7 @@ wss.on("connection", async (ws, req) => {
         const backendContent = data.content || ""
         const fragment = state.doc.getXmlFragment(FRAGMENT_KEY)
         const currentMarkdown = yFragmentToMarkdown(fragment)
-        if (fragment.length > 0 && currentMarkdown !== backendContent) {
+        if (state.revision === revision && fragment.length > 0 && currentMarkdown !== backendContent) {
           console.log(`[ws] article=${articleId} DB content differs from disk snapshot on connect, re-seeding (${backendContent.length} chars)`)
           state.doc.transact(() => {
             fragment.delete(0, fragment.length)

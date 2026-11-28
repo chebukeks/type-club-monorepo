@@ -3,6 +3,7 @@ import { config } from "../config";
 import { useAuth } from "../context/AuthContext";
 import { useEditor } from "../context/EditorContext";
 import { articlesApi } from "../api";
+import { PublicationFields, defaultPublication } from "@type-club/editor";
 
 interface PublishModalProps {
   onClose: () => void;
@@ -23,7 +24,7 @@ export function generateRandomSlug(): string {
 
 export function PublishModal({ onClose }: PublishModalProps) {
   const { user } = useAuth();
-  const { state, t } = useEditor();
+  const { state, t, fetchOnlineArticles } = useEditor();
   const username = user?.nickname || "username";
 
   const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId);
@@ -36,6 +37,7 @@ export function PublishModal({ onClose }: PublishModalProps) {
   const defaultFn = activeTab?.fileName?.replace(/\.md$/, "") || t('common.untitled');
   const [title, setTitle] = useState(isExisting ? defaultFn : defaultFn);
   const [accessState, setAccessState] = useState<string>("private");
+  const [publication, setPublication] = useState(defaultPublication);
   const [slug, setSlug] = useState(isExisting ? _slugify(defaultFn) : generateRandomSlug());
   const [copied, setCopied] = useState(false);
   const [status, setStatus] = useState<"idle" | "publishing" | "done" | "error">("idle");
@@ -70,6 +72,7 @@ export function PublishModal({ onClose }: PublishModalProps) {
         if (cancelled) return;
         setTitle(article.title);
         setAccessState(article.access_state);
+        setPublication(article.publication ?? defaultPublication);
         setSlug(article.slug);
       } catch {
         // Fallback to defaults
@@ -105,19 +108,19 @@ export function PublishModal({ onClose }: PublishModalProps) {
           content: articleContent,
           access_state: accessState,
           slug: finalSlug,
+          publication,
         });
       } else {
-        const res = await articlesApi.create({
+        await articlesApi.create({
           title: title.trim(),
           content: articleContent,
-          slug: finalSlug,
-        });
-        await articlesApi.update(res.id, {
           access_state: accessState,
           slug: finalSlug,
+          publication,
         });
       }
       setStatus("done");
+      if (state.sidebarMode === "online") void fetchOnlineArticles();
     } catch (err: any) {
       setErrorMsg(err.message || t('publish.publishFailed'));
       setStatus("error");
@@ -164,7 +167,7 @@ export function PublishModal({ onClose }: PublishModalProps) {
     <div className="modal-overlay" onMouseDown={handleOverlayMouseDown} onClick={handleOverlayClick}>
       <div
         className="modal-panel"
-        style={{ maxWidth: "430px" }}
+        style={{ maxWidth: "430px", maxHeight: "calc(100vh - 32px)", overflowY: "auto" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-header">
@@ -215,6 +218,8 @@ export function PublishModal({ onClose }: PublishModalProps) {
                 </button>
               ))}
             </div>
+
+            <PublicationFields value={publication} onChange={setPublication} disabled={status === "publishing"} t={t} />
 
             <div style={{ marginBottom: "20px" }}>
               <label className="modal-label">{t('publish.slug')}</label>

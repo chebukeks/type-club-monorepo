@@ -87,6 +87,26 @@ export interface ThemeTypography {
   lineHeightEditor: number;
 }
 
+export interface ThemeAppearance {
+  flatFrame?: boolean;
+  outlinedTabs?: boolean;
+  compactControls?: boolean;
+  compactTables?: boolean;
+  shadedSidebarHeader?: boolean;
+  outlinedBlocks?: boolean;
+  headingDividers?: boolean;
+  ruledPaper?: boolean;
+  ruleColor?: string;
+  ruleGap?: number;
+  spellingColor?: string;
+  taskColor?: string;
+  tabBackground?: string;
+  tabHover?: string;
+  tabBorder?: string;
+  tabActiveBackground?: string;
+  tabActiveBorder?: string;
+}
+
 /** Полная структура темы оформления */
 export interface AppTheme {
   id: string;
@@ -95,6 +115,7 @@ export interface AppTheme {
   baseTheme: 'dark' | 'light';
   colors: ThemeColors;
   backgrounds?: { editor?: string; panels?: string };
+  appearance?: ThemeAppearance;
   typography: ThemeTypography;
 }
 

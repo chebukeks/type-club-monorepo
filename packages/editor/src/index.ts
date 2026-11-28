@@ -75,3 +75,4 @@ export type { ParsedSuggestion, CreateSuggestionOptions } from "./editor/suggest
 
 export type { EditorMode, EditorProps, FocusMode, TocItem, SuggestionItem, CollaborationConfig } from "./types";
 export * from "./i18n";
+export { PublicationFields, defaultPublication, type PublicationOptions } from './PublicationFields'

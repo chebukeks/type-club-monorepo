@@ -1,19 +1,29 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { articlesApi, ArticleListItem } from "../api";
 import { useLanguage } from "../context/LanguageContext";
 import Pagination from "../components/Pagination";
 import SearchInput from "../components/SearchInput";
 import { useListQuery } from "../hooks/useListQuery";
-import { Trash2, Edit, Lightbulb } from "lucide-react";
+import { Trash2, Edit, Lightbulb, SlidersHorizontal } from "lucide-react";
 
 const PAGE_SIZE = 20;
 const ALL_ROLES = ["author", "co_author", "editor"] as const;
+const ALL_ACCESS = ["private", "link", "public", "blocked"] as const;
 type Role = (typeof ALL_ROLES)[number];
+type Access = (typeof ALL_ACCESS)[number];
 
-function parseRoles(param: string | null): Role[] {
-  if (param === null) return [...ALL_ROLES];
-  return ALL_ROLES.filter((r) => param.split(",").includes(r));
+function parseFilter<T extends string>(options: readonly T[], param: string | null): T[] {
+  if (param === null) return [...options];
+  const selected = new Set(param.split(","));
+  return options.filter((option) => selected.has(option));
+}
+
+function nextFilter<T extends string>(options: readonly T[], selected: T[], toggled: T): string | null {
+  const next = selected.includes(toggled)
+    ? selected.filter((option) => option !== toggled)
+    : [...selected, toggled];
+  return next.length === options.length ? null : next.join(",") || "none";
 }
 
 export default function MyArticles() {
@@ -21,29 +31,50 @@ export default function MyArticles() {
   const [articles, setArticles] = useState<ArticleListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filtersRef = useRef<HTMLDivElement>(null);
+  const filtersButtonRef = useRef<HTMLButtonElement>(null);
+  const requestRef = useRef(0);
 
   const roleLabels: Record<Role, string> = {
     author: t('role.author'),
     co_author: t('role.co_author'),
     editor: t('role.editor'),
   };
+  const accessLabels: Record<Access, string> = {
+    private: t('publish.private'),
+    link: t('publish.link'),
+    public: t('publish.public'),
+    blocked: t('publish.blocked'),
+  };
 
   const { searchParams, page, q, searchInput, setSearchInput, setPage, setParam } = useListQuery();
-  const selectedRoles = parseRoles(searchParams.get("roles"));
+  const selectedRoles = parseFilter(ALL_ROLES, searchParams.get("roles"));
+  const selectedAccess = parseFilter(ALL_ACCESS, searchParams.get("access"));
 
   const rolesKey = selectedRoles.join(",");
+  const accessKey = selectedAccess.join(",");
+  const filterCount = Number(selectedRoles.length < ALL_ROLES.length) + Number(selectedAccess.length < ALL_ACCESS.length);
 
   const fetchArticles = useCallback(() => {
+    const request = ++requestRef.current;
     setLoading(true);
     articlesApi
-      .myListPaged({ page, size: PAGE_SIZE, q, roles: rolesKey ? rolesKey.split(",") : [] })
+      .myListPaged({
+        page, size: PAGE_SIZE, q,
+        roles: rolesKey ? rolesKey.split(",") : [],
+        access: accessKey ? accessKey.split(",") : [],
+      })
       .then(({ items, total }) => {
+        if (request !== requestRef.current) return;
         setArticles(items);
         setTotal(total);
       })
       .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [page, q, rolesKey]);
+      .finally(() => {
+        if (request === requestRef.current) setLoading(false);
+      });
+  }, [page, q, rolesKey, accessKey]);
 
   useEffect(() => {
     fetchArticles();
@@ -56,14 +87,23 @@ export default function MyArticles() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, page, totalPages]);
 
-  const toggleRole = (role: Role) => {
-    const next = selectedRoles.includes(role)
-      ? selectedRoles.filter((r) => r !== role)
-      : [...selectedRoles, role];
-    if (next.length === ALL_ROLES.length) setParam("roles", null);
-    else if (next.length === 0) setParam("roles", "none");
-    else setParam("roles", next.join(","));
-  };
+  useEffect(() => {
+    if (!filtersOpen) return;
+    const dismiss = (event: PointerEvent) => {
+      if (!filtersRef.current?.contains(event.target as Node)) setFiltersOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setFiltersOpen(false);
+      filtersButtonRef.current?.focus();
+    };
+    document.addEventListener("pointerdown", dismiss);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", dismiss);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [filtersOpen]);
 
   const handleDelete = async (id: number) => {
     if (!confirm(t('articles.deleteConfirm'))) return;
@@ -71,7 +111,7 @@ export default function MyArticles() {
     fetchArticles();
   };
 
-  const hasFilters = Boolean(q) || selectedRoles.length < ALL_ROLES.length;
+  const hasFilters = Boolean(q) || filterCount > 0;
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -83,18 +123,43 @@ export default function MyArticles() {
       </div>
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
         <SearchInput value={searchInput} onChange={setSearchInput} placeholder={t('articles.searchPlaceholder')} />
-        <div className="flex items-center gap-4 shrink-0">
-          {ALL_ROLES.map((role) => (
-            <label key={role} className="flex items-center gap-1.5 text-sm cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={selectedRoles.includes(role)}
-                onChange={() => toggleRole(role)}
-                className="w-4 h-4 accent-blue-600 cursor-pointer"
-              />
-              {roleLabels[role]}
-            </label>
-          ))}
+        <div ref={filtersRef} className="relative shrink-0 self-end sm:self-auto">
+          <button
+            ref={filtersButtonRef}
+            type="button"
+            aria-expanded={filtersOpen}
+            aria-controls="my-articles-filters"
+            onClick={() => setFiltersOpen((open) => !open)}
+            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800"
+          >
+            <SlidersHorizontal size={15} />
+            {t('myArticles.filters')}
+            {filterCount > 0 && <span className="text-blue-600 dark:text-blue-400">{filterCount}</span>}
+          </button>
+          {filtersOpen && (
+            <div id="my-articles-filters" className="absolute right-0 top-full z-20 mt-2 w-64 space-y-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3 shadow-lg">
+              <fieldset>
+                <legend className="mb-1 text-sm font-semibold">{t('myArticles.filterRoles')}</legend>
+                {ALL_ROLES.map((role) => (
+                  <label key={role} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800">
+                    <input type="checkbox" className="accent-blue-600" checked={selectedRoles.includes(role)}
+                      onChange={() => setParam("roles", nextFilter(ALL_ROLES, selectedRoles, role))} />
+                    {roleLabels[role]}
+                  </label>
+                ))}
+              </fieldset>
+              <fieldset>
+                <legend className="mb-1 text-sm font-semibold">{t('myArticles.filterAccess')}</legend>
+                {ALL_ACCESS.map((access) => (
+                  <label key={access} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800">
+                    <input type="checkbox" className="accent-blue-600" checked={selectedAccess.includes(access)}
+                      onChange={() => setParam("access", nextFilter(ALL_ACCESS, selectedAccess, access))} />
+                    {accessLabels[access]}
+                  </label>
+                ))}
+              </fieldset>
+            </div>
+          )}
         </div>
       </div>
       {loading ? (
@@ -128,7 +193,7 @@ export default function MyArticles() {
                       <span>{new Date(a.updated_at).toLocaleDateString()}</span>
                       <span>·</span>
                       <span className="capitalize text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800">
-                        {a.access_state}
+                      {accessLabels[a.access_state as Access] ?? a.access_state}
                       </span>
                       {(a.my_roles ?? []).map((role) => (
                         <span key={role} className="text-xs px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950 text-blue-600">

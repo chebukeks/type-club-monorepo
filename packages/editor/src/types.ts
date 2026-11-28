@@ -30,7 +30,13 @@ export interface EditorProps {
   textZoom?: number
   documentZoom?: number
   readOnly?: boolean
+  nativeTextAssistance?: boolean
   onEditorView?: (view: EditorView) => void
+  onRawTextarea?: (textarea: HTMLTextAreaElement | null) => void
+  rawSearchMatch?: { from: number; to: number } | null
+  interactiveTasks?: boolean
+  taskProgressKey?: string
+  onSaveTask?: (id: string, checked: boolean) => Promise<void>
   className?: string
   focusMode?: FocusMode
   onTocUpdate?: (toc: TocItem[], suggestions?: SuggestionItem[]) => void
