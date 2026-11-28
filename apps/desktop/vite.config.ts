@@ -8,6 +8,7 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   server: {
     host: '127.0.0.1',
+    port: 5174,
     watch: {
       ignored: ['**/*.md', '**/*.txt', '**/tests/**', '**/release/**', '**/*.json'],
     },
